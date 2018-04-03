@@ -50,7 +50,8 @@ import Protolude  hiding (show, for)
 import Options.Generic
 import qualified Data.Vector.Sized as VS
 import Data.Finite
-import Data.Text (pack)
+import Data.Text   (pack)
+import Text.Printf (printf)
 \end{code}
 
 code
@@ -64,8 +65,9 @@ code
 ----------------------------------------------------------------------}
 
 data Opts w = Opts
-    { number :: w ::: Maybe Integer <?> "The number of games to play"
-    , rate   :: w ::: Maybe Double  <?> "The learning rate"
+    {
+    -- { number :: w ::: Maybe Integer <?> "The number of games to play"
+    -- , rate   :: w ::: Maybe Double  <?> "The learning rate"
     }
     deriving (Generic)
 
@@ -157,12 +159,13 @@ enumCell O     = 2
   Playing board state manipulation.
 ----------------------------------------------------------------------}
 
-playNTimes :: Integer -> Double -> Policy -> Policy -> [[BoardState]]
+playNTimes :: Integer -> Double -> Policy -> Policy -> [([BoardState], WinProbs)]
 playNTimes n r p p' = evalState (traverse nxt [1..n]) initProbs
  where nxt _ = do wps <- get
-                  let bss = play p p' wps
-                  put $ updateProbs r wps bss
-                  return bss
+                  let bs   = play p p' wps
+                      wps' = updateProbs r wps bs
+                  put wps'
+                  return (bs, wps')
 
 play :: Policy -> Policy -> WinProbs -> [BoardState]
 play p p' wps = unfoldr step initBoard
@@ -221,7 +224,7 @@ emptyCells bs =
 
 updateProbs :: Double -> WinProbs -> [BoardState] -> WinProbs
 updateProbs rate wps bss =
-  snd $ execState (traverse adj $ tail $ reverse bss) (endProb, wps)
+  snd $ execState (traverse adj $ tail $ reverse bss) (endProb, wps'')
  where adj bs = do (lastP, wps') <- get
                    let thisP = winProb wps' bs
                        newP  = thisP + (lastP - thisP)*rate
@@ -235,6 +238,7 @@ updateProbs rate wps bss =
                    None     -> 0.5
                    Opponent -> 0.0
                    Learner  -> 1.0
+       wps''   = wps VS.// [((fromIntegral . getFinite . stateToIndex . last) bss, endProb)]
 
 
 {----------------------------------------------------------------------
@@ -270,11 +274,14 @@ toBoth f (x1, x2) = (f x1, f x2)
 for :: (Functor f) => f a -> (a -> b) -> f b
 for = flip map
 
-showGame :: [BoardState] -> String
-showGame bss = unlines $
+showGame :: ([BoardState], WinProbs) -> String
+showGame (bss, wps) = unlines $
   "\\begin{array}{}" :
   ( intersperse "&" (map showBoard bss)
-  ) ++ ["\\end{array}"]
+    ++ [" \\\\ "]
+    ++ intersperse "&" (map (showProb wps) bss)
+    ++ ["\\end{array}"]
+  )
 
 showBoard :: BoardState -> String
 showBoard bs = unlines $
@@ -285,18 +292,39 @@ showBoard bs = unlines $
     )
   ) ++ ["\\end{array}"]
 
+showProb :: WinProbs -> BoardState -> String
+-- showProb wps bs = printf "%5.3f" $ wps `VS.index` $ stateToIndex bs
+showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
 
 {----------------------------------------------------------------------
   main()
 ----------------------------------------------------------------------}
 
+data RunDef = RunDef
+  { name  :: String
+  , polL  :: Policy   -- Learner's policy.
+  , polO  :: Policy   -- Opponent's policy.
+  , num   :: Integer  -- Number of games to play.
+  , lRate :: Double   -- Learning rate.
+  }
+
+runDefs =
+  [ RunDef "Dummy vs. Dummy"   dumb   dumb   2 0.1
+  , RunDef "Greedy vs. Dummy"  greedy dumb   2 0.1
+  , RunDef "Dummy vs. Greedy"  dumb   greedy 2 0.1
+  , RunDef "Greedy vs. Greedy" greedy greedy 5 0.1
+  ]
+
 main :: IO ()
 main = do
-    o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
-    let n   = fromMaybe 10  (number o)
-        r   = fromMaybe 0.1 (rate   o)
-        res = playNTimes n r greedy dumb
-    writeFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
+    -- o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
+    -- let n   = fromMaybe 10  (number o)
+    --     r   = fromMaybe 0.1 (rate   o)
+    writeFile  "other/tictactoe.md" "### Game Results:\n\n"
+    forM_ runDefs $ \ RunDef{..} ->
+      do let res = playNTimes num lRate polL polO
+         appendFile "other/tictactoe.md" $ pack name <> "\n\n"
+         appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
 \end{code}
 
 output
