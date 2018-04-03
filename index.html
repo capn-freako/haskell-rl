@@ -90,21 +90,15 @@ initProbs <span class="fu">=</span> pure <span class="fl">0.5</span>
  <span class="kw">deriving</span> (<span class="dt">Eq</span>)
 
 <span class="ot">winner ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Winner</span>
-winner bs <span class="fu">=</span>
-  <span class="kw">if</span> winnerX
-    <span class="kw">then</span> <span class="dt">Learner</span>
-    <span class="kw">else</span>
-      <span class="kw">if</span> winnerO
-        <span class="kw">then</span> <span class="dt">Opponent</span>
-        <span class="kw">else</span> <span class="dt">None</span>
+winner bs
+  <span class="fu">|</span> winnerX   <span class="fu">=</span> <span class="dt">Learner</span>
+  <span class="fu">|</span> winnerO   <span class="fu">=</span> <span class="dt">Opponent</span>
+  <span class="fu">|</span> otherwise <span class="fu">=</span> <span class="dt">None</span>
  <span class="kw">where</span> [winnerX, winnerO] <span class="fu">=</span>
          for [<span class="dt">X</span>, <span class="dt">O</span>]
              ( \ cs <span class="ot">-&gt;</span>
-                 ( or ( map (VS.any (VS.all (<span class="fu">==</span> cs)))
-                            [brd, sequenceA brd]
-                      )
-                   <span class="fu">||</span> (VS.any (VS.all (<span class="fu">==</span> cs))) (diagonals brd)
-                 )
+                 any (VS.any (VS.all (<span class="fu">==</span> cs))) [brd, sequenceA brd]
+                   <span class="fu">||</span> VS.any (VS.all (<span class="fu">==</span> cs))  (diagonals brd)
              )
        brd <span class="fu">=</span> cells bs
 
@@ -120,7 +114,7 @@ diagonals bs <span class="fu">=</span>
       ]
 
 <span class="ot">winProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span>
-winProb wps bs <span class="fu">=</span> wps <span class="ot">`VS.index`</span> (stateToIndex bs)
+winProb wps bs <span class="fu">=</span> wps <span class="ot">`VS.index`</span> stateToIndex bs
 
 <span class="ot">stateToIndex ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">19683</span>
 stateToIndex <span class="fu">=</span>
@@ -149,17 +143,17 @@ playNTimes n r p p&#39; <span class="fu">=</span> evalState (traverse nxt [<span
 <span class="ot">play ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>]
 play p p&#39; wps <span class="fu">=</span> unfoldr step initBoard
  <span class="kw">where</span><span class="ot"> step ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (<span class="dt">BoardState</span>, <span class="dt">BoardState</span>)
-       step bs <span class="fu">=</span> ( <span class="kw">let</span> pol <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs <span class="kw">then</span> p
-                                                  <span class="kw">else</span> p&#39;
-                       bs&#39; <span class="fu">=</span> move pol wps bs
-                    <span class="kw">in</span> <span class="kw">if</span> done bs
-                         <span class="kw">then</span> <span class="dt">Nothing</span>
-                         <span class="kw">else</span> <span class="dt">Just</span> (bs&#39;, bs&#39;)
-                 )
+       step bs <span class="fu">=</span> <span class="kw">let</span> pol <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
+                             <span class="kw">then</span> p
+                             <span class="kw">else</span> p&#39;
+                     bs&#39; <span class="fu">=</span> move pol wps bs
+                  <span class="kw">in</span> <span class="kw">if</span> done bs
+                       <span class="kw">then</span> <span class="dt">Nothing</span>
+                       <span class="kw">else</span> <span class="dt">Just</span> (bs&#39;, bs&#39;)
 
 <span class="ot">done ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span>
 done bs <span class="fu">=</span> winner bs <span class="fu">/=</span> <span class="dt">None</span>
-          <span class="fu">||</span> length (emptyCells bs) <span class="fu">==</span> <span class="dv">0</span>
+       <span class="fu">||</span> null (emptyCells bs)
 
 <span class="ot">move ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
 move p wps bs <span class="fu">=</span>
@@ -263,13 +257,14 @@ showGame (bss, wps) <span class="fu">=</span> unlines <span class="fu">$</span>
   )
 
 <span class="ot">showBoard ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
-showBoard bs <span class="fu">=</span> unlines <span class="fu">$</span>
+showBoard bs <span class="fu">=</span> unlines
   ( <span class="st">&quot;\\begin{array}{c|c|c}&quot;</span> <span class="fu">:</span>
-    ( intersperse <span class="st">&quot;\\hline&quot;</span> <span class="fu">$</span>
-        map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show <span class="fu">.</span> VS.toList)
+    intersperse <span class="st">&quot;\\hline&quot;</span>
+      ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show <span class="fu">.</span> VS.toList)
             (VS.toList (cells bs))
-    )
-  ) <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]
+      )
+    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]
+  )
 
 <span class="ot">showProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
 <span class="co">-- showProb wps bs = printf &quot;%5.3f&quot; $ wps `VS.index` $ stateToIndex bs</span>

@@ -111,21 +111,15 @@ data Winner = None
  deriving (Eq)
 
 winner :: BoardState -> Winner
-winner bs =
-  if winnerX
-    then Learner
-    else
-      if winnerO
-        then Opponent
-        else None
+winner bs
+  | winnerX   = Learner
+  | winnerO   = Opponent
+  | otherwise = None
  where [winnerX, winnerO] =
          for [X, O]
              ( \ cs ->
-                 ( or ( map (VS.any (VS.all (== cs)))
-                            [brd, sequenceA brd]
-                      )
-                   || (VS.any (VS.all (== cs))) (diagonals brd)
-                 )
+                 any (VS.any (VS.all (== cs))) [brd, sequenceA brd]
+                   || VS.any (VS.all (== cs))  (diagonals brd)
              )
        brd = cells bs
 
@@ -141,7 +135,7 @@ diagonals bs =
       ]
 
 winProb :: WinProbs -> BoardState -> Double
-winProb wps bs = wps `VS.index` (stateToIndex bs)
+winProb wps bs = wps `VS.index` stateToIndex bs
 
 stateToIndex :: BoardState -> Finite 19683
 stateToIndex =
@@ -170,17 +164,17 @@ playNTimes n r p p' = evalState (traverse nxt [1..n]) initProbs
 play :: Policy -> Policy -> WinProbs -> [BoardState]
 play p p' wps = unfoldr step initBoard
  where step :: BoardState -> Maybe (BoardState, BoardState)
-       step bs = ( let pol = if isLearnersTurn bs then p
-                                                  else p'
-                       bs' = move pol wps bs
-                    in if done bs
-                         then Nothing
-                         else Just (bs', bs')
-                 )
+       step bs = let pol = if isLearnersTurn bs
+                             then p
+                             else p'
+                     bs' = move pol wps bs
+                  in if done bs
+                       then Nothing
+                       else Just (bs', bs')
 
 done :: BoardState -> Bool
 done bs = winner bs /= None
-          || length (emptyCells bs) == 0
+       || null (emptyCells bs)
 
 move :: Policy -> WinProbs -> BoardState -> BoardState
 move p wps bs =
@@ -284,13 +278,14 @@ showGame (bss, wps) = unlines $
   )
 
 showBoard :: BoardState -> String
-showBoard bs = unlines $
+showBoard bs = unlines
   ( "\\begin{array}{c|c|c}" :
-    ( intersperse "\\hline" $
-        map ((++ " \\\\") . intercalate " & " . map show . VS.toList)
+    intersperse "\\hline"
+      ( map ((++ " \\\\") . intercalate " & " . map show . VS.toList)
             (VS.toList (cells bs))
-    )
-  ) ++ ["\\end{array}"]
+      )
+    ++ ["\\end{array}"]
+  )
 
 showProb :: WinProbs -> BoardState -> String
 -- showProb wps bs = printf "%5.3f" $ wps `VS.index` $ stateToIndex bs
