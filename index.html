@@ -2,10 +2,15 @@
 <script type="text/javascript" async
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
-<h1 id="haskell-rl">haskell-rl</h1>
+<h1 id="haskell-rl-tic-tac-toe-ex.-1">haskell-rl : Tic-Tac-Toe Ex. 1</h1>
+<p>This <a href="https://wiki.haskell.org/Literate_programming">literate Haskell</a> document provides solutions to some of the exercises at the end of Ch. 1 in <a href="http://incompleteideas.net/book/the-book-2nd.html">Reinforcement Learning: An Introduction</a>, by Sutton and Barto.</p>
+<p>Original author: <a href="mailto:capn.freako@gmail.com">David Banas</a><br />
+Original date: March 30, 2018</p>
+<p>Copyright © 2018 David Banas; all rights reserved World wide.</p>
 <h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
 <div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span>
-<span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></code></pre></div>
+<span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span>
+<span class="ot">{-# OPTIONS_GHC -Wno-missing-signatures #-}</span></code></pre></div>
 <h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
 <div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span>
 <span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span>
@@ -19,39 +24,351 @@
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/protolude">protolude</a></li>
 <li><a href="https://www.stackage.org/package/optparse-generic">optparse-generic</a></li>
+<li><a href="https://www.stackage.org/package/vector-sized">vector-sized</a></li>
+<li><a href="https://www.stackage.org/package/finite-typelits">finite-typelits</a></li>
 </ul>
-<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">import </span><span class="dt">Protolude</span>
-<span class="kw">import </span><span class="dt">Options.Generic</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">import </span><span class="dt">Prelude</span> (tail, last, unlines, <span class="dt">String</span>, <span class="dt">Show</span>(..))
+
+<span class="kw">import </span><span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for)
+<span class="kw">import </span><span class="dt">Options.Generic</span>
+<span class="kw">import qualified</span> <span class="dt">Data.Vector.Sized</span> <span class="kw">as</span> <span class="dt">VS</span>
+<span class="kw">import </span><span class="dt">Data.Finite</span>
+<span class="kw">import </span><span class="dt">Data.Text</span> (pack)</code></pre></div>
 <h2 id="code">code</h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
 </ul>
-<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span>
-    {<span class="ot"> number ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Integer</span> <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The number you want to product to&quot;</span>
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  Command line options defintions.</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span>
+    {<span class="ot"> number ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Integer</span> <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The number of games to play&quot;</span>
+    ,<span class="ot"> rate   ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Double</span>  <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The learning rate&quot;</span>
     }
     <span class="kw">deriving</span> (<span class="dt">Generic</span>)
 
 <span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)
 
+
+<span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  Playing board state definition.</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="kw">data</span> <span class="dt">CellState</span> <span class="fu">=</span> <span class="dt">Empty</span>
+               <span class="fu">|</span> <span class="dt">X</span>
+               <span class="fu">|</span> <span class="dt">O</span>
+ <span class="kw">deriving</span> (<span class="dt">Eq</span>)
+
+<span class="co">-- Note: Presumes that LaTeX is the final target.</span>
+<span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">CellState</span> <span class="kw">where</span>
+  show <span class="dt">Empty</span> <span class="fu">=</span> <span class="st">&quot;\\text{ }&quot;</span>
+  show <span class="dt">X</span>     <span class="fu">=</span> <span class="st">&quot;\\text{X}&quot;</span>
+  show <span class="dt">O</span>     <span class="fu">=</span> <span class="st">&quot;\\text{O}&quot;</span>
+
+<span class="kw">data</span> <span class="dt">BoardState</span> <span class="fu">=</span> <span class="dt">BoardState</span>
+  {<span class="ot"> cells          ::</span> <span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
+  ,<span class="ot"> isLearnersTurn ::</span> <span class="dt">Bool</span>
+  }
+
+<span class="ot">initBoard ::</span> <span class="dt">BoardState</span>
+initBoard <span class="fu">=</span> <span class="dt">BoardState</span>
+  { cells          <span class="fu">=</span> VS.replicate (VS.replicate <span class="dt">Empty</span>)
+  , isLearnersTurn <span class="fu">=</span> <span class="dt">True</span>
+  }
+
+<span class="kw">type</span> <span class="dt">WinProbs</span> <span class="fu">=</span> <span class="dt">VS.Vector</span> <span class="dv">19683</span> <span class="dt">Double</span>  <span class="co">-- 3^9</span>
+
+<span class="ot">initProbs ::</span> <span class="dt">WinProbs</span>
+initProbs <span class="fu">=</span> pure <span class="fl">0.5</span>
+
+<span class="kw">data</span> <span class="dt">Winner</span> <span class="fu">=</span> <span class="dt">None</span>
+            <span class="fu">|</span> <span class="dt">Opponent</span>
+            <span class="fu">|</span> <span class="dt">Learner</span>
+ <span class="kw">deriving</span> (<span class="dt">Eq</span>)
+
+<span class="ot">winner ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Winner</span>
+winner bs <span class="fu">=</span>
+  <span class="kw">if</span> winnerX
+    <span class="kw">then</span> <span class="dt">Learner</span>
+    <span class="kw">else</span>
+      <span class="kw">if</span> winnerO
+        <span class="kw">then</span> <span class="dt">Opponent</span>
+        <span class="kw">else</span> <span class="dt">None</span>
+ <span class="kw">where</span> [winnerX, winnerO] <span class="fu">=</span>
+         for [<span class="dt">X</span>, <span class="dt">O</span>]
+             ( \ cs <span class="ot">-&gt;</span>
+                 ( or ( map (VS.any (VS.all (<span class="fu">==</span> cs)))
+                            [brd, sequenceA brd]
+                      )
+                   <span class="fu">||</span> (VS.any (VS.all (<span class="fu">==</span> cs))) (diagonals brd)
+                 )
+             )
+       brd <span class="fu">=</span> cells bs
+
+<span class="ot">diagonals ::</span> <span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
+          <span class="ot">-&gt;</span> <span class="dt">VS.Vector</span> <span class="dv">2</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
+diagonals bs <span class="fu">=</span>
+  fromMaybe (VS.replicate (VS.replicate <span class="dt">Empty</span>)) <span class="fu">$</span>
+    VS.fromList
+      [ fromMaybe (VS.replicate <span class="dt">Empty</span>) <span class="fu">$</span>
+          VS.fromList [bs <span class="ot">`VS.index`</span> n <span class="ot">`VS.index`</span> n     <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]]
+      , fromMaybe (VS.replicate <span class="dt">Empty</span>) <span class="fu">$</span>
+          VS.fromList [bs <span class="ot">`VS.index`</span> n <span class="ot">`VS.index`</span> (<span class="dv">2</span><span class="fu">-</span>n) <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]]
+      ]
+
+<span class="ot">winProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span>
+winProb wps bs <span class="fu">=</span> wps <span class="ot">`VS.index`</span> (stateToIndex bs)
+
+<span class="ot">stateToIndex ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">19683</span>
+stateToIndex <span class="fu">=</span>
+  finite 
+  <span class="fu">.</span> foldl&#39; (\ acc <span class="ot">-&gt;</span> (acc <span class="fu">*</span> <span class="dv">3</span> <span class="fu">+</span>) <span class="fu">.</span> enumCell) <span class="dv">0</span>
+  <span class="fu">.</span> concatMap VS.toList <span class="fu">.</span> VS.toList <span class="fu">.</span> cells
+
+<span class="ot">enumCell ::</span> <span class="dt">CellState</span> <span class="ot">-&gt;</span> <span class="dt">Integer</span>
+enumCell <span class="dt">Empty</span> <span class="fu">=</span> <span class="dv">0</span>
+enumCell <span class="dt">X</span>     <span class="fu">=</span> <span class="dv">1</span>
+enumCell <span class="dt">O</span>     <span class="fu">=</span> <span class="dv">2</span>
+
+
+<span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  Playing board state manipulation.</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="ot">playNTimes ::</span> <span class="dt">Integer</span> <span class="ot">-&gt;</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> [[<span class="dt">BoardState</span>]]
+playNTimes n r p p&#39; <span class="fu">=</span> evalState (traverse nxt [<span class="dv">1</span><span class="fu">..</span>n]) initProbs
+ <span class="kw">where</span> nxt _ <span class="fu">=</span> <span class="kw">do</span> wps <span class="ot">&lt;-</span> get
+                  <span class="kw">let</span> bss <span class="fu">=</span> play p p&#39; wps
+                  put <span class="fu">$</span> updateProbs r wps bss
+                  return bss
+
+<span class="ot">play ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>]
+play p p&#39; wps <span class="fu">=</span> unfoldr step initBoard
+ <span class="kw">where</span><span class="ot"> step ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (<span class="dt">BoardState</span>, <span class="dt">BoardState</span>)
+       step bs <span class="fu">=</span> ( <span class="kw">let</span> pol <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs <span class="kw">then</span> p
+                                                  <span class="kw">else</span> p&#39;
+                       bs&#39; <span class="fu">=</span> move pol wps bs
+                    <span class="kw">in</span> <span class="kw">if</span> done bs
+                         <span class="kw">then</span> <span class="dt">Nothing</span>
+                         <span class="kw">else</span> <span class="dt">Just</span> (bs&#39;, bs&#39;)
+                 )
+
+<span class="ot">done ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span>
+done bs <span class="fu">=</span> winner bs <span class="fu">/=</span> <span class="dt">None</span>
+          <span class="fu">||</span> length (emptyCells bs) <span class="fu">==</span> <span class="dv">0</span>
+
+<span class="ot">move ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
+move p wps bs <span class="fu">=</span>
+  <span class="kw">if</span> done bs
+    <span class="kw">then</span> bs
+    <span class="kw">else</span> getPolicy p wps bs
+
+<span class="ot">nextPossibleStates ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>]
+nextPossibleStates bs <span class="fu">=</span>
+  map changeTurn
+      [ setCell cs (i,j) bs
+      <span class="fu">|</span> (i,j) <span class="ot">&lt;-</span> emptyCells bs
+      ]
+ <span class="kw">where</span> cs <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
+              <span class="kw">then</span> <span class="dt">X</span>
+              <span class="kw">else</span> <span class="dt">O</span>
+
+<span class="ot">changeTurn ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
+changeTurn <span class="dt">BoardState</span>{<span class="fu">..</span>} <span class="fu">=</span>
+  <span class="dt">BoardState</span>
+    { cells <span class="fu">=</span> cells
+    , isLearnersTurn <span class="fu">=</span> not isLearnersTurn
+    }
+
+<span class="ot">setCell ::</span> <span class="dt">CellState</span> <span class="ot">-&gt;</span> (<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>) <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
+setCell cs (i,j) <span class="dt">BoardState</span>{<span class="fu">..</span>} <span class="fu">=</span>
+  <span class="dt">BoardState</span>
+    { cells <span class="fu">=</span> cells <span class="fu">VS.//</span> [(i&#39;, cells <span class="ot">`VS.index`</span> i <span class="fu">VS.//</span> [(j&#39;, cs)])]
+    , isLearnersTurn <span class="fu">=</span> isLearnersTurn
+    }
+ <span class="kw">where</span> i&#39; <span class="fu">=</span> fromInteger <span class="fu">$</span> getFinite i
+       j&#39; <span class="fu">=</span> fromInteger <span class="fu">$</span> getFinite j
+
+<span class="ot">emptyCells ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [(<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>)]
+emptyCells bs <span class="fu">=</span>
+  [ (i,j)
+  <span class="fu">|</span> i <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
+  , j <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
+  , cells bs <span class="ot">`VS.index`</span> i <span class="ot">`VS.index`</span> j <span class="fu">==</span> <span class="dt">Empty</span>
+  ]
+
+<span class="ot">updateProbs ::</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>] <span class="ot">-&gt;</span> <span class="dt">WinProbs</span>
+updateProbs rate wps bss <span class="fu">=</span>
+  snd <span class="fu">$</span> execState (traverse adj <span class="fu">$</span> tail <span class="fu">$</span> reverse bss) (endProb, wps)
+ <span class="kw">where</span> adj bs <span class="fu">=</span> <span class="kw">do</span> (lastP, wps&#39;) <span class="ot">&lt;-</span> get
+                   <span class="kw">let</span> thisP <span class="fu">=</span> winProb wps&#39; bs
+                       newP  <span class="fu">=</span> thisP <span class="fu">+</span> (lastP <span class="fu">-</span> thisP)<span class="fu">*</span>rate
+                   put ( newP
+                       , wps&#39; <span class="fu">VS.//</span> [( (fromInteger <span class="fu">.</span> getFinite <span class="fu">.</span> stateToIndex) bs
+                                     , newP
+                                     )]
+                       )
+                   return ()
+       endProb <span class="fu">=</span> <span class="kw">case</span> winner (last bss) <span class="kw">of</span>
+                   <span class="dt">None</span>     <span class="ot">-&gt;</span> <span class="fl">0.5</span>
+                   <span class="dt">Opponent</span> <span class="ot">-&gt;</span> <span class="fl">0.0</span>
+                   <span class="dt">Learner</span>  <span class="ot">-&gt;</span> <span class="fl">1.0</span>
+
+
+<span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  Policy definitions.</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="kw">newtype</span> <span class="dt">Policy</span> <span class="fu">=</span> <span class="dt">Policy</span> {<span class="ot">getPolicy ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>}
+
+dumb <span class="fu">=</span>
+  <span class="dt">Policy</span> ( \ _ bs <span class="ot">-&gt;</span>
+             (fromMaybe initBoard <span class="fu">.</span> head <span class="fu">.</span> nextPossibleStates) bs
+         )
+
+greedy <span class="fu">=</span>
+  <span class="dt">Policy</span> ( \ wps bs <span class="ot">-&gt;</span>
+             <span class="kw">let</span> stateToProb <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
+                                 <span class="kw">then</span>         winProb wps
+                                 <span class="kw">else</span> (<span class="dv">1</span> <span class="fu">-</span>) <span class="fu">.</span> winProb wps
+              <span class="kw">in</span> maximumBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))
+                             (uncurry compare)
+                             (curry (toBoth stateToProb))
+                           ) (nextPossibleStates bs)
+         )
+
+
+<span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  Misc.</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="ot">toBoth ::</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> (a,a) <span class="ot">-&gt;</span> (b,b)
+toBoth f (x1, x2) <span class="fu">=</span> (f x1, f x2)
+
+<span class="ot">for ::</span> (<span class="dt">Functor</span> f) <span class="ot">=&gt;</span> f a <span class="ot">-&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> f b
+for <span class="fu">=</span> flip map
+
+<span class="ot">showGame ::</span> [<span class="dt">BoardState</span>] <span class="ot">-&gt;</span> <span class="dt">String</span>
+showGame bss <span class="fu">=</span> unlines <span class="fu">$</span>
+  <span class="st">&quot;\\begin{array}{}&quot;</span> <span class="fu">:</span>
+  ( intersperse <span class="st">&quot;&amp;&quot;</span> (map showBoard bss)
+  ) <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]
+
+<span class="ot">showBoard ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
+showBoard bs <span class="fu">=</span> unlines <span class="fu">$</span>
+  ( <span class="st">&quot;\\begin{array}{c|c|c}&quot;</span> <span class="fu">:</span>
+    ( intersperse <span class="st">&quot;\\hline&quot;</span> <span class="fu">$</span>
+        map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show <span class="fu">.</span> VS.toList)
+            (VS.toList (cells bs))
+    )
+  ) <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]
+
+
+<span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  main()</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
 <span class="ot">main ::</span> <span class="dt">IO</span> ()
 main <span class="fu">=</span> <span class="kw">do</span>
-<span class="ot">    o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span> unwrapRecord <span class="st">&quot;an example app for readme-lhs&quot;</span>
-    <span class="kw">let</span> n <span class="fu">=</span> fromMaybe <span class="dv">10</span> (number o)
-    <span class="kw">let</span> answer <span class="fu">=</span> product [<span class="dv">1</span><span class="fu">..</span>n]
-    putStrLn (show answer <span class="fu">&lt;&gt;</span> <span class="st">&quot; 👍&quot;</span><span class="ot"> ::</span> <span class="dt">Text</span>)
-    writeFile <span class="st">&quot;other/answer.md&quot;</span>
-        (<span class="st">&quot;$\\prod_{i=1}^{&quot;</span> <span class="fu">&lt;&gt;</span> show n <span class="fu">&lt;&gt;</span> <span class="st">&quot;} i = &quot;</span> <span class="fu">&lt;&gt;</span>
-         show answer <span class="fu">&lt;&gt;</span> <span class="st">&quot;$&quot;</span>)</code></pre></div>
+<span class="ot">    o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span> unwrapRecord <span class="st">&quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span>
+    <span class="kw">let</span> n   <span class="fu">=</span> fromMaybe <span class="dv">10</span>  (number o)
+        r   <span class="fu">=</span> fromMaybe <span class="fl">0.1</span> (rate   o)
+        res <span class="fu">=</span> playNTimes n r greedy dumb
+    writeFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res</code></pre></div>
 <h2 id="output">output</h2>
-<p><span class="math inline">\(\prod_{i=1}^{10} i = 3628800\)</span></p>
-<h2 id="tests">tests</h2>
-<ul class="incremental">
-<li><a href="https://www.stackage.org/package/doctest">doctest</a></li>
-</ul>
-<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="co">-- | doctests</span>
-<span class="co">-- &gt;&gt;&gt; let n = 10</span>
-<span class="co">-- &gt;&gt;&gt; product [1..n]</span>
-<span class="co">-- 3628800</span></code></pre></div>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+\end{array}\]</span>
 <hr />
 <div class="footer">
 <p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>

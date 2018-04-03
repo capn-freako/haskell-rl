@@ -125,6 +125,60 @@ executable haskell-rl-example
     TypeFamilies,
     TypeOperators
 
+executable tic-tac-toe
+  default-language:
+    Haskell2010
+  ghc-options:
+    -funbox-strict-fields
+    -fforce-recomp
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+  hs-source-dirs:
+    app
+  main-is:
+    tictactoe.lhs
+  build-depends:
+    base >= 4.7 && < 5,
+    protolude,
+    optparse-generic,
+    vector-sized,
+    finite-typelits,
+    text
+  default-extensions:
+    NoImplicitPrelude,
+    UnicodeSyntax,
+    BangPatterns,
+    BinaryLiterals,
+    DeriveFoldable,
+    DeriveFunctor,
+    DeriveGeneric,
+    DeriveTraversable,
+    DisambiguateRecordFields,
+    EmptyCase,
+    FlexibleContexts,
+    FlexibleInstances,
+    FunctionalDependencies,
+    GADTSyntax,
+    InstanceSigs,
+    KindSignatures,
+    LambdaCase,
+    MonadComprehensions,
+    MultiParamTypeClasses,
+    MultiWayIf,
+    NegativeLiterals,
+    OverloadedStrings,
+    ParallelListComp,
+    PartialTypeSignatures,
+    PatternSynonyms,
+    RankNTypes,
+    RecordWildCards,
+    RecursiveDo,
+    ScopedTypeVariables,
+    TupleSections,
+    TypeFamilies,
+    TypeOperators
+
 test-suite test
   default-language:
     Haskell2010
