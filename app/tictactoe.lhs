@@ -103,7 +103,15 @@ initBoard = BoardState
 type WinProbs = VS.Vector 19683 Double  -- 3^9
 
 initProbs :: WinProbs
-initProbs = pure 0.5
+initProbs = pure 0.5 VS.//
+  [ ((fromIntegral . getFinite . stateToIndex) bs, winnerToProb w)
+  | bs <- allStates
+  , let w = winner bs
+  , w /= None
+  ]
+
+allStates :: [BoardState]
+allStates = [indexToState (finite ix) | ix <- [0..19682]]
 
 data Winner = None
             | Opponent
@@ -122,6 +130,11 @@ winner bs
                    || VS.any (VS.all (== cs))  (diagonals brd)
              )
        brd = cells bs
+
+winnerToProb :: Winner -> Double
+winnerToProb Learner  = 1.0
+winnerToProb Opponent = 0.0
+winnerToProb _        = 0.5
 
 diagonals :: VS.Vector 3 (VS.Vector 3 CellState)
           -> VS.Vector 2 (VS.Vector 3 CellState)
@@ -147,6 +160,29 @@ enumCell :: CellState -> Integer
 enumCell Empty = 0
 enumCell X     = 1
 enumCell O     = 2
+
+indexToState :: Finite 19683 -> BoardState
+indexToState n = BoardState brd $ length (emptyCells' brd) `mod` 2 == 1
+ where brd   = fromMaybe ( VS.replicate (VS.replicate Empty) )
+                         ( VS.fromList
+                             [ fromMaybe (VS.replicate Empty)
+                                         (VS.fromList  xs)
+                             | xs <- [ take 3 $ drop (3*m) cls
+                                     | m <- [0..2]
+                                     ]
+                             ]
+                         )
+       cls   = evalState (traverse nxt [0..8]) $ getFinite n
+       nxt _ = do acc <- get
+                  let cl = indCell $ finite $ acc `mod` 3
+                  put $ acc `div` 3
+                  return cl
+
+indCell :: Finite 3 -> CellState
+indCell n = case (getFinite n) of
+  1 -> X
+  2 -> O
+  _ -> Empty
 
 
 {----------------------------------------------------------------------
@@ -209,16 +245,20 @@ setCell cs (i,j) BoardState{..} =
        j' = fromInteger $ getFinite j
 
 emptyCells :: BoardState -> [(Finite 3, Finite 3)]
-emptyCells bs =
+emptyCells bs = emptyCells' $ cells bs
+
+emptyCells' :: VS.Vector 3 (VS.Vector 3 CellState) -> [(Finite 3, Finite 3)]
+emptyCells' brd =
   [ (i,j)
   | i <- [0..2]
   , j <- [0..2]
-  , cells bs `VS.index` i `VS.index` j == Empty
+  , brd `VS.index` i `VS.index` j == Empty
   ]
 
 updateProbs :: Double -> WinProbs -> [BoardState] -> WinProbs
 updateProbs rate wps bss =
-  snd $ execState (traverse adj $ tail $ reverse bss) (endProb, wps'')
+  snd $ execState (traverse adj $ tail $ reverse bss)
+                  (winProb wps (last bss), wps)
  where adj bs = do (lastP, wps') <- get
                    let thisP = winProb wps' bs
                        newP  = thisP + (lastP - thisP)*rate
@@ -228,11 +268,6 @@ updateProbs rate wps bss =
                                      )]
                        )
                    return ()
-       endProb = case winner (last bss) of
-                   None     -> 0.5
-                   Opponent -> 0.0
-                   Learner  -> 1.0
-       wps''   = wps VS.// [((fromIntegral . getFinite . stateToIndex . last) bss, endProb)]
 
 
 {----------------------------------------------------------------------
@@ -241,10 +276,9 @@ updateProbs rate wps bss =
 
 newtype Policy = Policy {getPolicy :: WinProbs -> BoardState -> BoardState}
 
-dumb =
-  Policy ( \ _ bs ->
-             (fromMaybe initBoard . head . nextPossibleStates) bs
-         )
+dumb = Policy (const (fromMaybe initBoard . head . nextPossibleStates))
+
+rand = Policy (const (fromMaybe initBoard . head . nextPossibleStates))
 
 greedy =
   Policy ( \ wps bs ->

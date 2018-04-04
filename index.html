@@ -82,7 +82,15 @@ initBoard <span class="fu">=</span> <span class="dt">BoardState</span>
 <span class="kw">type</span> <span class="dt">WinProbs</span> <span class="fu">=</span> <span class="dt">VS.Vector</span> <span class="dv">19683</span> <span class="dt">Double</span>  <span class="co">-- 3^9</span>
 
 <span class="ot">initProbs ::</span> <span class="dt">WinProbs</span>
-initProbs <span class="fu">=</span> pure <span class="fl">0.5</span>
+initProbs <span class="fu">=</span> pure <span class="fl">0.5</span> <span class="fu">VS.//</span>
+  [ ((fromIntegral <span class="fu">.</span> getFinite <span class="fu">.</span> stateToIndex) bs, winnerToProb w)
+  <span class="fu">|</span> bs <span class="ot">&lt;-</span> allStates
+  , <span class="kw">let</span> w <span class="fu">=</span> winner bs
+  , w <span class="fu">/=</span> <span class="dt">None</span>
+  ]
+
+<span class="ot">allStates ::</span> [<span class="dt">BoardState</span>]
+allStates <span class="fu">=</span> [indexToState (finite ix) <span class="fu">|</span> ix <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">19682</span>]]
 
 <span class="kw">data</span> <span class="dt">Winner</span> <span class="fu">=</span> <span class="dt">None</span>
             <span class="fu">|</span> <span class="dt">Opponent</span>
@@ -101,6 +109,11 @@ winner bs
                    <span class="fu">||</span> VS.any (VS.all (<span class="fu">==</span> cs))  (diagonals brd)
              )
        brd <span class="fu">=</span> cells bs
+
+<span class="ot">winnerToProb ::</span> <span class="dt">Winner</span> <span class="ot">-&gt;</span> <span class="dt">Double</span>
+winnerToProb <span class="dt">Learner</span>  <span class="fu">=</span> <span class="fl">1.0</span>
+winnerToProb <span class="dt">Opponent</span> <span class="fu">=</span> <span class="fl">0.0</span>
+winnerToProb _        <span class="fu">=</span> <span class="fl">0.5</span>
 
 <span class="ot">diagonals ::</span> <span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
           <span class="ot">-&gt;</span> <span class="dt">VS.Vector</span> <span class="dv">2</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
@@ -126,6 +139,29 @@ stateToIndex <span class="fu">=</span>
 enumCell <span class="dt">Empty</span> <span class="fu">=</span> <span class="dv">0</span>
 enumCell <span class="dt">X</span>     <span class="fu">=</span> <span class="dv">1</span>
 enumCell <span class="dt">O</span>     <span class="fu">=</span> <span class="dv">2</span>
+
+<span class="ot">indexToState ::</span> <span class="dt">Finite</span> <span class="dv">19683</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
+indexToState n <span class="fu">=</span> <span class="dt">BoardState</span> brd <span class="fu">$</span> length (emptyCells&#39; brd) <span class="ot">`mod`</span> <span class="dv">2</span> <span class="fu">==</span> <span class="dv">1</span>
+ <span class="kw">where</span> brd   <span class="fu">=</span> fromMaybe ( VS.replicate (VS.replicate <span class="dt">Empty</span>) )
+                         ( VS.fromList
+                             [ fromMaybe (VS.replicate <span class="dt">Empty</span>)
+                                         (VS.fromList  xs)
+                             <span class="fu">|</span> xs <span class="ot">&lt;-</span> [ take <span class="dv">3</span> <span class="fu">$</span> drop (<span class="dv">3</span><span class="fu">*</span>m) cls
+                                     <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
+                                     ]
+                             ]
+                         )
+       cls   <span class="fu">=</span> evalState (traverse nxt [<span class="dv">0</span><span class="fu">..</span><span class="dv">8</span>]) <span class="fu">$</span> getFinite n
+       nxt _ <span class="fu">=</span> <span class="kw">do</span> acc <span class="ot">&lt;-</span> get
+                  <span class="kw">let</span> cl <span class="fu">=</span> indCell <span class="fu">$</span> finite <span class="fu">$</span> acc <span class="ot">`mod`</span> <span class="dv">3</span>
+                  put <span class="fu">$</span> acc <span class="ot">`div`</span> <span class="dv">3</span>
+                  return cl
+
+<span class="ot">indCell ::</span> <span class="dt">Finite</span> <span class="dv">3</span> <span class="ot">-&gt;</span> <span class="dt">CellState</span>
+indCell n <span class="fu">=</span> <span class="kw">case</span> (getFinite n) <span class="kw">of</span>
+  <span class="dv">1</span> <span class="ot">-&gt;</span> <span class="dt">X</span>
+  <span class="dv">2</span> <span class="ot">-&gt;</span> <span class="dt">O</span>
+  _ <span class="ot">-&gt;</span> <span class="dt">Empty</span>
 
 
 <span class="co">{----------------------------------------------------------------------</span>
@@ -188,16 +224,20 @@ setCell cs (i,j) <span class="dt">BoardState</span>{<span class="fu">..</span>} 
        j&#39; <span class="fu">=</span> fromInteger <span class="fu">$</span> getFinite j
 
 <span class="ot">emptyCells ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [(<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>)]
-emptyCells bs <span class="fu">=</span>
+emptyCells bs <span class="fu">=</span> emptyCells&#39; <span class="fu">$</span> cells bs
+
+<span class="ot">emptyCells&#39; ::</span> <span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>) <span class="ot">-&gt;</span> [(<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>)]
+emptyCells&#39; brd <span class="fu">=</span>
   [ (i,j)
   <span class="fu">|</span> i <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
   , j <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
-  , cells bs <span class="ot">`VS.index`</span> i <span class="ot">`VS.index`</span> j <span class="fu">==</span> <span class="dt">Empty</span>
+  , brd <span class="ot">`VS.index`</span> i <span class="ot">`VS.index`</span> j <span class="fu">==</span> <span class="dt">Empty</span>
   ]
 
 <span class="ot">updateProbs ::</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>] <span class="ot">-&gt;</span> <span class="dt">WinProbs</span>
 updateProbs rate wps bss <span class="fu">=</span>
-  snd <span class="fu">$</span> execState (traverse adj <span class="fu">$</span> tail <span class="fu">$</span> reverse bss) (endProb, wps&#39;&#39;)
+  snd <span class="fu">$</span> execState (traverse adj <span class="fu">$</span> tail <span class="fu">$</span> reverse bss)
+                  (winProb wps (last bss), wps)
  <span class="kw">where</span> adj bs <span class="fu">=</span> <span class="kw">do</span> (lastP, wps&#39;) <span class="ot">&lt;-</span> get
                    <span class="kw">let</span> thisP <span class="fu">=</span> winProb wps&#39; bs
                        newP  <span class="fu">=</span> thisP <span class="fu">+</span> (lastP <span class="fu">-</span> thisP)<span class="fu">*</span>rate
@@ -207,11 +247,6 @@ updateProbs rate wps bss <span class="fu">=</span>
                                      )]
                        )
                    return ()
-       endProb <span class="fu">=</span> <span class="kw">case</span> winner (last bss) <span class="kw">of</span>
-                   <span class="dt">None</span>     <span class="ot">-&gt;</span> <span class="fl">0.5</span>
-                   <span class="dt">Opponent</span> <span class="ot">-&gt;</span> <span class="fl">0.0</span>
-                   <span class="dt">Learner</span>  <span class="ot">-&gt;</span> <span class="fl">1.0</span>
-       wps&#39;&#39;   <span class="fu">=</span> wps <span class="fu">VS.//</span> [((fromIntegral <span class="fu">.</span> getFinite <span class="fu">.</span> stateToIndex <span class="fu">.</span> last) bss, endProb)]
 
 
 <span class="co">{----------------------------------------------------------------------</span>
@@ -220,10 +255,10 @@ updateProbs rate wps bss <span class="fu">=</span>
 
 <span class="kw">newtype</span> <span class="dt">Policy</span> <span class="fu">=</span> <span class="dt">Policy</span> {<span class="ot">getPolicy ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>}
 
-dumb <span class="fu">=</span>
-  <span class="dt">Policy</span> ( \ _ bs <span class="ot">-&gt;</span>
-             (fromMaybe initBoard <span class="fu">.</span> head <span class="fu">.</span> nextPossibleStates) bs
-         )
+dumb <span class="fu">=</span> <span class="dt">Policy</span> (const (fromMaybe initBoard <span class="fu">.</span> head <span class="fu">.</span> nextPossibleStates))
+  <span class="co">-- Policy ( \ _ bs -&gt;</span>
+  <span class="co">--            (fromMaybe initBoard . head . nextPossibleStates) bs</span>
+  <span class="co">--        )</span>
 
 greedy <span class="fu">=</span>
   <span class="dt">Policy</span> ( \ wps bs <span class="ot">-&gt;</span>
@@ -819,25 +854,7 @@ main <span class="fu">=</span> <span class="kw">do</span>
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
@@ -845,10 +862,6 @@ main <span class="fu">=</span> <span class="kw">do</span>
 \end{array}
 
  \\ 
-0.500
-&amp;
-0.500
-&amp;
 0.500
 &amp;
 0.500
@@ -966,18 +979,9 @@ main <span class="fu">=</span> <span class="kw">do</span>
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{O} &amp; \text{X} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{X} \\
 \end{array}
@@ -989,13 +993,11 @@ main <span class="fu">=</span> <span class="kw">do</span>
 &amp;
 0.500
 &amp;
-0.500
+0.495
 &amp;
-0.505
+0.450
 &amp;
-0.550
-&amp;
-1.000
+0.000
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
@@ -1010,7 +1012,7 @@ main <span class="fu">=</span> <span class="kw">do</span>
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
@@ -1019,63 +1021,36 @@ main <span class="fu">=</span> <span class="kw">do</span>
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
  \\ 
@@ -1085,17 +1060,11 @@ main <span class="fu">=</span> <span class="kw">do</span>
 &amp;
 0.500
 &amp;
-0.500
+0.495
 &amp;
-0.500
+0.450
 &amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
+0.000
 \end{array}\]</span>
 <hr />
 <div class="footer">
