@@ -144,7 +144,9 @@ executable tic-tac-toe
     optparse-generic,
     vector-sized,
     finite-typelits,
-    text
+    text,
+    QuickCheck,
+    monad-extras
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,

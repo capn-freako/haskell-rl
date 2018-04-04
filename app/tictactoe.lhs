@@ -48,10 +48,14 @@ import Prelude (tail, last, unlines, String, Show(..))
 
 import Protolude  hiding (show, for)
 import Options.Generic
+
 import qualified Data.Vector.Sized as VS
+
+import Control.Monad.Extra  (unfoldM)
 import Data.Finite
-import Data.Text   (pack)
-import Text.Printf (printf)
+import Data.Text            (pack)
+import Text.Printf          (printf)
+import Test.QuickCheck      (generate, elements)
 \end{code}
 
 code
@@ -99,6 +103,10 @@ initBoard = BoardState
   { cells          = VS.replicate (VS.replicate Empty)
   , isLearnersTurn = True
   }
+
+done :: BoardState -> Bool
+done bs = winner bs /= None
+       || null (emptyCells bs)
 
 type WinProbs = VS.Vector 19683 Double  -- 3^9
 
@@ -186,37 +194,8 @@ indCell n = case (getFinite n) of
 
 
 {----------------------------------------------------------------------
-  Playing board state manipulation.
+  Playing board state manipulation (pure).
 ----------------------------------------------------------------------}
-
-playNTimes :: Integer -> Double -> Policy -> Policy -> [([BoardState], WinProbs)]
-playNTimes n r p p' = evalState (traverse nxt [1..n]) initProbs
- where nxt _ = do wps <- get
-                  let bs   = play p p' wps
-                      wps' = updateProbs r wps bs
-                  put wps'
-                  return (bs, wps')
-
-play :: Policy -> Policy -> WinProbs -> [BoardState]
-play p p' wps = unfoldr step initBoard
- where step :: BoardState -> Maybe (BoardState, BoardState)
-       step bs = let pol = if isLearnersTurn bs
-                             then p
-                             else p'
-                     bs' = move pol wps bs
-                  in if done bs
-                       then Nothing
-                       else Just (bs', bs')
-
-done :: BoardState -> Bool
-done bs = winner bs /= None
-       || null (emptyCells bs)
-
-move :: Policy -> WinProbs -> BoardState -> BoardState
-move p wps bs =
-  if done bs
-    then bs
-    else getPolicy p wps bs
 
 nextPossibleStates :: BoardState -> [BoardState]
 nextPossibleStates bs =
@@ -274,22 +253,111 @@ updateProbs rate wps bss =
   Policy definitions.
 ----------------------------------------------------------------------}
 
-newtype Policy = Policy {getPolicy :: WinProbs -> BoardState -> BoardState}
+newtype Policy m =
+  Policy { getPolicy :: Monad m => WinProbs
+                                -> BoardState
+                                -> m BoardState }
 
-dumb = Policy (const (fromMaybe initBoard . head . nextPossibleStates))
+dumb = Policy ( const ( return
+                      . fromMaybe initBoard
+                      . head
+                      . nextPossibleStates
+                      )
+              )
 
-rand = Policy (const (fromMaybe initBoard . head . nextPossibleStates))
+-- rand = Policy ( const ( \ bs ->
+--                           randItem $ nextPossibleStates bs
+--                       )
+--               )
+rand = Policy (const (randItem . nextPossibleStates))
 
 greedy =
   Policy ( \ wps bs ->
-             let stateToProb = if isLearnersTurn bs
-                                 then         winProb wps
-                                 else (1 -) . winProb wps
-              in maximumBy ( ((.) . (.))
-                             (uncurry compare)
-                             (curry (toBoth stateToProb))
-                           ) (nextPossibleStates bs)
+             do let stateToProb = if isLearnersTurn bs
+                                    then         winProb wps
+                                    else (1 -) . winProb wps
+                return $ maximumBy ( ((.) . (.))
+                                     (uncurry compare)
+                                     (curry (toBoth stateToProb))
+                                   ) (nextPossibleStates bs)
          )
+
+
+{----------------------------------------------------------------------
+  Playing board state manipulation (monadic).
+----------------------------------------------------------------------}
+
+playNTimes :: Monad m
+           => Integer   -- Number of games to play.
+           -> Double    -- Learning rate.
+           -> Policy m  -- Learner's policy.
+           -> Policy m  -- Opponent's policy.
+           -> m [([BoardState], WinProbs)]
+playNTimes n r p p' = evalStateT (traverse nxt [1..n]) initProbs
+ where nxt _ = do wps <- get
+                  bs  <- play p p' wps
+                  let wps' = updateProbs r wps bs
+                  put wps'
+                  return (bs, wps')
+
+play :: Monad m
+     => Policy m  -- Learner's policy.
+     -> Policy m  -- Opponent's policy.
+     -> WinProbs  -- Probabilities of Learner winning.
+     -> m [BoardState]
+play p p' wps = unfoldM step initBoard
+ -- where step :: BoardState -> m (Maybe (BoardState, BoardState))
+ where step bs = do let pol = if isLearnersTurn bs
+                                then p
+                                else p'
+                    -- bs' <- move pol wps bs
+                    let bs' = initBoard
+                    return $ if done bs
+                               then Nothing
+                               else Just (bs', bs')
+
+-- unfoldM :: Monad m => (s -> m (Maybe (a, s))) -> s -> m [a]
+
+move :: Monad m
+     => Policy m    -- Policy to use.
+     -> WinProbs    -- Probabilities of Learner winning.
+     -> BoardState  -- Board state before move.
+     -> m BoardState
+move p wps bs =
+  if done bs
+    then return bs
+    else getPolicy p wps bs
+
+
+{----------------------------------------------------------------------
+  main()
+----------------------------------------------------------------------}
+
+data RunDef = RunDef
+  { name  :: String
+  , polL  :: Policy IO  -- Learner's policy.
+  , polO  :: Policy IO  -- Opponent's policy.
+  , num   :: Integer    -- Number of games to play.
+  , lRate :: Double     -- Learning rate.
+  }
+
+runDefs =
+  [ RunDef "Dummy vs. Dummy"   dumb   dumb   2 0.1
+  , RunDef "Greedy vs. Dummy"  greedy dumb   2 0.1
+  , RunDef "Dummy vs. Greedy"  dumb   greedy 2 0.1
+  , RunDef "Greedy vs. Greedy" greedy greedy 5 0.1
+  ]
+
+main :: IO ()
+main = do
+    -- o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
+    -- let n   = fromMaybe 10  (number o)
+    --     r   = fromMaybe 0.1 (rate   o)
+    writeFile  "other/tictactoe.md" "### Game Results:\n\n"
+    forM_ runDefs $ \ RunDef{..} ->
+      do res <- playNTimes num lRate polL polO
+         appendFile "other/tictactoe.md" $ pack name <> "\n\n"
+         appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
 
 
 {----------------------------------------------------------------------
@@ -325,35 +393,8 @@ showProb :: WinProbs -> BoardState -> String
 -- showProb wps bs = printf "%5.3f" $ wps `VS.index` $ stateToIndex bs
 showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
 
-{----------------------------------------------------------------------
-  main()
-----------------------------------------------------------------------}
-
-data RunDef = RunDef
-  { name  :: String
-  , polL  :: Policy   -- Learner's policy.
-  , polO  :: Policy   -- Opponent's policy.
-  , num   :: Integer  -- Number of games to play.
-  , lRate :: Double   -- Learning rate.
-  }
-
-runDefs =
-  [ RunDef "Dummy vs. Dummy"   dumb   dumb   2 0.1
-  , RunDef "Greedy vs. Dummy"  greedy dumb   2 0.1
-  , RunDef "Dummy vs. Greedy"  dumb   greedy 2 0.1
-  , RunDef "Greedy vs. Greedy" greedy greedy 5 0.1
-  ]
-
-main :: IO ()
-main = do
-    -- o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
-    -- let n   = fromMaybe 10  (number o)
-    --     r   = fromMaybe 0.1 (rate   o)
-    writeFile  "other/tictactoe.md" "### Game Results:\n\n"
-    forM_ runDefs $ \ RunDef{..} ->
-      do let res = playNTimes num lRate polL polO
-         appendFile "other/tictactoe.md" $ pack name <> "\n\n"
-         appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
+randItem :: [a] -> IO a
+randItem = generate . elements
 \end{code}
 
 output
