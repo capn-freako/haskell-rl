@@ -31,10 +31,14 @@ Original date: March 30, 2018</p>
 
 <span class="kw">import </span><span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for)
 <span class="kw">import </span><span class="dt">Options.Generic</span>
+
 <span class="kw">import qualified</span> <span class="dt">Data.Vector.Sized</span> <span class="kw">as</span> <span class="dt">VS</span>
+
+<span class="kw">import </span><span class="dt">Control.Monad.Extra</span>  (unfoldM)
 <span class="kw">import </span><span class="dt">Data.Finite</span>
-<span class="kw">import </span><span class="dt">Data.Text</span>   (pack)
-<span class="kw">import </span><span class="dt">Text.Printf</span> (printf)</code></pre></div>
+<span class="kw">import </span><span class="dt">Data.Text</span>            (pack)
+<span class="kw">import </span><span class="dt">Text.Printf</span>          (printf)
+<span class="kw">import </span><span class="dt">Test.QuickCheck</span>      (generate, elements)</code></pre></div>
 <h2 id="code">code</h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
@@ -78,6 +82,10 @@ initBoard <span class="fu">=</span> <span class="dt">BoardState</span>
   { cells          <span class="fu">=</span> VS.replicate (VS.replicate <span class="dt">Empty</span>)
   , isLearnersTurn <span class="fu">=</span> <span class="dt">True</span>
   }
+
+<span class="ot">done ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span>
+done bs <span class="fu">=</span> winner bs <span class="fu">/=</span> <span class="dt">None</span>
+       <span class="fu">||</span> null (emptyCells bs)
 
 <span class="kw">type</span> <span class="dt">WinProbs</span> <span class="fu">=</span> <span class="dt">VS.Vector</span> <span class="dv">19683</span> <span class="dt">Double</span>  <span class="co">-- 3^9</span>
 
@@ -158,44 +166,15 @@ indexToState n <span class="fu">=</span> <span class="dt">BoardState</span> brd 
                   return cl
 
 <span class="ot">indCell ::</span> <span class="dt">Finite</span> <span class="dv">3</span> <span class="ot">-&gt;</span> <span class="dt">CellState</span>
-indCell n <span class="fu">=</span> <span class="kw">case</span> (getFinite n) <span class="kw">of</span>
+indCell n <span class="fu">=</span> <span class="kw">case</span> getFinite n <span class="kw">of</span>
   <span class="dv">1</span> <span class="ot">-&gt;</span> <span class="dt">X</span>
   <span class="dv">2</span> <span class="ot">-&gt;</span> <span class="dt">O</span>
   _ <span class="ot">-&gt;</span> <span class="dt">Empty</span>
 
 
 <span class="co">{----------------------------------------------------------------------</span>
-<span class="co">  Playing board state manipulation.</span>
+<span class="co">  Playing board state manipulation (pure).</span>
 <span class="co">----------------------------------------------------------------------}</span>
-
-<span class="ot">playNTimes ::</span> <span class="dt">Integer</span> <span class="ot">-&gt;</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> [([<span class="dt">BoardState</span>], <span class="dt">WinProbs</span>)]
-playNTimes n r p p&#39; <span class="fu">=</span> evalState (traverse nxt [<span class="dv">1</span><span class="fu">..</span>n]) initProbs
- <span class="kw">where</span> nxt _ <span class="fu">=</span> <span class="kw">do</span> wps <span class="ot">&lt;-</span> get
-                  <span class="kw">let</span> bs   <span class="fu">=</span> play p p&#39; wps
-                      wps&#39; <span class="fu">=</span> updateProbs r wps bs
-                  put wps&#39;
-                  return (bs, wps&#39;)
-
-<span class="ot">play ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>]
-play p p&#39; wps <span class="fu">=</span> unfoldr step initBoard
- <span class="kw">where</span><span class="ot"> step ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (<span class="dt">BoardState</span>, <span class="dt">BoardState</span>)
-       step bs <span class="fu">=</span> <span class="kw">let</span> pol <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
-                             <span class="kw">then</span> p
-                             <span class="kw">else</span> p&#39;
-                     bs&#39; <span class="fu">=</span> move pol wps bs
-                  <span class="kw">in</span> <span class="kw">if</span> done bs
-                       <span class="kw">then</span> <span class="dt">Nothing</span>
-                       <span class="kw">else</span> <span class="dt">Just</span> (bs&#39;, bs&#39;)
-
-<span class="ot">done ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span>
-done bs <span class="fu">=</span> winner bs <span class="fu">/=</span> <span class="dt">None</span>
-       <span class="fu">||</span> null (emptyCells bs)
-
-<span class="ot">move ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
-move p wps bs <span class="fu">=</span>
-  <span class="kw">if</span> done bs
-    <span class="kw">then</span> bs
-    <span class="kw">else</span> getPolicy p wps bs
 
 <span class="ot">nextPossibleStates ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>]
 nextPossibleStates bs <span class="fu">=</span>
@@ -250,25 +229,106 @@ updateProbs rate wps bss <span class="fu">=</span>
 
 
 <span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  Playing board state manipulation (monadic).</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="ot">playNTimes ::</span> <span class="dt">Monad</span> m
+           <span class="ot">=&gt;</span> <span class="dt">Integer</span>   <span class="co">-- Number of games to play.</span>
+           <span class="ot">-&gt;</span> <span class="dt">Double</span>    <span class="co">-- Learning rate.</span>
+           <span class="ot">-&gt;</span> <span class="dt">Policy</span> m  <span class="co">-- Learner&#39;s policy.</span>
+           <span class="ot">-&gt;</span> <span class="dt">Policy</span> m  <span class="co">-- Opponent&#39;s policy.</span>
+           <span class="ot">-&gt;</span> m [([<span class="dt">BoardState</span>], <span class="dt">WinProbs</span>)]
+playNTimes n r p p&#39; <span class="fu">=</span> evalStateT (traverse nxt [<span class="dv">1</span><span class="fu">..</span>n]) initProbs
+ <span class="kw">where</span> nxt _ <span class="fu">=</span> <span class="kw">do</span> wps <span class="ot">&lt;-</span> get
+                  bs  <span class="ot">&lt;-</span> lift <span class="fu">$</span> play p p&#39; wps
+                  <span class="kw">let</span> wps&#39; <span class="fu">=</span> updateProbs r wps bs
+                  put wps&#39;
+                  return (bs, wps&#39;)
+
+<span class="ot">play ::</span> <span class="dt">Monad</span> m
+     <span class="ot">=&gt;</span> <span class="dt">Policy</span> m  <span class="co">-- Learner&#39;s policy.</span>
+     <span class="ot">-&gt;</span> <span class="dt">Policy</span> m  <span class="co">-- Opponent&#39;s policy.</span>
+     <span class="ot">-&gt;</span> <span class="dt">WinProbs</span>  <span class="co">-- Probabilities of Learner winning.</span>
+     <span class="ot">-&gt;</span> m [<span class="dt">BoardState</span>]
+play p p&#39; wps <span class="fu">=</span> unfoldM step initBoard
+ <span class="kw">where</span> step bs <span class="fu">=</span> <span class="kw">do</span> <span class="kw">let</span> pol <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
+                                <span class="kw">then</span> p
+                                <span class="kw">else</span> p&#39;
+                    bs&#39; <span class="ot">&lt;-</span> move pol wps bs
+                    return <span class="fu">$</span> <span class="kw">if</span> done bs
+                               <span class="kw">then</span> <span class="dt">Nothing</span>
+                               <span class="kw">else</span> <span class="dt">Just</span> (bs&#39;, bs&#39;)
+
+<span class="ot">move ::</span> <span class="dt">Monad</span> m
+     <span class="ot">=&gt;</span> <span class="dt">Policy</span> m    <span class="co">-- Policy to use.</span>
+     <span class="ot">-&gt;</span> <span class="dt">WinProbs</span>    <span class="co">-- Probabilities of Learner winning.</span>
+     <span class="ot">-&gt;</span> <span class="dt">BoardState</span>  <span class="co">-- Board state before move.</span>
+     <span class="ot">-&gt;</span> m <span class="dt">BoardState</span>
+move p wps bs <span class="fu">=</span>
+  <span class="kw">if</span> done bs
+    <span class="kw">then</span> return bs
+    <span class="kw">else</span> getPolicy p wps bs
+
+
+<span class="co">{----------------------------------------------------------------------</span>
+<span class="co">  main()</span>
+<span class="co">----------------------------------------------------------------------}</span>
+
+<span class="kw">data</span> <span class="dt">RunDef</span> <span class="fu">=</span> <span class="dt">RunDef</span>
+  {<span class="ot"> name  ::</span> <span class="dt">String</span>
+  ,<span class="ot"> polL  ::</span> <span class="dt">Policy</span> <span class="dt">IO</span>  <span class="co">-- Learner&#39;s policy.</span>
+  ,<span class="ot"> polO  ::</span> <span class="dt">Policy</span> <span class="dt">IO</span>  <span class="co">-- Opponent&#39;s policy.</span>
+  ,<span class="ot"> num   ::</span> <span class="dt">Integer</span>    <span class="co">-- Number of games to play.</span>
+  ,<span class="ot"> lRate ::</span> <span class="dt">Double</span>     <span class="co">-- Learning rate.</span>
+  }
+
+runDefs <span class="fu">=</span>
+  [ <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Dummy&quot;</span>   dumb   dumb   <span class="dv">2</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Dummy&quot;</span>  greedy dumb   <span class="dv">2</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Greedy&quot;</span>  dumb   greedy <span class="dv">2</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Greedy&quot;</span> greedy greedy <span class="dv">5</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span> greedy rand   <span class="dv">5</span> <span class="fl">0.1</span>
+  ]
+
+<span class="ot">main ::</span> <span class="dt">IO</span> ()
+main <span class="fu">=</span> <span class="kw">do</span>
+    <span class="co">-- o :: Opts Unwrapped &lt;- unwrapRecord &quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span>
+    <span class="co">-- let n   = fromMaybe 10  (number o)</span>
+    <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span>
+    writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results:\n\n&quot;</span>
+    forM_ runDefs <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
+      <span class="kw">do</span> res <span class="ot">&lt;-</span> playNTimes num lRate polL polO
+         appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> pack name <span class="fu">&lt;&gt;</span> <span class="st">&quot;\n\n&quot;</span>
+         appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res
+
+
+<span class="co">{----------------------------------------------------------------------</span>
 <span class="co">  Policy definitions.</span>
 <span class="co">----------------------------------------------------------------------}</span>
 
-<span class="kw">newtype</span> <span class="dt">Policy</span> <span class="fu">=</span> <span class="dt">Policy</span> {<span class="ot">getPolicy ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>}
+<span class="kw">newtype</span> <span class="dt">Policy</span> m <span class="fu">=</span>
+  <span class="dt">Policy</span> {<span class="ot"> getPolicy ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> <span class="dt">WinProbs</span>
+                                <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
+                                <span class="ot">-&gt;</span> m <span class="dt">BoardState</span> }
 
-dumb <span class="fu">=</span> <span class="dt">Policy</span> (const (fromMaybe initBoard <span class="fu">.</span> head <span class="fu">.</span> nextPossibleStates))
-  <span class="co">-- Policy ( \ _ bs -&gt;</span>
-  <span class="co">--            (fromMaybe initBoard . head . nextPossibleStates) bs</span>
-  <span class="co">--        )</span>
+dumb <span class="fu">=</span> <span class="dt">Policy</span> ( const ( return
+                      <span class="fu">.</span> fromMaybe initBoard
+                      <span class="fu">.</span> head
+                      <span class="fu">.</span> nextPossibleStates
+                      )
+              )
+
+rand <span class="fu">=</span> <span class="dt">Policy</span> (const (randItem <span class="fu">.</span> nextPossibleStates))
 
 greedy <span class="fu">=</span>
   <span class="dt">Policy</span> ( \ wps bs <span class="ot">-&gt;</span>
-             <span class="kw">let</span> stateToProb <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
-                                 <span class="kw">then</span>         winProb wps
-                                 <span class="kw">else</span> (<span class="dv">1</span> <span class="fu">-</span>) <span class="fu">.</span> winProb wps
-              <span class="kw">in</span> maximumBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))
-                             (uncurry compare)
-                             (curry (toBoth stateToProb))
-                           ) (nextPossibleStates bs)
+             <span class="kw">do</span> <span class="kw">let</span> stateToProb <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
+                                    <span class="kw">then</span>         winProb wps
+                                    <span class="kw">else</span> (<span class="dv">1</span> <span class="fu">-</span>) <span class="fu">.</span> winProb wps
+                return <span class="fu">$</span> maximumBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))
+                                     (uncurry compare)
+                                     (curry (toBoth stateToProb))
+                                   ) (nextPossibleStates bs)
          )
 
 
@@ -302,38 +362,10 @@ showBoard bs <span class="fu">=</span> unlines
   )
 
 <span class="ot">showProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
-<span class="co">-- showProb wps bs = printf &quot;%5.3f&quot; $ wps `VS.index` $ stateToIndex bs</span>
 showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;</span> <span class="fu">.</span> VS.index wps <span class="fu">.</span> stateToIndex
 
-<span class="co">{----------------------------------------------------------------------</span>
-<span class="co">  main()</span>
-<span class="co">----------------------------------------------------------------------}</span>
-
-<span class="kw">data</span> <span class="dt">RunDef</span> <span class="fu">=</span> <span class="dt">RunDef</span>
-  {<span class="ot"> name  ::</span> <span class="dt">String</span>
-  ,<span class="ot"> polL  ::</span> <span class="dt">Policy</span>   <span class="co">-- Learner&#39;s policy.</span>
-  ,<span class="ot"> polO  ::</span> <span class="dt">Policy</span>   <span class="co">-- Opponent&#39;s policy.</span>
-  ,<span class="ot"> num   ::</span> <span class="dt">Integer</span>  <span class="co">-- Number of games to play.</span>
-  ,<span class="ot"> lRate ::</span> <span class="dt">Double</span>   <span class="co">-- Learning rate.</span>
-  }
-
-runDefs <span class="fu">=</span>
-  [ <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Dummy&quot;</span>   dumb   dumb   <span class="dv">2</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Dummy&quot;</span>  greedy dumb   <span class="dv">2</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Greedy&quot;</span>  dumb   greedy <span class="dv">2</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Greedy&quot;</span> greedy greedy <span class="dv">5</span> <span class="fl">0.1</span>
-  ]
-
-<span class="ot">main ::</span> <span class="dt">IO</span> ()
-main <span class="fu">=</span> <span class="kw">do</span>
-    <span class="co">-- o :: Opts Unwrapped &lt;- unwrapRecord &quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span>
-    <span class="co">-- let n   = fromMaybe 10  (number o)</span>
-    <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span>
-    writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results:\n\n&quot;</span>
-    forM_ runDefs <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
-      <span class="kw">do</span> <span class="kw">let</span> res <span class="fu">=</span> playNTimes num lRate polL polO
-         appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> pack name <span class="fu">&lt;&gt;</span> <span class="st">&quot;\n\n&quot;</span>
-         appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res</code></pre></div>
+<span class="ot">randItem ::</span> [a] <span class="ot">-&gt;</span> <span class="dt">IO</span> a
+randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="game-results">Game Results:</h3>
 <p>Dummy vs. Dummy</p>
@@ -1065,6 +1097,309 @@ main <span class="fu">=</span> <span class="kw">do</span>
 0.450
 &amp;
 0.000
+\end{array}\]</span>
+<p>Greedy vs. Random</p>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
 \end{array}\]</span>
 <hr />
 <div class="footer">

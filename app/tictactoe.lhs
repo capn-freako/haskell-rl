@@ -187,7 +187,7 @@ indexToState n = BoardState brd $ length (emptyCells' brd) `mod` 2 == 1
                   return cl
 
 indCell :: Finite 3 -> CellState
-indCell n = case (getFinite n) of
+indCell n = case getFinite n of
   1 -> X
   2 -> O
   _ -> Empty
@@ -250,40 +250,6 @@ updateProbs rate wps bss =
 
 
 {----------------------------------------------------------------------
-  Policy definitions.
-----------------------------------------------------------------------}
-
-newtype Policy m =
-  Policy { getPolicy :: Monad m => WinProbs
-                                -> BoardState
-                                -> m BoardState }
-
-dumb = Policy ( const ( return
-                      . fromMaybe initBoard
-                      . head
-                      . nextPossibleStates
-                      )
-              )
-
--- rand = Policy ( const ( \ bs ->
---                           randItem $ nextPossibleStates bs
---                       )
---               )
-rand = Policy (const (randItem . nextPossibleStates))
-
-greedy =
-  Policy ( \ wps bs ->
-             do let stateToProb = if isLearnersTurn bs
-                                    then         winProb wps
-                                    else (1 -) . winProb wps
-                return $ maximumBy ( ((.) . (.))
-                                     (uncurry compare)
-                                     (curry (toBoth stateToProb))
-                                   ) (nextPossibleStates bs)
-         )
-
-
-{----------------------------------------------------------------------
   Playing board state manipulation (monadic).
 ----------------------------------------------------------------------}
 
@@ -295,7 +261,7 @@ playNTimes :: Monad m
            -> m [([BoardState], WinProbs)]
 playNTimes n r p p' = evalStateT (traverse nxt [1..n]) initProbs
  where nxt _ = do wps <- get
-                  bs  <- play p p' wps
+                  bs  <- lift $ play p p' wps
                   let wps' = updateProbs r wps bs
                   put wps'
                   return (bs, wps')
@@ -306,17 +272,13 @@ play :: Monad m
      -> WinProbs  -- Probabilities of Learner winning.
      -> m [BoardState]
 play p p' wps = unfoldM step initBoard
- -- where step :: BoardState -> m (Maybe (BoardState, BoardState))
  where step bs = do let pol = if isLearnersTurn bs
                                 then p
                                 else p'
-                    -- bs' <- move pol wps bs
-                    let bs' = initBoard
+                    bs' <- move pol wps bs
                     return $ if done bs
                                then Nothing
                                else Just (bs', bs')
-
--- unfoldM :: Monad m => (s -> m (Maybe (a, s))) -> s -> m [a]
 
 move :: Monad m
      => Policy m    -- Policy to use.
@@ -346,6 +308,7 @@ runDefs =
   , RunDef "Greedy vs. Dummy"  greedy dumb   2 0.1
   , RunDef "Dummy vs. Greedy"  dumb   greedy 2 0.1
   , RunDef "Greedy vs. Greedy" greedy greedy 5 0.1
+  , RunDef "Greedy vs. Random" greedy rand   5 0.1
   ]
 
 main :: IO ()
@@ -358,6 +321,36 @@ main = do
       do res <- playNTimes num lRate polL polO
          appendFile "other/tictactoe.md" $ pack name <> "\n\n"
          appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
+
+
+{----------------------------------------------------------------------
+  Policy definitions.
+----------------------------------------------------------------------}
+
+newtype Policy m =
+  Policy { getPolicy :: Monad m => WinProbs
+                                -> BoardState
+                                -> m BoardState }
+
+dumb = Policy ( const ( return
+                      . fromMaybe initBoard
+                      . head
+                      . nextPossibleStates
+                      )
+              )
+
+rand = Policy (const (randItem . nextPossibleStates))
+
+greedy =
+  Policy ( \ wps bs ->
+             do let stateToProb = if isLearnersTurn bs
+                                    then         winProb wps
+                                    else (1 -) . winProb wps
+                return $ maximumBy ( ((.) . (.))
+                                     (uncurry compare)
+                                     (curry (toBoth stateToProb))
+                                   ) (nextPossibleStates bs)
+         )
 
 
 {----------------------------------------------------------------------
@@ -390,7 +383,6 @@ showBoard bs = unlines
   )
 
 showProb :: WinProbs -> BoardState -> String
--- showProb wps bs = printf "%5.3f" $ wps `VS.index` $ stateToIndex bs
 showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
 
 randItem :: [a] -> IO a
