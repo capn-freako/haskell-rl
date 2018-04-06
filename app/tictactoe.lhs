@@ -44,6 +44,7 @@ Copyright &copy; 2018 David Banas; all rights reserved World wide.
 - [finite-typelits](https://www.stackage.org/package/finite-typelits)
 
 \begin{code}
+import qualified Prelude as P
 import Prelude (tail, last, unlines, String, Show(..))
 
 import Protolude  hiding (show, for)
@@ -51,12 +52,14 @@ import Options.Generic
 
 import qualified Data.Vector.Sized as VS
 
-import Control.Arrow        ((&&&))
-import Control.Monad.Extra  (unfoldM)
+import Control.Arrow              ((&&&))
+import Control.Monad.Extra        (unfoldM)
 import Data.Finite
-import Data.Text            (pack)
-import Text.Printf          (printf)
-import Test.QuickCheck      (generate, elements)
+import Data.Text                  (pack)
+import System.Random              (randomIO)
+import System.Random.Shuffle      (shuffleM)
+import Text.Printf                (printf)
+-- import Test.QuickCheck            (generate, elements)
 \end{code}
 
 code
@@ -196,15 +199,16 @@ indCell n = case getFinite n of
   Playing board state manipulation (pure).
 ----------------------------------------------------------------------}
 
+nxtMrk :: BoardState -> CellState
+nxtMrk BoardState{..} = if isLearnersTurn then X
+                                          else O
+
 nextPossibleStates :: BoardState -> [BoardState]
 nextPossibleStates bs =
   map changeTurn
-      [ setCell cs (i,j) bs
+      [ setCell (nxtMrk bs) (i,j) bs
       | (i,j) <- emptyCells bs
       ]
- where cs = if isLearnersTurn bs
-              then X
-              else O
 
 changeTurn :: BoardState -> BoardState
 changeTurn BoardState{..} =
@@ -222,6 +226,12 @@ setCell cs (i,j) BoardState{..} =
  where i' = fromInteger $ getFinite i
        j' = fromInteger $ getFinite j
 
+getCell :: (Finite 3, Finite 3) -> BoardState -> CellState
+getCell (i,j) BoardState{..} = cells `VS.index` i `VS.index` j
+
+chooseCell :: (Finite 3, Finite 3) -> BoardState -> BoardState
+chooseCell (i,j) bs = (changeTurn . setCell (nxtMrk bs) (i,j)) bs
+
 emptyCells :: BoardState -> [(Finite 3, Finite 3)]
 emptyCells bs = emptyCells' $ cells bs
 
@@ -231,6 +241,14 @@ emptyCells' brd =
   | i <- [0..2]
   , j <- [0..2]
   , brd `VS.index` i `VS.index` j == Empty
+  ]
+
+diffCells :: BoardState -> BoardState -> [(Finite 3, Finite 3)]
+diffCells bs bs' =
+  [ (i,j)
+  | i <- [0..2]
+  , j <- [0..2]
+  , ((/=) `on` getCell (i,j))  bs bs'
   ]
 
 updateProbs :: Double -> WinProbs -> [BoardState] -> WinProbs
@@ -287,7 +305,10 @@ move :: Monad m
 move p wps bs =
   if done bs
     then return bs
-    else getPolicy p wps bs
+    else do bss <- getPolicy p wps bs
+            return $ if null bss
+                       then bs
+                       else P.head bss
 
 
 {----------------------------------------------------------------------
@@ -303,11 +324,13 @@ data RunDef = RunDef
   }
 
 runDefs =
-  [ RunDef "Dummy vs. Dummy"   dumb   dumb   2 0.1
-  , RunDef "Greedy vs. Dummy"  greedy dumb   2 0.1
-  , RunDef "Dummy vs. Greedy"  dumb   greedy 2 0.1
-  , RunDef "Greedy vs. Greedy" greedy greedy 5 0.1
-  , RunDef "Greedy vs. Random" greedy rand   5 0.1
+  [ RunDef "Dummy vs. Dummy"     dumb                      dumb   2 0.1
+  , RunDef "Greedy vs. Dummy"    greedy                    dumb   2 0.1
+  , RunDef "Dummy vs. Greedy"    dumb                      greedy 2 0.1
+  , RunDef "Greedy vs. Random"   greedy                    rand   5 0.1
+  , RunDef "Greedy vs. Greedy"   greedy                    greedy 5 0.1
+  , RunDef "Explorer vs. Random" (explore 0.1 greedy rand) rand   5 0.1
+  , RunDef "Explorer vs. Greedy" (explore 0.1 greedy rand) greedy 5 0.1
   ]
 
 main :: IO ()
@@ -315,41 +338,97 @@ main = do
     -- o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
     -- let n   = fromMaybe 10  (number o)
     --     r   = fromMaybe 0.1 (rate   o)
-    writeFile  "other/tictactoe.md" "### Game Results:\n\n"
-    forM_ runDefs $ \ RunDef{..} ->
-      do res <- playNTimes num lRate polL polO
-         appendFile "other/tictactoe.md" $ pack name <> "\n\n"
-         appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
+    writeFile  "other/tictactoe.md" "### Game Results\n\n"
+    playShowBoth runDefs
+
+playShowBoth :: [RunDef] -> IO ()
+playShowBoth rds =
+  forM_ rds $ \ RunDef{..} ->
+    do appendFile "other/tictactoe.md" $ "#### " <> pack name <> "\n\n"
+       appendFile "other/tictactoe.md" $ "##### " <> "Model free\n\n"
+       res <- playNTimes num lRate polL polO
+       appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res
+       appendFile "other/tictactoe.md" $ "##### " <> "Model based\n\n"
+       res' <- playNTimes num lRate (model >?= polL) polO
+       appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res'
 
 
 {----------------------------------------------------------------------
   Policy definitions.
 ----------------------------------------------------------------------}
 
+-- === General types and utilities ===
+
 newtype Policy m =
   Policy { getPolicy :: Monad m => WinProbs
                                 -> BoardState
-                                -> m BoardState }
+                                -> m [BoardState] }
 
-dumb = Policy ( const ( return
-                      . fromMaybe initBoard
-                      . head
-                      . nextPossibleStates
-                      )
-              )
+-- Policy combinator tries the first one and resorts to the second, if
+-- the first returns no options.
+infixl 1 >?=
 
-rand = Policy (const (randItem . nextPossibleStates))
+(>?=) :: Policy m -> Policy m -> Policy m
+Policy f >?= Policy g = Policy $ \ wps bs ->
+  do bss <- f wps bs
+     if null bss
+       then g wps bs
+       else return bss
 
-greedy =
-  Policy ( \ wps bs ->
-             do let stateToProb = if isLearnersTurn bs
-                                    then         winProb wps
-                                    else (1 -) . winProb wps
-                return $ maximumBy ( ((.) . (.))
-                                     (uncurry compare)
-                                     (curry (toBoth stateToProb))
-                                   ) (nextPossibleStates bs)
-         )
+-- Returns the "corrected" win probability, such that a larger number
+-- always represents the better option, regardless of whos turn is next.
+stateToProb :: WinProbs -> BoardState -> Double
+stateToProb wps bs =
+  let p = winProb wps bs
+   in if isLearnersTurn bs
+        then p
+        else 1 - p
+
+-- Returns one of its two Policy arguments according to given probability.
+explore :: Float -> Policy IO -> Policy IO -> Policy IO
+explore eps (Policy f) (Policy g) = Policy $ \ wps bs ->
+ do r <- randomIO
+    if r > eps
+      then f wps bs
+      else g wps bs
+
+
+-- === Model free policies ===
+
+-- Just returns the list of next possible states in no particular order.
+dumb = Policy (const(return . nextPossibleStates))
+
+-- Like `dumb`, but randomizes the list before returning.
+rand = Policy (const(shuffleM . nextPossibleStates))
+
+-- Chooses the next state with highest probability of success.
+greedy = Policy $ \ wps bs ->
+ ( return
+ . sortBy ( ((.) . (.))
+            (uncurry compare)
+            (curry (toBoth $ stateToProb wps))
+          )
+ ) $ nextPossibleStates bs
+
+
+-- === Model based policies ===
+
+-- Intended for use as a prefix to some model free policy.
+model = win >?= block
+
+-- Finds available winning positions.
+win = Policy $ \ wps bs ->
+  ( return
+  . filter ((== 0) . stateToProb wps)
+  ) $ nextPossibleStates bs
+
+-- Looks for other player's victory in next move and blocks if apropos.
+block = Policy $ \ wps bs ->
+ do let oppWins = filter ((== 0) . stateToProb wps)
+                         (nextPossibleStates $ changeTurn bs)
+    return $ if null oppWins
+               then []
+               else [(chooseCell . P.head . diffCells bs . P.head) oppWins bs]
 
 
 {----------------------------------------------------------------------
@@ -384,8 +463,8 @@ showBoard bs = unlines
 showProb :: WinProbs -> BoardState -> String
 showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
 
-randItem :: [a] -> IO a
-randItem = generate . elements
+-- randItem :: [a] -> IO a
+-- randItem = generate . elements
 \end{code}
 
 output

@@ -27,19 +27,22 @@ Original date: March 30, 2018</p>
 <li><a href="https://www.stackage.org/package/vector-sized">vector-sized</a></li>
 <li><a href="https://www.stackage.org/package/finite-typelits">finite-typelits</a></li>
 </ul>
-<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">import </span><span class="dt">Prelude</span> (tail, last, unlines, <span class="dt">String</span>, <span class="dt">Show</span>(..))
+<div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Prelude</span> <span class="kw">as</span> <span class="dt">P</span>
+<span class="kw">import </span><span class="dt">Prelude</span> (tail, last, unlines, <span class="dt">String</span>, <span class="dt">Show</span>(..))
 
 <span class="kw">import </span><span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for)
 <span class="kw">import </span><span class="dt">Options.Generic</span>
 
 <span class="kw">import qualified</span> <span class="dt">Data.Vector.Sized</span> <span class="kw">as</span> <span class="dt">VS</span>
 
-<span class="kw">import </span><span class="dt">Control.Arrow</span>        ((&amp;&amp;&amp;))
-<span class="kw">import </span><span class="dt">Control.Monad.Extra</span>  (unfoldM)
+<span class="kw">import </span><span class="dt">Control.Arrow</span>              ((&amp;&amp;&amp;))
+<span class="kw">import </span><span class="dt">Control.Monad.Extra</span>        (unfoldM)
 <span class="kw">import </span><span class="dt">Data.Finite</span>
-<span class="kw">import </span><span class="dt">Data.Text</span>            (pack)
-<span class="kw">import </span><span class="dt">Text.Printf</span>          (printf)
-<span class="kw">import </span><span class="dt">Test.QuickCheck</span>      (generate, elements)</code></pre></div>
+<span class="kw">import </span><span class="dt">Data.Text</span>                  (pack)
+<span class="kw">import </span><span class="dt">System.Random</span>              (randomIO)
+<span class="kw">import </span><span class="dt">System.Random.Shuffle</span>      (shuffleM)
+<span class="kw">import </span><span class="dt">Text.Printf</span>                (printf)
+<span class="co">-- import Test.QuickCheck            (generate, elements)</span></code></pre></div>
 <h2 id="code">code</h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
@@ -92,7 +95,6 @@ done bs <span class="fu">=</span> winner bs <span class="fu">/=</span> <span cla
 
 <span class="ot">initProbs ::</span> <span class="dt">WinProbs</span>
 initProbs <span class="fu">=</span> pure <span class="fl">0.5</span> <span class="fu">VS.//</span>
-  <span class="co">-- [ ((fromIntegral . getFinite . stateToIndex) bs, (winnerToProb . winner) bs)</span>
   [ ((fromIntegral <span class="fu">.</span> getFinite <span class="fu">.</span> stateToIndex) <span class="fu">&amp;&amp;&amp;</span> (winnerToProb <span class="fu">.</span> winner)) bs
   <span class="fu">|</span> bs <span class="ot">&lt;-</span> allStates
   , done bs
@@ -176,15 +178,16 @@ indCell n <span class="fu">=</span> <span class="kw">case</span> getFinite n <sp
 <span class="co">  Playing board state manipulation (pure).</span>
 <span class="co">----------------------------------------------------------------------}</span>
 
+<span class="ot">nxtMrk ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">CellState</span>
+nxtMrk <span class="dt">BoardState</span>{<span class="fu">..</span>} <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn <span class="kw">then</span> <span class="dt">X</span>
+                                          <span class="kw">else</span> <span class="dt">O</span>
+
 <span class="ot">nextPossibleStates ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>]
 nextPossibleStates bs <span class="fu">=</span>
   map changeTurn
-      [ setCell cs (i,j) bs
+      [ setCell (nxtMrk bs) (i,j) bs
       <span class="fu">|</span> (i,j) <span class="ot">&lt;-</span> emptyCells bs
       ]
- <span class="kw">where</span> cs <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
-              <span class="kw">then</span> <span class="dt">X</span>
-              <span class="kw">else</span> <span class="dt">O</span>
 
 <span class="ot">changeTurn ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
 changeTurn <span class="dt">BoardState</span>{<span class="fu">..</span>} <span class="fu">=</span>
@@ -202,6 +205,12 @@ setCell cs (i,j) <span class="dt">BoardState</span>{<span class="fu">..</span>} 
  <span class="kw">where</span> i&#39; <span class="fu">=</span> fromInteger <span class="fu">$</span> getFinite i
        j&#39; <span class="fu">=</span> fromInteger <span class="fu">$</span> getFinite j
 
+<span class="ot">getCell ::</span> (<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>) <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">CellState</span>
+getCell (i,j) <span class="dt">BoardState</span>{<span class="fu">..</span>} <span class="fu">=</span> cells <span class="ot">`VS.index`</span> i <span class="ot">`VS.index`</span> j
+
+<span class="ot">chooseCell ::</span> (<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>) <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
+chooseCell (i,j) bs <span class="fu">=</span> (changeTurn <span class="fu">.</span> setCell (nxtMrk bs) (i,j)) bs
+
 <span class="ot">emptyCells ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [(<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>)]
 emptyCells bs <span class="fu">=</span> emptyCells&#39; <span class="fu">$</span> cells bs
 
@@ -211,6 +220,14 @@ emptyCells&#39; brd <span class="fu">=</span>
   <span class="fu">|</span> i <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
   , j <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
   , brd <span class="ot">`VS.index`</span> i <span class="ot">`VS.index`</span> j <span class="fu">==</span> <span class="dt">Empty</span>
+  ]
+
+<span class="ot">diffCells ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> [(<span class="dt">Finite</span> <span class="dv">3</span>, <span class="dt">Finite</span> <span class="dv">3</span>)]
+diffCells bs bs&#39; <span class="fu">=</span>
+  [ (i,j)
+  <span class="fu">|</span> i <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
+  , j <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">2</span>]
+  , ((<span class="fu">/=</span>) <span class="ot">`on`</span> getCell (i,j))  bs bs&#39;
   ]
 
 <span class="ot">updateProbs ::</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> [<span class="dt">BoardState</span>] <span class="ot">-&gt;</span> <span class="dt">WinProbs</span>
@@ -267,7 +284,10 @@ play p p&#39; wps <span class="fu">=</span> unfoldM step initBoard
 move p wps bs <span class="fu">=</span>
   <span class="kw">if</span> done bs
     <span class="kw">then</span> return bs
-    <span class="kw">else</span> getPolicy p wps bs
+    <span class="kw">else</span> <span class="kw">do</span> bss <span class="ot">&lt;-</span> getPolicy p wps bs
+            return <span class="fu">$</span> <span class="kw">if</span> null bss
+                       <span class="kw">then</span> bs
+                       <span class="kw">else</span> P.head bss
 
 
 <span class="co">{----------------------------------------------------------------------</span>
@@ -283,11 +303,13 @@ move p wps bs <span class="fu">=</span>
   }
 
 runDefs <span class="fu">=</span>
-  [ <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Dummy&quot;</span>   dumb   dumb   <span class="dv">2</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Dummy&quot;</span>  greedy dumb   <span class="dv">2</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Greedy&quot;</span>  dumb   greedy <span class="dv">2</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Greedy&quot;</span> greedy greedy <span class="dv">5</span> <span class="fl">0.1</span>
-  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span> greedy rand   <span class="dv">5</span> <span class="fl">0.1</span>
+  [ <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Dummy&quot;</span>     dumb                      dumb   <span class="dv">2</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Dummy&quot;</span>    greedy                    dumb   <span class="dv">2</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Greedy&quot;</span>    dumb                      greedy <span class="dv">2</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span>   greedy                    rand   <span class="dv">5</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Greedy&quot;</span>   greedy                    greedy <span class="dv">5</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Random&quot;</span> (explore <span class="fl">0.1</span> greedy rand) rand   <span class="dv">5</span> <span class="fl">0.1</span>
+  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Greedy&quot;</span> (explore <span class="fl">0.1</span> greedy rand) greedy <span class="dv">5</span> <span class="fl">0.1</span>
   ]
 
 <span class="ot">main ::</span> <span class="dt">IO</span> ()
@@ -295,41 +317,97 @@ main <span class="fu">=</span> <span class="kw">do</span>
     <span class="co">-- o :: Opts Unwrapped &lt;- unwrapRecord &quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span>
     <span class="co">-- let n   = fromMaybe 10  (number o)</span>
     <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span>
-    writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results:\n\n&quot;</span>
-    forM_ runDefs <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
-      <span class="kw">do</span> res <span class="ot">&lt;-</span> playNTimes num lRate polL polO
-         appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> pack name <span class="fu">&lt;&gt;</span> <span class="st">&quot;\n\n&quot;</span>
-         appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res
+    writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results\n\n&quot;</span>
+    playShowBoth runDefs
+
+<span class="ot">playShowBoth ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
+playShowBoth rds <span class="fu">=</span>
+  forM_ rds <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
+    <span class="kw">do</span> appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;#### &quot;</span> <span class="fu">&lt;&gt;</span> pack name <span class="fu">&lt;&gt;</span> <span class="st">&quot;\n\n&quot;</span>
+       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model free\n\n&quot;</span>
+       res <span class="ot">&lt;-</span> playNTimes num lRate polL polO
+       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res
+       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model based\n\n&quot;</span>
+       res&#39; <span class="ot">&lt;-</span> playNTimes num lRate (model <span class="fu">&gt;?=</span> polL) polO
+       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res&#39;
 
 
 <span class="co">{----------------------------------------------------------------------</span>
 <span class="co">  Policy definitions.</span>
 <span class="co">----------------------------------------------------------------------}</span>
 
+<span class="co">-- === General types and utilities ===</span>
+
 <span class="kw">newtype</span> <span class="dt">Policy</span> m <span class="fu">=</span>
   <span class="dt">Policy</span> {<span class="ot"> getPolicy ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> <span class="dt">WinProbs</span>
                                 <span class="ot">-&gt;</span> <span class="dt">BoardState</span>
-                                <span class="ot">-&gt;</span> m <span class="dt">BoardState</span> }
+                                <span class="ot">-&gt;</span> m [<span class="dt">BoardState</span>] }
 
-dumb <span class="fu">=</span> <span class="dt">Policy</span> ( const ( return
-                      <span class="fu">.</span> fromMaybe initBoard
-                      <span class="fu">.</span> head
-                      <span class="fu">.</span> nextPossibleStates
-                      )
-              )
+<span class="co">-- Policy combinator tries the first one and resorts to the second, if</span>
+<span class="co">-- the first returns no options.</span>
+<span class="kw">infixl</span> <span class="dv">1</span> <span class="fu">&gt;?=</span>
 
-rand <span class="fu">=</span> <span class="dt">Policy</span> (const (randItem <span class="fu">.</span> nextPossibleStates))
+<span class="ot">(&gt;?=) ::</span> <span class="dt">Policy</span> m <span class="ot">-&gt;</span> <span class="dt">Policy</span> m <span class="ot">-&gt;</span> <span class="dt">Policy</span> m
+<span class="dt">Policy</span> f <span class="fu">&gt;?=</span> <span class="dt">Policy</span> g <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span>
+  <span class="kw">do</span> bss <span class="ot">&lt;-</span> f wps bs
+     <span class="kw">if</span> null bss
+       <span class="kw">then</span> g wps bs
+       <span class="kw">else</span> return bss
 
-greedy <span class="fu">=</span>
-  <span class="dt">Policy</span> ( \ wps bs <span class="ot">-&gt;</span>
-             <span class="kw">do</span> <span class="kw">let</span> stateToProb <span class="fu">=</span> <span class="kw">if</span> isLearnersTurn bs
-                                    <span class="kw">then</span>         winProb wps
-                                    <span class="kw">else</span> (<span class="dv">1</span> <span class="fu">-</span>) <span class="fu">.</span> winProb wps
-                return <span class="fu">$</span> maximumBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))
-                                     (uncurry compare)
-                                     (curry (toBoth stateToProb))
-                                   ) (nextPossibleStates bs)
-         )
+<span class="co">-- Returns the &quot;corrected&quot; win probability, such that a larger number</span>
+<span class="co">-- always represents the better option, regardless of whos turn is next.</span>
+<span class="ot">stateToProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span>
+stateToProb wps bs <span class="fu">=</span>
+  <span class="kw">let</span> p <span class="fu">=</span> winProb wps bs
+   <span class="kw">in</span> <span class="kw">if</span> isLearnersTurn bs
+        <span class="kw">then</span> p
+        <span class="kw">else</span> <span class="dv">1</span> <span class="fu">-</span> p
+
+<span class="co">-- Returns one of its two Policy arguments according to given probability.</span>
+<span class="ot">explore ::</span> <span class="dt">Float</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span>
+explore eps (<span class="dt">Policy</span> f) (<span class="dt">Policy</span> g) <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span>
+ <span class="kw">do</span> r <span class="ot">&lt;-</span> randomIO
+    <span class="kw">if</span> r <span class="fu">&gt;</span> eps
+      <span class="kw">then</span> f wps bs
+      <span class="kw">else</span> g wps bs
+
+
+<span class="co">-- === Model free policies ===</span>
+
+<span class="co">-- Just returns the list of next possible states in no particular order.</span>
+dumb <span class="fu">=</span> <span class="dt">Policy</span> (const(return <span class="fu">.</span> nextPossibleStates))
+
+<span class="co">-- Like `dumb`, but randomizes the list before returning.</span>
+rand <span class="fu">=</span> <span class="dt">Policy</span> (const(shuffleM <span class="fu">.</span> nextPossibleStates))
+
+<span class="co">-- Chooses the next state with highest probability of success.</span>
+greedy <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span>
+ ( return
+ <span class="fu">.</span> sortBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))
+            (uncurry compare)
+            (curry (toBoth <span class="fu">$</span> stateToProb wps))
+          )
+ ) <span class="fu">$</span> nextPossibleStates bs
+
+
+<span class="co">-- === Model based policies ===</span>
+
+<span class="co">-- Intended for use as a prefix to some model free policy.</span>
+model <span class="fu">=</span> win <span class="fu">&gt;?=</span> block
+
+<span class="co">-- Finds available winning positions.</span>
+win <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span>
+  ( return
+  <span class="fu">.</span> filter ((<span class="fu">==</span> <span class="dv">0</span>) <span class="fu">.</span> stateToProb wps)
+  ) <span class="fu">$</span> nextPossibleStates bs
+
+<span class="co">-- Looks for other player&#39;s victory in next move and blocks if apropos.</span>
+block <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span>
+ <span class="kw">do</span> <span class="kw">let</span> oppWins <span class="fu">=</span> filter ((<span class="fu">==</span> <span class="dv">0</span>) <span class="fu">.</span> stateToProb wps)
+                         (nextPossibleStates <span class="fu">$</span> changeTurn bs)
+    return <span class="fu">$</span> <span class="kw">if</span> null oppWins
+               <span class="kw">then</span> []
+               <span class="kw">else</span> [(chooseCell <span class="fu">.</span> P.head <span class="fu">.</span> diffCells bs <span class="fu">.</span> P.head) oppWins bs]
 
 
 <span class="co">{----------------------------------------------------------------------</span>
@@ -364,11 +442,12 @@ showBoard bs <span class="fu">=</span> unlines
 <span class="ot">showProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
 showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;</span> <span class="fu">.</span> VS.index wps <span class="fu">.</span> stateToIndex
 
-<span class="ot">randItem ::</span> [a] <span class="ot">-&gt;</span> <span class="dt">IO</span> a
-randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</code></pre></div>
+<span class="co">-- randItem :: [a] -&gt; IO a</span>
+<span class="co">-- randItem = generate . elements</span></code></pre></div>
 <h2 id="output">output</h2>
-<h3 id="game-results">Game Results:</h3>
-<p>Dummy vs. Dummy</p>
+<h3 id="game-results">Game Results</h3>
+<h4 id="dummy-vs.-dummy">Dummy vs. Dummy</h4>
+<h5 id="model-free">Model free</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
@@ -525,53 +604,75 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 &amp;
 1.000
 \end{array}\]</span>
-<p>Greedy vs. Dummy</p>
+<h5 id="model-based">Model based</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
+0.500
+&amp;
+0.500
+&amp;
 0.500
 &amp;
 0.500
@@ -584,50 +685,72 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
+0.500
+&amp;
+0.500
+&amp;
 0.500
 &amp;
 0.502
@@ -638,7 +761,8 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 &amp;
 1.000
 \end{array}\]</span>
-<p>Dummy vs. Greedy</p>
+<h4 id="greedy-vs.-dummy">Greedy vs. Dummy</h4>
+<h5 id="model-free-1">Model free</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
@@ -650,41 +774,220 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.502
+&amp;
+0.514
+&amp;
+0.595
+&amp;
+1.000
+\end{array}\]</span>
+<h5 id="model-based-1">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
 0.500
 &amp;
 0.500
@@ -706,113 +1009,136 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.502
+&amp;
+0.514
+&amp;
+0.595
+&amp;
+1.000
+\end{array}\]</span>
+<h4 id="dummy-vs.-greedy">Dummy vs. Greedy</h4>
+<h5 id="model-free-2">Model free</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<p>Greedy vs. Greedy</p>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -832,65 +1158,1019 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<h5 id="model-based-2">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h4 id="greedy-vs.-random">Greedy vs. Random</h4>
+<h5 id="model-free-3">Model free</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h5 id="model-based-3">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.501
+&amp;
+0.510
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h4 id="greedy-vs.-greedy">Greedy vs. Greedy</h4>
+<h5 id="model-free-4">Model free</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -910,47 +2190,125 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -966,56 +2324,56 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1033,56 +2391,56 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
 \text{X} &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1098,50 +2456,989 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 &amp;
 0.000
 \end{array}\]</span>
-<p>Greedy vs. Random</p>
+<h5 id="model-based-4">Model based</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h4 id="explorer-vs.-random">Explorer vs. Random</h4>
+<h5 id="model-free-5">Model free</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h5 id="model-based-5">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1157,128 +3454,208 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
 \text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
+0.500
+&amp;
+0.501
+&amp;
+0.510
+&amp;
+0.595
+&amp;
+1.000
+\end{array}\]</span>
+<h4 id="explorer-vs.-greedy">Explorer vs. Greedy</h4>
+<h5 id="model-free-6">Model free</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
 0.500
 &amp;
 0.500
@@ -1291,56 +3668,134 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1358,50 +3813,530 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{X} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{X} \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
  \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h5 id="model-based-6">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
 0.500
 &amp;
 0.500

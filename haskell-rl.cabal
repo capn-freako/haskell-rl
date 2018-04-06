@@ -146,7 +146,9 @@ executable tic-tac-toe
     finite-typelits,
     text,
     QuickCheck,
-    monad-extras
+    monad-extras,
+    random-shuffle,
+    random
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,
