@@ -34,6 +34,7 @@ Original date: March 30, 2018</p>
 
 <span class="kw">import qualified</span> <span class="dt">Data.Vector.Sized</span> <span class="kw">as</span> <span class="dt">VS</span>
 
+<span class="kw">import </span><span class="dt">Control.Arrow</span>        ((&amp;&amp;&amp;))
 <span class="kw">import </span><span class="dt">Control.Monad.Extra</span>  (unfoldM)
 <span class="kw">import </span><span class="dt">Data.Finite</span>
 <span class="kw">import </span><span class="dt">Data.Text</span>            (pack)
@@ -91,10 +92,10 @@ done bs <span class="fu">=</span> winner bs <span class="fu">/=</span> <span cla
 
 <span class="ot">initProbs ::</span> <span class="dt">WinProbs</span>
 initProbs <span class="fu">=</span> pure <span class="fl">0.5</span> <span class="fu">VS.//</span>
-  [ ((fromIntegral <span class="fu">.</span> getFinite <span class="fu">.</span> stateToIndex) bs, winnerToProb w)
+  <span class="co">-- [ ((fromIntegral . getFinite . stateToIndex) bs, (winnerToProb . winner) bs)</span>
+  [ ((fromIntegral <span class="fu">.</span> getFinite <span class="fu">.</span> stateToIndex) <span class="fu">&amp;&amp;&amp;</span> (winnerToProb <span class="fu">.</span> winner)) bs
   <span class="fu">|</span> bs <span class="ot">&lt;-</span> allStates
-  , <span class="kw">let</span> w <span class="fu">=</span> winner bs
-  , w <span class="fu">/=</span> <span class="dt">None</span>
+  , done bs
   ]
 
 <span class="ot">allStates ::</span> [<span class="dt">BoardState</span>]
@@ -120,8 +121,7 @@ winner bs
 
 <span class="ot">winnerToProb ::</span> <span class="dt">Winner</span> <span class="ot">-&gt;</span> <span class="dt">Double</span>
 winnerToProb <span class="dt">Learner</span>  <span class="fu">=</span> <span class="fl">1.0</span>
-winnerToProb <span class="dt">Opponent</span> <span class="fu">=</span> <span class="fl">0.0</span>
-winnerToProb _        <span class="fu">=</span> <span class="fl">0.5</span>
+winnerToProb _        <span class="fu">=</span> <span class="fl">0.0</span>
 
 <span class="ot">diagonals ::</span> <span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
           <span class="ot">-&gt;</span> <span class="dt">VS.Vector</span> <span class="dv">2</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)
@@ -1130,128 +1130,16 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \end{array}
@@ -1298,43 +1186,99 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
 \text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{O} &amp; \text{X} \\
 \hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
 \text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{X} \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
  \\ 
-0.500
-&amp;
-0.500
-&amp;
 0.500
 &amp;
 0.500
@@ -1356,7 +1300,7 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
@@ -1365,7 +1309,7 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
@@ -1374,18 +1318,85 @@ randItem <span class="fu">=</span> generate <span class="fu">.</span> elements</
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{X} \\
+\text{O} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \end{array}

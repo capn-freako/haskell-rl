@@ -51,6 +51,7 @@ import Options.Generic
 
 import qualified Data.Vector.Sized as VS
 
+import Control.Arrow        ((&&&))
 import Control.Monad.Extra  (unfoldM)
 import Data.Finite
 import Data.Text            (pack)
@@ -112,10 +113,9 @@ type WinProbs = VS.Vector 19683 Double  -- 3^9
 
 initProbs :: WinProbs
 initProbs = pure 0.5 VS.//
-  [ ((fromIntegral . getFinite . stateToIndex) bs, winnerToProb w)
+  [ ((fromIntegral . getFinite . stateToIndex) &&& (winnerToProb . winner)) bs
   | bs <- allStates
-  , let w = winner bs
-  , w /= None
+  , done bs
   ]
 
 allStates :: [BoardState]
@@ -141,8 +141,7 @@ winner bs
 
 winnerToProb :: Winner -> Double
 winnerToProb Learner  = 1.0
-winnerToProb Opponent = 0.0
-winnerToProb _        = 0.5
+winnerToProb _        = 0.0
 
 diagonals :: VS.Vector 3 (VS.Vector 3 CellState)
           -> VS.Vector 2 (VS.Vector 3 CellState)
