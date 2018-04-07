@@ -148,7 +148,9 @@ executable tic-tac-toe
     QuickCheck,
     monad-extras,
     random-shuffle,
-    random
+    random,
+    Chart,
+    Chart-cairo
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,

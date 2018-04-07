@@ -60,6 +60,8 @@ import System.Random              (randomIO)
 import System.Random.Shuffle      (shuffleM)
 import Text.Printf                (printf)
 -- import Test.QuickCheck            (generate, elements)
+import Graphics.Rendering.Chart.Easy hiding (Wrapped, Empty)
+import Graphics.Rendering.Chart.Backend.Cairo
 \end{code}
 
 code
@@ -122,7 +124,7 @@ initProbs = pure 0.5 VS.//
   ]
 
 allStates :: [BoardState]
-allStates = [indexToState (finite ix) | ix <- [0..19682]]
+allStates = [indexToState (finite idx) | idx <- [0..19682]]
 
 data Winner = None
             | Opponent
@@ -335,11 +337,27 @@ runDefs =
 
 main :: IO ()
 main = do
+    -- Process command line options.
     -- o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
     -- let n   = fromMaybe 10  (number o)
     --     r   = fromMaybe 0.1 (rate   o)
+
+    -- Play and display the specified games.
     writeFile  "other/tictactoe.md" "### Game Results\n\n"
     playShowBoth runDefs
+
+    -- Test specified games over many trials.
+    let rds    = drop 3 runDefs  -- Uninteresting; first 2 always win and third always loses.
+        labels = map name rds
+    yss   <- getWins rds
+    yss'  <- getWins $ for rds $ \ rd -> rd{polL = model >?= polL rd}
+    yss'' <- getWins $ for rds $ \ rd -> rd{polL = model >?= polL rd, polO = model >?= polO rd}
+    plotWins "img/plot1.png" "Expected Learner Win Probability - Model Free"                 $ zip labels yss
+    plotWins "img/plot2.png" "Expected Learner Win Probability - Model Based (Learner Only)" $ zip labels yss'
+    plotWins "img/plot3.png" "Expected Learner Win Probability - Model Based (Both)"         $ zip labels yss''
+    appendFile "other/tictactoe.md" $ "![](img/plot1.png)\n"
+    appendFile "other/tictactoe.md" $ "![](img/plot2.png)\n"
+    appendFile "other/tictactoe.md" $ "![](img/plot3.png)\n"
 
 playShowBoth :: [RunDef] -> IO ()
 playShowBoth rds =
@@ -351,6 +369,22 @@ playShowBoth rds =
        appendFile "other/tictactoe.md" $ "##### " <> "Model based\n\n"
        res' <- playNTimes num lRate (model >?= polL) polO
        appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res'
+
+getWins :: [RunDef] -> IO [[Float]]
+getWins rds = forM rds $ \ RunDef{..} -> do
+  res <- playNTimes 1000 lRate polL polO
+  let wins = map (boolToFloat . (== Learner) . winner . last . fst) res
+  return $ movingAve 100 wins
+
+plotWins :: String               -- file name
+         -> String               -- plot name
+         -> [(String, [Float])]  -- plot pairs (label + y-data)
+         -> IO ()
+plotWins fname pname prs = toFile def fname $ do
+  layout_title .= pname
+  setColors $ map opaque [red, green, blue, yellow]
+  forM_ prs $ \ (lbl, ys) -> do
+    plot (line lbl [zip [(0::Int)..] ys])
 
 
 {----------------------------------------------------------------------
@@ -462,6 +496,23 @@ showBoard bs = unlines
 
 showProb :: WinProbs -> BoardState -> String
 showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
+
+boolToFloat :: Bool -> Float
+boolToFloat True = 1.0
+boolToFloat _    = 0.0
+
+movingAve :: Fractional a => Int -> [a] -> [a]
+movingAve w xs =
+  ( take (length xs - w) . map mean . transpose
+  ) [drop n xs | n <- [0..(w - 1)]]
+
+-- | Mean value of a collection
+mean :: (Foldable f, Fractional a) => f a -> a
+mean = uncurry (/) . foldr (\e (s,c) -> (e+s,c+1)) (0,0)
+
+takeEvery :: Int -> [a] -> [a]
+takeEvery _ [] = []
+takeEvery n xs = P.head xs : takeEvery n (drop n xs)
 
 -- randItem :: [a] -> IO a
 -- randItem = generate . elements

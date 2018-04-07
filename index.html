@@ -42,7 +42,9 @@ Original date: March 30, 2018</p>
 <span class="kw">import </span><span class="dt">System.Random</span>              (randomIO)
 <span class="kw">import </span><span class="dt">System.Random.Shuffle</span>      (shuffleM)
 <span class="kw">import </span><span class="dt">Text.Printf</span>                (printf)
-<span class="co">-- import Test.QuickCheck            (generate, elements)</span></code></pre></div>
+<span class="co">-- import Test.QuickCheck            (generate, elements)</span>
+<span class="kw">import </span><span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span> (<span class="dt">Wrapped</span>, <span class="dt">Empty</span>)
+<span class="kw">import </span><span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></code></pre></div>
 <h2 id="code">code</h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
@@ -101,7 +103,7 @@ initProbs <span class="fu">=</span> pure <span class="fl">0.5</span> <span class
   ]
 
 <span class="ot">allStates ::</span> [<span class="dt">BoardState</span>]
-allStates <span class="fu">=</span> [indexToState (finite ix) <span class="fu">|</span> ix <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">19682</span>]]
+allStates <span class="fu">=</span> [indexToState (finite idx) <span class="fu">|</span> idx <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">19682</span>]]
 
 <span class="kw">data</span> <span class="dt">Winner</span> <span class="fu">=</span> <span class="dt">None</span>
             <span class="fu">|</span> <span class="dt">Opponent</span>
@@ -314,11 +316,27 @@ runDefs <span class="fu">=</span>
 
 <span class="ot">main ::</span> <span class="dt">IO</span> ()
 main <span class="fu">=</span> <span class="kw">do</span>
+    <span class="co">-- Process command line options.</span>
     <span class="co">-- o :: Opts Unwrapped &lt;- unwrapRecord &quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span>
     <span class="co">-- let n   = fromMaybe 10  (number o)</span>
     <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span>
+
+    <span class="co">-- Play and display the specified games.</span>
     writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results\n\n&quot;</span>
     playShowBoth runDefs
+
+    <span class="co">-- Test specified games over many trials.</span>
+    <span class="kw">let</span> rds    <span class="fu">=</span> drop <span class="dv">3</span> runDefs  <span class="co">-- Uninteresting; first 2 always win and third always loses.</span>
+        labels <span class="fu">=</span> map name rds
+    yss   <span class="ot">&lt;-</span> getWins rds
+    yss&#39;  <span class="ot">&lt;-</span> getWins <span class="fu">$</span> for rds <span class="fu">$</span> \ rd <span class="ot">-&gt;</span> rd{polL <span class="fu">=</span> model <span class="fu">&gt;?=</span> polL rd}
+    yss&#39;&#39; <span class="ot">&lt;-</span> getWins <span class="fu">$</span> for rds <span class="fu">$</span> \ rd <span class="ot">-&gt;</span> rd{polL <span class="fu">=</span> model <span class="fu">&gt;?=</span> polL rd, polO <span class="fu">=</span> model <span class="fu">&gt;?=</span> polO rd}
+    plotWins <span class="st">&quot;img/plot1.png&quot;</span> <span class="st">&quot;Expected Learner Win Probability - Model Free&quot;</span>                 <span class="fu">$</span> zip labels yss
+    plotWins <span class="st">&quot;img/plot2.png&quot;</span> <span class="st">&quot;Expected Learner Win Probability - Model Based (Learner Only)&quot;</span> <span class="fu">$</span> zip labels yss&#39;
+    plotWins <span class="st">&quot;img/plot3.png&quot;</span> <span class="st">&quot;Expected Learner Win Probability - Model Based (Both)&quot;</span>         <span class="fu">$</span> zip labels yss&#39;&#39;
+    appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;![](img/plot1.png)\n&quot;</span>
+    appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;![](img/plot2.png)\n&quot;</span>
+    appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;![](img/plot3.png)\n&quot;</span>
 
 <span class="ot">playShowBoth ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
 playShowBoth rds <span class="fu">=</span>
@@ -330,6 +348,23 @@ playShowBoth rds <span class="fu">=</span>
        appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model based\n\n&quot;</span>
        res&#39; <span class="ot">&lt;-</span> playNTimes num lRate (model <span class="fu">&gt;?=</span> polL) polO
        appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res&#39;
+
+<span class="ot">getWins ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> [[<span class="dt">Float</span>]]
+getWins rds <span class="fu">=</span> forM rds <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> <span class="kw">do</span>
+  res <span class="ot">&lt;-</span> playNTimes <span class="dv">1000</span> lRate polL polO
+  <span class="kw">let</span> wins <span class="fu">=</span> map (boolToFloat <span class="fu">.</span> (<span class="fu">==</span> <span class="dt">Learner</span>) <span class="fu">.</span> winner <span class="fu">.</span> last <span class="fu">.</span> fst) res
+  return <span class="fu">$</span> movingAve <span class="dv">100</span> wins
+
+<span class="ot">plotWins ::</span> <span class="dt">String</span>               <span class="co">-- file name</span>
+         <span class="ot">-&gt;</span> <span class="dt">String</span>               <span class="co">-- plot name</span>
+         <span class="ot">-&gt;</span> [(<span class="dt">String</span>, [<span class="dt">Float</span>])]  <span class="co">-- plot pairs (label + y-data)</span>
+         <span class="co">-- -&gt; StateT (Layout Float Float) (State CState) ()</span>
+         <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
+plotWins fname pname prs <span class="fu">=</span> toFile def fname <span class="fu">$</span> <span class="kw">do</span>
+  layout_title <span class="fu">.=</span> pname
+  setColors <span class="fu">$</span> map opaque [red, green, blue, yellow]
+  forM_ prs <span class="fu">$</span> \ (lbl, ys) <span class="ot">-&gt;</span> <span class="kw">do</span>
+    plot (line lbl [zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] ys])
 
 
 <span class="co">{----------------------------------------------------------------------</span>
@@ -441,6 +476,23 @@ showBoard bs <span class="fu">=</span> unlines
 
 <span class="ot">showProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
 showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;</span> <span class="fu">.</span> VS.index wps <span class="fu">.</span> stateToIndex
+
+<span class="ot">boolToFloat ::</span> <span class="dt">Bool</span> <span class="ot">-&gt;</span> <span class="dt">Float</span>
+boolToFloat <span class="dt">True</span> <span class="fu">=</span> <span class="fl">1.0</span>
+boolToFloat _    <span class="fu">=</span> <span class="fl">0.0</span>
+
+<span class="ot">movingAve ::</span> <span class="dt">Fractional</span> a <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [a]
+movingAve w xs <span class="fu">=</span>
+  ( take (length xs <span class="fu">-</span> w) <span class="fu">.</span> map mean <span class="fu">.</span> transpose
+  ) [drop n xs <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(w <span class="fu">-</span> <span class="dv">1</span>)]]
+
+<span class="co">-- | Mean value of a collection</span>
+<span class="ot">mean ::</span> (<span class="dt">Foldable</span> f, <span class="dt">Fractional</span> a) <span class="ot">=&gt;</span> f a <span class="ot">-&gt;</span> a
+mean <span class="fu">=</span> uncurry (<span class="fu">/</span>) <span class="fu">.</span> foldr (\e (s,c) <span class="ot">-&gt;</span> (e<span class="fu">+</span>s,c<span class="fu">+</span><span class="dv">1</span>)) (<span class="dv">0</span>,<span class="dv">0</span>)
+
+<span class="ot">takeEvery ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [a]
+takeEvery _ [] <span class="fu">=</span> []
+takeEvery n xs <span class="fu">=</span> P.head xs <span class="fu">:</span> takeEvery n (drop n xs)
 
 <span class="co">-- randItem :: [a] -&gt; IO a</span>
 <span class="co">-- randItem = generate . elements</span></code></pre></div>
@@ -1415,74 +1467,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
@@ -1504,7 +1489,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
@@ -1513,7 +1498,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
  \\ 
@@ -1529,59 +1514,204 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
 0.500
 &amp;
 0.500
@@ -1596,7 +1726,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
@@ -1605,138 +1735,38 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -1786,36 +1816,36 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1842,25 +1872,25 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
@@ -1869,9 +1899,65 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1916,7 +2002,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -1925,9 +2011,9 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -1936,7 +2022,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \hline
 \text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -1945,96 +2031,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -2063,46 +2060,68 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \end{array}
 
  \\ 
 0.500
 &amp;
-0.501
+0.500
 &amp;
-0.510
+0.500
+&amp;
+0.500
+&amp;
+0.505
 &amp;
 0.550
 &amp;
@@ -2884,9 +2903,18 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
@@ -2895,25 +2923,16 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
  \\ 
@@ -2938,138 +2957,38 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -3094,74 +3013,56 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -3173,15 +3074,67 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 &amp;
 0.500
 &amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
 0.500
 &amp;
-0.500
+0.501
 &amp;
-0.495
+0.510
 &amp;
-0.450
+0.550
 &amp;
-0.000
+1.000
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
@@ -3249,9 +3202,9 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
  \\ 
 0.500
 &amp;
-0.500
+0.501
 &amp;
-0.500
+0.505
 &amp;
 0.500
 &amp;
@@ -3275,36 +3228,36 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -3329,89 +3282,11 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -3420,7 +3295,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -3454,7 +3329,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
@@ -3463,18 +3338,18 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -3501,18 +3376,18 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -3543,46 +3418,102 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
  \\ 
 0.500
 &amp;
-0.501
+0.500
 &amp;
-0.510
+0.505
 &amp;
-0.595
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
 &amp;
 1.000
 \end{array}\]</span>
@@ -3782,20 +3713,76 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
 \text{O} &amp; \text{O} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -3813,139 +3800,50 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
 \text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
  \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
 0.500
 &amp;
 0.500
@@ -4189,20 +4087,120 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -4269,84 +4267,7 @@ showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;
 &amp;
 1.000
 \end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
+<p><img src="img/plot1.png" /> <img src="img/plot2.png" /> <img src="img/plot3.png" /></p>
 <hr />
 <div class="footer">
 <p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
