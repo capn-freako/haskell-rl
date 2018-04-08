@@ -33,6 +33,7 @@ Copyright &copy; 2018 David Banas; all rights reserved World wide.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
 \end{code}
 
 [libraries](https://www.stackage.org/)
@@ -264,9 +265,9 @@ updateProbs :: Double -> WinProbs -> [BoardState] -> WinProbs
 updateProbs rate wps bss =
   snd $ execState (traverse adj $ tail $ reverse bss)
                   (winProb wps (last bss), wps)
- where adj bs = do (lastP, wps') <- get
-                   let thisP = winProb wps' bs
-                       newP  = thisP + (lastP - thisP)*rate
+ where adj bs = do (!lastP, !wps') <- get
+                   let !thisP = winProb wps' bs
+                       !newP  = thisP + (lastP - thisP)*rate
                    put ( newP
                        , wps' VS.// [( (fromInteger . getFinite . stateToIndex) bs
                                      , newP
@@ -288,7 +289,7 @@ playNTimes :: Monad m
 playNTimes n r p p' = evalStateT (traverse nxt [1..n]) initProbs
  where nxt _ = do wps <- get
                   bs  <- lift $ play p p' wps
-                  let wps' = updateProbs r wps bs
+                  let !wps' = updateProbs r wps bs
                   put wps'
                   return (bs, wps')
 
