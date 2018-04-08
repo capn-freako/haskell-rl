@@ -87,8 +87,8 @@ Original date: March 30, 2018</p>
 <a class="sourceLine" id="cb4-28" data-line-number="28">  show <span class="dt">O</span>     <span class="fu">=</span> <span class="st">&quot;\\text{O}&quot;</span></a>
 <a class="sourceLine" id="cb4-29" data-line-number="29"></a>
 <a class="sourceLine" id="cb4-30" data-line-number="30"><span class="kw">data</span> <span class="dt">BoardState</span> <span class="fu">=</span> <span class="dt">BoardState</span></a>
-<a class="sourceLine" id="cb4-31" data-line-number="31">  {<span class="ot"> cells          ::</span> <span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>)</a>
-<a class="sourceLine" id="cb4-32" data-line-number="32">  ,<span class="ot"> isLearnersTurn ::</span> <span class="dt">Bool</span></a>
+<a class="sourceLine" id="cb4-31" data-line-number="31">  {<span class="ot"> cells          ::</span> <span class="fu">!</span>(<span class="dt">VS.Vector</span> <span class="dv">3</span> (<span class="dt">VS.Vector</span> <span class="dv">3</span> <span class="dt">CellState</span>))</a>
+<a class="sourceLine" id="cb4-32" data-line-number="32">  ,<span class="ot"> isLearnersTurn ::</span> <span class="fu">!</span><span class="dt">Bool</span></a>
 <a class="sourceLine" id="cb4-33" data-line-number="33">  }</a>
 <a class="sourceLine" id="cb4-34" data-line-number="34"></a>
 <a class="sourceLine" id="cb4-35" data-line-number="35"><span class="ot">initBoard ::</span> <span class="dt">BoardState</span></a>
@@ -1573,6 +1573,66 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.502
+&amp;
+0.514
+&amp;
+0.595
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
@@ -1580,27 +1640,214 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h5 id="model-based-3">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{X} &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -1633,7 +1880,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -1642,7 +1889,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -1651,7 +1898,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -1660,65 +1907,9 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -1780,15 +1971,14 @@ Original date: March 30, 2018</p>
  \\ 
 0.500
 &amp;
-0.501
+0.500
 &amp;
-0.510
+0.505
 &amp;
 0.550
 &amp;
 1.000
 \end{array}\]</span>
-<h5 id="model-based-3">Model based</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
@@ -1800,18 +1990,18 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -1880,7 +2070,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -1889,7 +2079,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -1898,216 +2088,26 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
 0.500
 &amp;
-0.500
+0.501
 &amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
+0.510
 &amp;
 0.550
 &amp;
@@ -2878,430 +2878,83 @@ Original date: March 30, 2018</p>
 <h5 id="model-free-5">Model free</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
 \text{X} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<h5 id="model-based-5">Model based</h5>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{X} \\
 \end{array}
 
  \\ 
@@ -3336,162 +2989,6 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
@@ -3510,7 +3007,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -3519,7 +3016,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -3548,9 +3045,362 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<h5 id="model-based-5">Model based</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
@@ -3559,12 +3409,166 @@ Original date: March 30, 2018</p>
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.501
+&amp;
+0.510
+&amp;
+0.595
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
@@ -3573,9 +3577,330 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<h4 id="explorer-vs.-greedy">Explorer vs. Greedy</h4>
+<h5 id="model-free-6">Model free</h5>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -3604,7 +3929,7 @@ Original date: March 30, 2018</p>
 \hline
 \text{O} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -3613,7 +3938,7 @@ Original date: March 30, 2018</p>
 \hline
 \text{O} &amp; \text{O} &amp; \text{X} \\
 \hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
  \\ 
@@ -3635,203 +3960,67 @@ Original date: March 30, 2018</p>
 &amp;
 0.000
 \end{array}\]</span>
-<h4 id="explorer-vs.-greedy">Explorer vs. Greedy</h4>
-<h5 id="model-free-6">Model free</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -3848,140 +4037,6 @@ Original date: March 30, 2018</p>
 0.550
 &amp;
 1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
 \end{array}\]</span>
 <h5 id="model-based-6">Model based</h5>
 <span class="math display">\[\begin{array}{}
@@ -4064,6 +4119,106 @@ Original date: March 30, 2018</p>
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
@@ -4142,6 +4297,84 @@ Original date: March 30, 2018</p>
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
@@ -4186,206 +4419,6 @@ Original date: March 30, 2018</p>
 \end{array}
 
  \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
 0.500
 &amp;
 0.500

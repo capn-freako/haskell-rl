@@ -108,8 +108,8 @@ instance Show CellState where
   show O     = "\\text{O}"
 
 data BoardState = BoardState
-  { cells          :: VS.Vector 3 (VS.Vector 3 CellState)
-  , isLearnersTurn :: Bool
+  { cells          :: !(VS.Vector 3 (VS.Vector 3 CellState))
+  , isLearnersTurn :: !Bool
   }
 
 initBoard :: BoardState
