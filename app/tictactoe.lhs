@@ -293,6 +293,19 @@ playNTimes n r p p' = evalStateT (traverse nxt [1..n]) initProbs
                   put wps'
                   return (bs, wps')
 
+playNTimes' :: Monad m
+            => Integer   -- Number of games to play.
+            -> Double    -- Learning rate.
+            -> Policy m  -- Learner's policy.
+            -> Policy m  -- Opponent's policy.
+            -> m [Winner]
+playNTimes' n r p p' = evalStateT (traverse nxt [1..n]) initProbs
+ where nxt _ = do wps <- get
+                  bs  <- lift $ play p p' wps
+                  let !wps' = updateProbs r wps bs
+                  put wps'
+                  return $ winner $ last bs
+
 play :: Monad m
      => Policy m  -- Learner's policy.
      -> Policy m  -- Opponent's policy.
@@ -380,8 +393,8 @@ playShowBoth rds =
 
 getWins :: [RunDef] -> IO [[Float]]
 getWins rds = forM rds $ \ RunDef{..} -> do
-  res <- playNTimes 1000 lRate polL polO
-  let wins = map (boolToFloat . (== Learner) . winner . last . fst) res
+  res <- playNTimes' 1000 lRate polL polO
+  let wins = map (boolToFloat . (== Learner)) res
   return $ movingAve 100 wins
 
 plotWins :: String               -- file name
