@@ -42,6 +42,13 @@ Copyright &copy; 2018 David Banas; all rights reserved World wide.
 - [optparse-generic](https://www.stackage.org/package/optparse-generic)
 - [vector-sized](https://www.stackage.org/package/vector-sized)
 - [finite-typelits](https://www.stackage.org/package/finite-typelits)
+- [extra](https://www.stackage.org/package/extra)
+- [finite-typelits](https://www.stackage.org/package/finite-typelits)
+- [text](https://www.stackage.org/package/text)
+- [random](https://www.stackage.org/package/random)
+- [random-shuffle](https://www.stackage.org/package/random-shuffle)
+- [Chart](https://www.stackage.org/package/Chart)
+- [Chart-cairo](https://www.stackage.org/package/Chart-cairo)
 
 \begin{code}
 import qualified Prelude as P
@@ -508,7 +515,8 @@ movingAve w xs =
 
 -- | Mean value of a collection
 mean :: (Foldable f, Fractional a) => f a -> a
-mean = uncurry (/) . foldr (\e (s,c) -> (e+s,c+1)) (0,0)
+-- mean = uncurry (/) . foldr (\e (s,c) -> (e+s,c+1)) (0,0)
+mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0)
 
 takeEvery :: Int -> [a] -> [a]
 takeEvery _ [] = []
