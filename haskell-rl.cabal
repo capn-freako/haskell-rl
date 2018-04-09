@@ -143,6 +143,7 @@ executable tic-tac-toe
     protolude,
     optparse-generic,
     vector-sized,
+    vector,
     finite-typelits,
     text,
     QuickCheck,

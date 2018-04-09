@@ -58,7 +58,8 @@ import Prelude (tail, last, unlines, String, Show(..))
 import Protolude  hiding (show, for)
 import Options.Generic
 
-import qualified Data.Vector.Sized as VS
+import qualified Data.Vector.Sized   as VS
+import qualified Data.Vector.Unboxed as V
 
 import Control.Arrow              ((&&&))
 import Control.Monad.Extra        (unfoldM)
@@ -293,19 +294,6 @@ playNTimes n r p p' = evalStateT (traverse nxt [1..n]) initProbs
                   put wps'
                   return (bs, wps')
 
-playNTimes' :: Monad m
-            => Integer   -- Number of games to play.
-            -> Double    -- Learning rate.
-            -> Policy m  -- Learner's policy.
-            -> Policy m  -- Opponent's policy.
-            -> m [Winner]
-playNTimes' n r p p' = evalStateT (traverse nxt [1..n]) initProbs
- where nxt _ = do wps <- get
-                  bs  <- lift $ play p p' wps
-                  let !wps' = updateProbs r wps bs
-                  put wps'
-                  return $ winner $ last bs
-
 play :: Monad m
      => Policy m  -- Learner's policy.
      -> Policy m  -- Opponent's policy.
@@ -332,6 +320,36 @@ move p wps bs =
             return $ if null bss
                        then bs
                        else P.head bss
+
+calcWinAves :: Monad m
+            => Int       -- Moving average window size.
+            -> Integer   -- Number of games to play.
+            -> Double    -- Learning rate.
+            -> Policy m  -- Learner's policy.
+            -> Policy m  -- Opponent's policy.
+            -> m [Double]
+calcWinAves m n r p p' = calcWinAves' initProbs (V.replicate m 0) 0 [] m n r p p'
+            >>= \xs -> return (drop m xs)
+
+calcWinAves' :: Monad m
+             => WinProbs         -- current win probabilities
+             -> V.Vector Double  -- averaging window storage
+             -> Double           -- current expected win probability
+             -> [Double]         -- expected win probabilities
+             -> Int
+             -> Integer
+             -> Double
+             -> Policy m
+             -> Policy m
+             -> m [Double]
+calcWinAves' wps xs acc ys m n r p p'
+  | n == 0    = return $ reverse ys
+  | otherwise = do bs <- play p p' wps
+                   let !wps' = updateProbs r wps bs
+                       !y    = ((/ (fromIntegral m)) . winnerToProb . winner . last) bs
+                       !acc' = acc + y - V.last xs     -- Update the running average.
+                       !xs'  = y `V.cons` (V.init xs)  -- Shift y in and oldest element out.
+                   calcWinAves' wps' xs' acc' (acc : ys) m (n - 1) r p p'
 
 
 {----------------------------------------------------------------------
@@ -391,15 +409,13 @@ playShowBoth rds =
        res' <- playNTimes num lRate (model >?= polL) polO
        appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res'
 
-getWins :: [RunDef] -> IO [[Float]]
+getWins :: [RunDef] -> IO [[Double]]
 getWins rds = forM rds $ \ RunDef{..} -> do
-  res <- playNTimes' 1000 lRate polL polO
-  let wins = map (boolToFloat . (== Learner)) res
-  return $ movingAve 100 wins
+  calcWinAves 1000 10000 lRate polL polO
 
 plotWins :: String               -- file name
          -> String               -- plot name
-         -> [(String, [Float])]  -- plot pairs (label + y-data)
+         -> [(String, [Double])]  -- plot pairs (label + y-data)
          -> IO ()
 plotWins fname pname prs = toFile def fname $ do
   layout_title .= pname
@@ -518,23 +534,22 @@ showBoard bs = unlines
 showProb :: WinProbs -> BoardState -> String
 showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
 
-boolToFloat :: Bool -> Float
-boolToFloat True = 1.0
-boolToFloat _    = 0.0
+-- boolToFloat :: Bool -> Float
+-- boolToFloat True = 1.0
+-- boolToFloat _    = 0.0
 
-movingAve :: Fractional a => Int -> [a] -> [a]
-movingAve w xs =
-  ( take (length xs - w) . map mean . transpose
-  ) [drop n xs | n <- [0..(w - 1)]]
+-- movingAve :: Fractional a => Int -> [a] -> [a]
+-- movingAve w xs =
+--   ( take (length xs - w) . map mean . transpose
+--   ) [drop n xs | n <- [0..(w - 1)]]
 
 -- | Mean value of a collection
-mean :: (Foldable f, Fractional a) => f a -> a
--- mean = uncurry (/) . foldr (\e (s,c) -> (e+s,c+1)) (0,0)
-mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0)
+-- mean :: (Foldable f, Fractional a) => f a -> a
+-- mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0)
 
-takeEvery :: Int -> [a] -> [a]
-takeEvery _ [] = []
-takeEvery n xs = P.head xs : takeEvery n (drop n xs)
+-- takeEvery :: Int -> [a] -> [a]
+-- takeEvery _ [] = []
+-- takeEvery n xs = P.head xs : takeEvery n (drop n xs)
 
 -- randItem :: [a] -> IO a
 -- randItem = generate . elements
