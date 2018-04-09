@@ -411,7 +411,7 @@ playShowBoth rds =
 
 getWins :: [RunDef] -> IO [[Double]]
 getWins rds = forM rds $ \ RunDef{..} -> do
-  calcWinAves 1000 10000 lRate polL polO
+  calcWinAves 100 1000 lRate polL polO
 
 plotWins :: String               -- file name
          -> String               -- plot name
