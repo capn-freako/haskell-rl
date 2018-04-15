@@ -116,7 +116,7 @@ data BoardState = BoardState
 initBoard :: BoardState
 initBoard = BoardState
   { cells          = VS.replicate (VS.replicate Empty)
-  , isLearnersTurn = True
+  , isLearnersTurn = False
   }
 
 done :: BoardState -> Bool
@@ -321,35 +321,39 @@ move p wps bs =
                        then bs
                        else P.head bss
 
-calcWinAves :: Monad m
-            => Int       -- Moving average window size.
-            -> Integer   -- Number of games to play.
-            -> Double    -- Learning rate.
-            -> Policy m  -- Learner's policy.
-            -> Policy m  -- Opponent's policy.
-            -> m [Double]
-calcWinAves m n r p p' = calcWinAves' initProbs (V.replicate m 0) 0 [] m n r p p'
-            >>= \xs -> return (drop m xs)
+-- | Calculate moving average, as well as cumulative, number of learner wins.
+calcWinStats :: Monad m
+             => Int       -- Moving average window size.
+             -> Integer   -- Number of games to play.
+             -> Double    -- Learning rate.
+             -> Policy m  -- Learner's policy.
+             -> Policy m  -- Opponent's policy.
+             -> m ([Double],[Double]) -- (ave., cum.)
+calcWinStats m n r p p' = calcWinStats' initProbs (V.replicate m 0) 0 [] 0 [] m n r p p'
+                          >>= \xss -> return $ toBoth (drop m) xss
 
-calcWinAves' :: Monad m
-             => WinProbs         -- current win probabilities
-             -> V.Vector Double  -- averaging window storage
-             -> Double           -- current expected win probability
-             -> [Double]         -- expected win probabilities
-             -> Int
-             -> Integer
-             -> Double
-             -> Policy m
-             -> Policy m
-             -> m [Double]
-calcWinAves' wps xs acc ys m n r p p'
-  | n == 0    = return $ reverse ys
+calcWinStats' :: Monad m
+              => WinProbs         -- current win probabilities
+              -> V.Vector Double  -- averaging window storage
+              -> Double           -- current expected win probability
+              -> [Double]         -- expected win probabilities
+              -> Double           -- current cumulative wins
+              -> [Double]         -- cumulative wins
+              -> Int
+              -> Integer
+              -> Double
+              -> Policy m
+              -> Policy m
+              -> m ([Double],[Double])
+calcWinStats' wps xs acc ys wins zs m n r p p'
+  | n == 0    = return $ toBoth reverse (ys,zs)
   | otherwise = do bs <- play p p' wps
                    let !wps' = updateProbs r wps bs
-                       !y    = ((/ (fromIntegral m)) . winnerToProb . winner . last) bs
+                       !z    = (winnerToProb . winner . last) bs
+                       !y    = z / (fromIntegral m)
                        !acc' = acc + y - V.last xs     -- Update the running average.
                        !xs'  = y `V.cons` (V.init xs)  -- Shift y in and oldest element out.
-                   calcWinAves' wps' xs' acc' (acc : ys) m (n - 1) r p p'
+                   calcWinStats' wps' xs' acc' (acc : ys) (wins + z) (wins : zs) m (n - 1) r p p'
 
 
 {----------------------------------------------------------------------
@@ -374,6 +378,24 @@ runDefs =
   , RunDef "Explorer vs. Greedy" (explore 0.1 greedy rand) greedy 5 0.1
   ]
 
+runDefs' =
+  [ RunDef "Greedy vs. Random"   greedy                    rand   5 0.1
+  , RunDef "Explorer vs. Random" (explore 0.1 greedy rand) rand   5 0.1
+  ]
+
+data PlotDef = PlotDef
+  { title  :: String
+  , runMod :: RunDef -> RunDef
+  }
+
+plotDefs =
+  [ PlotDef "Model Free"                 P.id
+  , PlotDef "Model Based (Learner Only)" ( \rd -> rd{polL = model >?= polL rd})
+  , PlotDef "Model Based (Both)"         ( \rd -> rd{polL = model >?= polL rd
+                                         ,           polO = model >?= polO rd}
+                                         )
+  ]
+
 main :: IO ()
 main = do
     -- Process command line options.
@@ -386,17 +408,13 @@ main = do
     playShowBoth runDefs
 
     -- Test specified games over many trials.
-    let rds    = drop 3 runDefs  -- Uninteresting; first 2 always win and third always loses.
-        labels = map name rds
-    yss   <- getWins rds
-    yss'  <- getWins $ for rds $ \ rd -> rd{polL = model >?= polL rd}
-    yss'' <- getWins $ for rds $ \ rd -> rd{polL = model >?= polL rd, polO = model >?= polO rd}
-    plotWins "img/plot1.png" "Expected Learner Win Probability - Model Free"                 $ zip labels yss
-    plotWins "img/plot2.png" "Expected Learner Win Probability - Model Based (Learner Only)" $ zip labels yss'
-    plotWins "img/plot3.png" "Expected Learner Win Probability - Model Based (Both)"         $ zip labels yss''
-    appendFile "other/tictactoe.md" $ "![](img/plot1.png)\n"
-    appendFile "other/tictactoe.md" $ "![](img/plot2.png)\n"
-    appendFile "other/tictactoe.md" $ "![](img/plot3.png)\n"
+    let labels = map name runDefs'
+    forM_ (zip [(1 :: Int)..] plotDefs) $ \ (i, PlotDef{..}) -> do
+      prss <- getWins $ map runMod runDefs'
+      plotWins (printf "img/plot%d.png" i)
+               (printf "Average Probability of and Cumulative Learner Wins - %s" title)
+               (toBoth (zip labels) (unzip prss))
+      appendFile "other/tictactoe.md" $ pack $ printf "![](img/plot%d.png)\n" i
 
 playShowBoth :: [RunDef] -> IO ()
 playShowBoth rds =
@@ -409,19 +427,24 @@ playShowBoth rds =
        res' <- playNTimes num lRate (model >?= polL) polO
        appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res'
 
-getWins :: [RunDef] -> IO [[Double]]
+getWins :: [RunDef] -> IO [([Double],[Double])]
 getWins rds = forM rds $ \ RunDef{..} -> do
-  calcWinAves 100 1000 lRate polL polO
+  calcWinStats 1000 100000 lRate polL polO
 
-plotWins :: String               -- file name
-         -> String               -- plot name
-         -> [(String, [Double])]  -- plot pairs (label + y-data)
+plotWins :: String                    -- file name
+         -> String                    -- plot name
+         -> ( [(String, [Double])]    -- average probability plot pairs (label + y-data)
+            , [(String, [Double])] )  -- cumulative plot pairs (label + y-data)
          -> IO ()
-plotWins fname pname prs = toFile def fname $ do
-  layout_title .= pname
-  setColors $ map opaque [red, green, blue, yellow]
-  forM_ prs $ \ (lbl, ys) -> do
-    plot (line lbl [zip [(0::Int)..] ys])
+plotWins fname pname pr = toFile def fname $ do
+  layoutlr_title .= pname
+  layoutlr_left_axis  . laxis_override .= axisGridHide
+  layoutlr_right_axis . laxis_override .= axisGridHide
+  setColors $ map opaque [red, blue, red, blue]
+  forM_ (fst pr) $ \ (lbl, ys) -> do
+    plotLeft (line lbl [zip [(0::Int)..] ys])
+  forM_ (snd pr) $ \ (lbl, ys) -> do
+    plotRight (line lbl [zip [(0::Int)..] ys])
 
 
 {----------------------------------------------------------------------
