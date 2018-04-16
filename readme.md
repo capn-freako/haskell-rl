@@ -1,10 +1,10 @@
 haskell-rl
 ===
 
-[![Build Status](https://travis-ci.org/capn-freako/haskell-rl.png)](https://travis-ci.org/capn-freako/haskell-rl)
-
-See https://capn-freako.github.io/haskell-rl/index.html for project description.
+See [repository *index.html* file](https://pages.git.target.com/RedOptHaskell/haskell-rl/) for project description.
 
 ~~~
-stack build --test --exec "$(stack path --local-install-root)/bin/haskell-rl-example" --exec "$(stack path --local-bin)/pandoc -f markdown+lhs -i app/example.lhs -t html -o index.html --filter pandoc-include --mathjax" --file-watch
+stack build :tic-tac-toe
+stack exec tic-tac-toe
+pandoc -f markdown+lhs -i app/tictactoe.lhs -t html -o index.html --filter pandoc-include --mathjax
 ~~~
