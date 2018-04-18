@@ -70,7 +70,7 @@ import Options.Generic
 import qualified Data.Vector.Sized   as VS
 import qualified Data.Vector.Unboxed as V
 
-import Control.Arrow              ((&&&))
+import Control.Arrow              ((&&&), (***))
 import Control.Monad.Extra        (unfoldM)
 import Data.Finite
 import Data.Text                  (pack)
@@ -337,9 +337,9 @@ calcWinStats :: Monad m
              -> Double    -- Learning rate.
              -> Policy m  -- Learner's policy.
              -> Policy m  -- Opponent's policy.
-             -> m ([Double],[Double]) -- (ave., cum.)
-calcWinStats m n r p p' = calcWinStats' initProbs (V.replicate m 0) 0 [] 0 [] m n r p p'
-                          >>= \xss -> return $ toBoth (drop m) xss
+             -> m (([Double],[Double]), [Double]) -- ((ave., cum.), var.)
+calcWinStats m n r p p' = calcWinStats' initProbs (V.replicate m 0) 0 [] 0 [] [] m n r p p'
+                          >>= \xss -> return $ ((toBoth (drop m)) *** (drop m)) xss
 
 calcWinStats' :: Monad m
               => WinProbs         -- current win probabilities
@@ -348,21 +348,23 @@ calcWinStats' :: Monad m
               -> [Double]         -- expected win probabilities
               -> Double           -- current cumulative wins
               -> [Double]         -- cumulative wins
+              -> [Double]         -- variances in win probabilities
               -> Int
               -> Integer
               -> Double
               -> Policy m
               -> Policy m
-              -> m ([Double],[Double])
-calcWinStats' wps xs acc ys wins zs m n r p p'
-  | n == 0    = return $ toBoth reverse (ys,zs)
+              -> m (([Double],[Double]), [Double])
+calcWinStats' wps xs acc ys wins zs vs m n r p p'
+  | n == 0    = return $ (toBoth reverse (ys,zs), reverse vs)
   | otherwise = do bs <- play p p' wps
                    let !wps' = updateProbs r wps bs
+                       !var  = mean $ VS.map sqr $ VS.zipWith (-) wps' wps
                        !z    = (winnerToProb . winner . last) bs
                        !y    = z / (fromIntegral m)
                        !acc' = acc + y - V.last xs     -- Update the running average.
                        !xs'  = y `V.cons` (V.init xs)  -- Shift y in and oldest element out.
-                   calcWinStats' wps' xs' acc' (acc : ys) (wins + z) (wins : zs) m (n - 1) r p p'
+                   calcWinStats' wps' xs' acc' (acc : ys) (wins + z) (wins : zs) (var : vs) m (n - 1) r p p'
 
 
 {----------------------------------------------------------------------
@@ -421,8 +423,10 @@ main = do
     forM_ (zip [(1 :: Int)..] plotDefs) $ \ (i, PlotDef{..}) -> do
       prss <- getWins $ map runMod runDefs'
       plotWins (printf "img/plot%d.png" i)
-               (printf "Average Probability of and Cumulative Learner Wins - %s" title)
-               (toBoth (zip labels) (unzip prss))
+               -- (printf "Average Probability of and Cumulative Learner Wins - %s" title)
+               (printf "Expectation of, and Average Variance in, Win Probabilities - %s" title)
+               -- (toBoth (zip labels) (unzip prss))
+               (toBoth (zip labels) $ first (fst . unzip) (unzip prss))
       appendFile "other/tictactoe.md" $ pack $ printf "![](img/plot%d.png)\n" i
 
 playShowBoth :: [RunDef] -> IO ()
@@ -436,7 +440,7 @@ playShowBoth rds =
        res' <- playNTimes num lRate (model >?= polL) polO
        appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res'
 
-getWins :: [RunDef] -> IO [([Double],[Double])]
+getWins :: [RunDef] -> IO [(([Double],[Double]), [Double])]
 getWins rds = forM rds $ \ RunDef{..} -> do
   calcWinStats 1000 100000 lRate polL polO
 
@@ -576,8 +580,12 @@ showProb wps = printf "%5.3f" . VS.index wps . stateToIndex
 --   ) [drop n xs | n <- [0..(w - 1)]]
 
 -- | Mean value of a collection
--- mean :: (Foldable f, Fractional a) => f a -> a
--- mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0)
+mean :: (Foldable f, Fractional a) => f a -> a
+mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0)
+
+-- | Square a numerical value.
+sqr :: Num a => a -> a
+sqr x = x * x
 
 -- takeEvery :: Int -> [a] -> [a]
 -- takeEvery _ [] = []

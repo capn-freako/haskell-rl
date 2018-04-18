@@ -2,7 +2,7 @@
 <script type="text/javascript" async
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
-<h1 id="haskell-rl-tic-tac-toe-ex.-1">haskell-rl : Tic-Tac-Toe Ex. 1</h1>
+<h1 id="haskell-rl-tic-tac-toe">haskell-rl : Tic-Tac-Toe</h1>
 <p>This <a href="https://wiki.haskell.org/Literate_programming">literate Haskell</a> document provides solutions to some of the exercises at the end of Ch. 1 in <a href="http://incompleteideas.net/book/the-book-2nd.html">Reinforcement Learning: An Introduction</a>, by Sutton and Barto.</p>
 <p>Original author: <a href="mailto:David.Banas@target.com">David Banas</a><br />
 Original date: March 30, 2018</p>
@@ -50,7 +50,7 @@ Original date: March 30, 2018</p>
 <a class="sourceLine" id="cb3-7" data-line-number="7"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
 <a class="sourceLine" id="cb3-8" data-line-number="8"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Unboxed</span> <span class="kw">as</span> <span class="dt">V</span></a>
 <a class="sourceLine" id="cb3-9" data-line-number="9"></a>
-<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Control.Arrow</span>              ((&amp;&amp;&amp;))</a>
+<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Control.Arrow</span>              ((&amp;&amp;&amp;), (***))</a>
 <a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Control.Monad.Extra</span>        (unfoldM)</a>
 <a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
 <a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.Text</span>                  (pack)</a>
@@ -313,9 +313,9 @@ Original date: March 30, 2018</p>
 <a class="sourceLine" id="cb4-247" data-line-number="247">             <span class="ot">-&gt;</span> <span class="dt">Double</span>    <span class="co">-- Learning rate.</span></a>
 <a class="sourceLine" id="cb4-248" data-line-number="248">             <span class="ot">-&gt;</span> <span class="dt">Policy</span> m  <span class="co">-- Learner&#39;s policy.</span></a>
 <a class="sourceLine" id="cb4-249" data-line-number="249">             <span class="ot">-&gt;</span> <span class="dt">Policy</span> m  <span class="co">-- Opponent&#39;s policy.</span></a>
-<a class="sourceLine" id="cb4-250" data-line-number="250">             <span class="ot">-&gt;</span> m ([<span class="dt">Double</span>],[<span class="dt">Double</span>]) <span class="co">-- (ave., cum.)</span></a>
-<a class="sourceLine" id="cb4-251" data-line-number="251">calcWinStats m n r p p&#39; <span class="fu">=</span> calcWinStats&#39; initProbs (V.replicate m <span class="dv">0</span>) <span class="dv">0</span> [] <span class="dv">0</span> [] m n r p p&#39;</a>
-<a class="sourceLine" id="cb4-252" data-line-number="252">                          <span class="fu">&gt;&gt;=</span> \xss <span class="ot">-&gt;</span> return <span class="fu">$</span> toBoth (drop m) xss</a>
+<a class="sourceLine" id="cb4-250" data-line-number="250">             <span class="ot">-&gt;</span> m (([<span class="dt">Double</span>],[<span class="dt">Double</span>]), [<span class="dt">Double</span>]) <span class="co">-- ((ave., cum.), var.)</span></a>
+<a class="sourceLine" id="cb4-251" data-line-number="251">calcWinStats m n r p p&#39; <span class="fu">=</span> calcWinStats&#39; initProbs (V.replicate m <span class="dv">0</span>) <span class="dv">0</span> [] <span class="dv">0</span> [] [] m n r p p&#39;</a>
+<a class="sourceLine" id="cb4-252" data-line-number="252">                          <span class="fu">&gt;&gt;=</span> \xss <span class="ot">-&gt;</span> return <span class="fu">$</span> ((toBoth (drop m)) <span class="fu">***</span> (drop m)) xss</a>
 <a class="sourceLine" id="cb4-253" data-line-number="253"></a>
 <a class="sourceLine" id="cb4-254" data-line-number="254"><span class="ot">calcWinStats&#39; ::</span> <span class="dt">Monad</span> m</a>
 <a class="sourceLine" id="cb4-255" data-line-number="255">              <span class="ot">=&gt;</span> <span class="dt">WinProbs</span>         <span class="co">-- current win probabilities</span></a>
@@ -324,243 +324,251 @@ Original date: March 30, 2018</p>
 <a class="sourceLine" id="cb4-258" data-line-number="258">              <span class="ot">-&gt;</span> [<span class="dt">Double</span>]         <span class="co">-- expected win probabilities</span></a>
 <a class="sourceLine" id="cb4-259" data-line-number="259">              <span class="ot">-&gt;</span> <span class="dt">Double</span>           <span class="co">-- current cumulative wins</span></a>
 <a class="sourceLine" id="cb4-260" data-line-number="260">              <span class="ot">-&gt;</span> [<span class="dt">Double</span>]         <span class="co">-- cumulative wins</span></a>
-<a class="sourceLine" id="cb4-261" data-line-number="261">              <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb4-262" data-line-number="262">              <span class="ot">-&gt;</span> <span class="dt">Integer</span></a>
-<a class="sourceLine" id="cb4-263" data-line-number="263">              <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
-<a class="sourceLine" id="cb4-264" data-line-number="264">              <span class="ot">-&gt;</span> <span class="dt">Policy</span> m</a>
+<a class="sourceLine" id="cb4-261" data-line-number="261">              <span class="ot">-&gt;</span> [<span class="dt">Double</span>]         <span class="co">-- variances in win probabilities</span></a>
+<a class="sourceLine" id="cb4-262" data-line-number="262">              <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-263" data-line-number="263">              <span class="ot">-&gt;</span> <span class="dt">Integer</span></a>
+<a class="sourceLine" id="cb4-264" data-line-number="264">              <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
 <a class="sourceLine" id="cb4-265" data-line-number="265">              <span class="ot">-&gt;</span> <span class="dt">Policy</span> m</a>
-<a class="sourceLine" id="cb4-266" data-line-number="266">              <span class="ot">-&gt;</span> m ([<span class="dt">Double</span>],[<span class="dt">Double</span>])</a>
-<a class="sourceLine" id="cb4-267" data-line-number="267">calcWinStats&#39; wps xs acc ys wins zs m n r p p&#39;</a>
-<a class="sourceLine" id="cb4-268" data-line-number="268">  <span class="fu">|</span> n <span class="fu">==</span> <span class="dv">0</span>    <span class="fu">=</span> return <span class="fu">$</span> toBoth reverse (ys,zs)</a>
-<a class="sourceLine" id="cb4-269" data-line-number="269">  <span class="fu">|</span> otherwise <span class="fu">=</span> <span class="kw">do</span> bs <span class="ot">&lt;-</span> play p p&#39; wps</a>
-<a class="sourceLine" id="cb4-270" data-line-number="270">                   <span class="kw">let</span> <span class="fu">!</span>wps&#39; <span class="fu">=</span> updateProbs r wps bs</a>
-<a class="sourceLine" id="cb4-271" data-line-number="271">                       <span class="fu">!</span>z    <span class="fu">=</span> (winnerToProb <span class="fu">.</span> winner <span class="fu">.</span> last) bs</a>
-<a class="sourceLine" id="cb4-272" data-line-number="272">                       <span class="fu">!</span>y    <span class="fu">=</span> z <span class="fu">/</span> (fromIntegral m)</a>
-<a class="sourceLine" id="cb4-273" data-line-number="273">                       <span class="fu">!</span>acc&#39; <span class="fu">=</span> acc <span class="fu">+</span> y <span class="fu">-</span> V.last xs     <span class="co">-- Update the running average.</span></a>
-<a class="sourceLine" id="cb4-274" data-line-number="274">                       <span class="fu">!</span>xs&#39;  <span class="fu">=</span> y <span class="ot">`V.cons`</span> (V.init xs)  <span class="co">-- Shift y in and oldest element out.</span></a>
-<a class="sourceLine" id="cb4-275" data-line-number="275">                   calcWinStats&#39; wps&#39; xs&#39; acc&#39; (acc <span class="fu">:</span> ys) (wins <span class="fu">+</span> z) (wins <span class="fu">:</span> zs) m (n <span class="fu">-</span> <span class="dv">1</span>) r p p&#39;</a>
-<a class="sourceLine" id="cb4-276" data-line-number="276"></a>
-<a class="sourceLine" id="cb4-277" data-line-number="277"></a>
-<a class="sourceLine" id="cb4-278" data-line-number="278"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-279" data-line-number="279"><span class="co">  main()</span></a>
-<a class="sourceLine" id="cb4-280" data-line-number="280"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-281" data-line-number="281"></a>
-<a class="sourceLine" id="cb4-282" data-line-number="282"><span class="kw">data</span> <span class="dt">RunDef</span> <span class="fu">=</span> <span class="dt">RunDef</span></a>
-<a class="sourceLine" id="cb4-283" data-line-number="283">  {<span class="ot"> name  ::</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-284" data-line-number="284">  ,<span class="ot"> polL  ::</span> <span class="dt">Policy</span> <span class="dt">IO</span>  <span class="co">-- Learner&#39;s policy.</span></a>
-<a class="sourceLine" id="cb4-285" data-line-number="285">  ,<span class="ot"> polO  ::</span> <span class="dt">Policy</span> <span class="dt">IO</span>  <span class="co">-- Opponent&#39;s policy.</span></a>
-<a class="sourceLine" id="cb4-286" data-line-number="286">  ,<span class="ot"> num   ::</span> <span class="dt">Integer</span>    <span class="co">-- Number of games to play.</span></a>
-<a class="sourceLine" id="cb4-287" data-line-number="287">  ,<span class="ot"> lRate ::</span> <span class="dt">Double</span>     <span class="co">-- Learning rate.</span></a>
-<a class="sourceLine" id="cb4-288" data-line-number="288">  }</a>
-<a class="sourceLine" id="cb4-289" data-line-number="289"></a>
-<a class="sourceLine" id="cb4-290" data-line-number="290">runDefs <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-291" data-line-number="291">  [ <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Dummy&quot;</span>     dumb                      dumb   <span class="dv">2</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-292" data-line-number="292">  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Dummy&quot;</span>    greedy                    dumb   <span class="dv">2</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-293" data-line-number="293">  , <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Greedy&quot;</span>    dumb                      greedy <span class="dv">2</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-294" data-line-number="294">  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span>   greedy                    rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-295" data-line-number="295">  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Greedy&quot;</span>   greedy                    greedy <span class="dv">5</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-296" data-line-number="296">  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Random&quot;</span> (explore <span class="fl">0.1</span> greedy rand) rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-297" data-line-number="297">  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Greedy&quot;</span> (explore <span class="fl">0.1</span> greedy rand) greedy <span class="dv">5</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-298" data-line-number="298">  ]</a>
-<a class="sourceLine" id="cb4-299" data-line-number="299"></a>
-<a class="sourceLine" id="cb4-300" data-line-number="300">runDefs&#39; <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-301" data-line-number="301">  [ <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span>   greedy                    rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-302" data-line-number="302">  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Random&quot;</span> (explore <span class="fl">0.1</span> greedy rand) rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
-<a class="sourceLine" id="cb4-303" data-line-number="303">  ]</a>
-<a class="sourceLine" id="cb4-304" data-line-number="304"></a>
-<a class="sourceLine" id="cb4-305" data-line-number="305"><span class="kw">data</span> <span class="dt">PlotDef</span> <span class="fu">=</span> <span class="dt">PlotDef</span></a>
-<a class="sourceLine" id="cb4-306" data-line-number="306">  {<span class="ot"> title  ::</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-307" data-line-number="307">  ,<span class="ot"> runMod ::</span> <span class="dt">RunDef</span> <span class="ot">-&gt;</span> <span class="dt">RunDef</span></a>
-<a class="sourceLine" id="cb4-308" data-line-number="308">  }</a>
-<a class="sourceLine" id="cb4-309" data-line-number="309"></a>
-<a class="sourceLine" id="cb4-310" data-line-number="310">plotDefs <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-311" data-line-number="311">  [ <span class="dt">PlotDef</span> <span class="st">&quot;Model Free&quot;</span>                 P.id</a>
-<a class="sourceLine" id="cb4-312" data-line-number="312">  , <span class="dt">PlotDef</span> <span class="st">&quot;Model Based (Learner Only)&quot;</span> ( \rd <span class="ot">-&gt;</span> rd{polL <span class="fu">=</span> model <span class="fu">&gt;?=</span> polL rd})</a>
-<a class="sourceLine" id="cb4-313" data-line-number="313">  , <span class="dt">PlotDef</span> <span class="st">&quot;Model Based (Both)&quot;</span>         ( \rd <span class="ot">-&gt;</span> rd{polL <span class="fu">=</span> model <span class="fu">&gt;?=</span> polL rd</a>
-<a class="sourceLine" id="cb4-314" data-line-number="314">                                         ,           polO <span class="fu">=</span> model <span class="fu">&gt;?=</span> polO rd}</a>
-<a class="sourceLine" id="cb4-315" data-line-number="315">                                         )</a>
-<a class="sourceLine" id="cb4-316" data-line-number="316">  ]</a>
-<a class="sourceLine" id="cb4-317" data-line-number="317"></a>
-<a class="sourceLine" id="cb4-318" data-line-number="318"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb4-319" data-line-number="319">main <span class="fu">=</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-320" data-line-number="320">    <span class="co">-- Process command line options.</span></a>
-<a class="sourceLine" id="cb4-321" data-line-number="321">    <span class="co">-- o :: Opts Unwrapped &lt;- unwrapRecord &quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span></a>
-<a class="sourceLine" id="cb4-322" data-line-number="322">    <span class="co">-- let n   = fromMaybe 10  (number o)</span></a>
-<a class="sourceLine" id="cb4-323" data-line-number="323">    <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span></a>
-<a class="sourceLine" id="cb4-324" data-line-number="324"></a>
-<a class="sourceLine" id="cb4-325" data-line-number="325">    <span class="co">-- Play and display the specified games.</span></a>
-<a class="sourceLine" id="cb4-326" data-line-number="326">    writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-327" data-line-number="327">    playShowBoth runDefs</a>
-<a class="sourceLine" id="cb4-328" data-line-number="328"></a>
-<a class="sourceLine" id="cb4-329" data-line-number="329">    <span class="co">-- Test specified games over many trials.</span></a>
-<a class="sourceLine" id="cb4-330" data-line-number="330">    <span class="kw">let</span> labels <span class="fu">=</span> map name runDefs&#39;</a>
-<a class="sourceLine" id="cb4-331" data-line-number="331">    forM_ (zip [(<span class="dv">1</span><span class="ot"> ::</span> <span class="dt">Int</span>)<span class="fu">..</span>] plotDefs) <span class="fu">$</span> \ (i, <span class="dt">PlotDef</span>{<span class="fu">..</span>}) <span class="ot">-&gt;</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-332" data-line-number="332">      prss <span class="ot">&lt;-</span> getWins <span class="fu">$</span> map runMod runDefs&#39;</a>
-<a class="sourceLine" id="cb4-333" data-line-number="333">      plotWins (printf <span class="st">&quot;img/plot%d.png&quot;</span> i)</a>
-<a class="sourceLine" id="cb4-334" data-line-number="334">               (printf <span class="st">&quot;Average Probability of and Cumulative Learner Wins - %s&quot;</span> title)</a>
-<a class="sourceLine" id="cb4-335" data-line-number="335">               (toBoth (zip labels) (unzip prss))</a>
-<a class="sourceLine" id="cb4-336" data-line-number="336">      appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;![](img/plot%d.png)\n&quot;</span> i</a>
-<a class="sourceLine" id="cb4-337" data-line-number="337"></a>
-<a class="sourceLine" id="cb4-338" data-line-number="338"><span class="ot">playShowBoth ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb4-339" data-line-number="339">playShowBoth rds <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-340" data-line-number="340">  forM_ rds <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-341" data-line-number="341">    <span class="kw">do</span> appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;#### &quot;</span> <span class="fu">&lt;&gt;</span> pack name <span class="fu">&lt;&gt;</span> <span class="st">&quot;\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-342" data-line-number="342">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model free\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-343" data-line-number="343">       res <span class="ot">&lt;-</span> playNTimes num lRate polL polO</a>
-<a class="sourceLine" id="cb4-344" data-line-number="344">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res</a>
-<a class="sourceLine" id="cb4-345" data-line-number="345">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model based\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-346" data-line-number="346">       res&#39; <span class="ot">&lt;-</span> playNTimes num lRate (model <span class="fu">&gt;?=</span> polL) polO</a>
-<a class="sourceLine" id="cb4-347" data-line-number="347">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res&#39;</a>
-<a class="sourceLine" id="cb4-348" data-line-number="348"></a>
-<a class="sourceLine" id="cb4-349" data-line-number="349"><span class="ot">getWins ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> [([<span class="dt">Double</span>],[<span class="dt">Double</span>])]</a>
-<a class="sourceLine" id="cb4-350" data-line-number="350">getWins rds <span class="fu">=</span> forM rds <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-351" data-line-number="351">  calcWinStats <span class="dv">1000</span> <span class="dv">100000</span> lRate polL polO</a>
+<a class="sourceLine" id="cb4-266" data-line-number="266">              <span class="ot">-&gt;</span> <span class="dt">Policy</span> m</a>
+<a class="sourceLine" id="cb4-267" data-line-number="267">              <span class="ot">-&gt;</span> m (([<span class="dt">Double</span>],[<span class="dt">Double</span>]), [<span class="dt">Double</span>])</a>
+<a class="sourceLine" id="cb4-268" data-line-number="268">calcWinStats&#39; wps xs acc ys wins zs vs m n r p p&#39;</a>
+<a class="sourceLine" id="cb4-269" data-line-number="269">  <span class="fu">|</span> n <span class="fu">==</span> <span class="dv">0</span>    <span class="fu">=</span> return <span class="fu">$</span> (toBoth reverse (ys,zs), reverse vs)</a>
+<a class="sourceLine" id="cb4-270" data-line-number="270">  <span class="fu">|</span> otherwise <span class="fu">=</span> <span class="kw">do</span> bs <span class="ot">&lt;-</span> play p p&#39; wps</a>
+<a class="sourceLine" id="cb4-271" data-line-number="271">                   <span class="kw">let</span> <span class="fu">!</span>wps&#39; <span class="fu">=</span> updateProbs r wps bs</a>
+<a class="sourceLine" id="cb4-272" data-line-number="272">                       <span class="fu">!</span>var  <span class="fu">=</span> mean <span class="fu">$</span> VS.map sqr <span class="fu">$</span> VS.zipWith (<span class="fu">-</span>) wps&#39; wps</a>
+<a class="sourceLine" id="cb4-273" data-line-number="273">                       <span class="fu">!</span>z    <span class="fu">=</span> (winnerToProb <span class="fu">.</span> winner <span class="fu">.</span> last) bs</a>
+<a class="sourceLine" id="cb4-274" data-line-number="274">                       <span class="fu">!</span>y    <span class="fu">=</span> z <span class="fu">/</span> (fromIntegral m)</a>
+<a class="sourceLine" id="cb4-275" data-line-number="275">                       <span class="fu">!</span>acc&#39; <span class="fu">=</span> acc <span class="fu">+</span> y <span class="fu">-</span> V.last xs     <span class="co">-- Update the running average.</span></a>
+<a class="sourceLine" id="cb4-276" data-line-number="276">                       <span class="fu">!</span>xs&#39;  <span class="fu">=</span> y <span class="ot">`V.cons`</span> (V.init xs)  <span class="co">-- Shift y in and oldest element out.</span></a>
+<a class="sourceLine" id="cb4-277" data-line-number="277">                   calcWinStats&#39; wps&#39; xs&#39; acc&#39; (acc <span class="fu">:</span> ys) (wins <span class="fu">+</span> z) (wins <span class="fu">:</span> zs) (var <span class="fu">:</span> vs) m (n <span class="fu">-</span> <span class="dv">1</span>) r p p&#39;</a>
+<a class="sourceLine" id="cb4-278" data-line-number="278"></a>
+<a class="sourceLine" id="cb4-279" data-line-number="279"></a>
+<a class="sourceLine" id="cb4-280" data-line-number="280"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-281" data-line-number="281"><span class="co">  main()</span></a>
+<a class="sourceLine" id="cb4-282" data-line-number="282"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-283" data-line-number="283"></a>
+<a class="sourceLine" id="cb4-284" data-line-number="284"><span class="kw">data</span> <span class="dt">RunDef</span> <span class="fu">=</span> <span class="dt">RunDef</span></a>
+<a class="sourceLine" id="cb4-285" data-line-number="285">  {<span class="ot"> name  ::</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-286" data-line-number="286">  ,<span class="ot"> polL  ::</span> <span class="dt">Policy</span> <span class="dt">IO</span>  <span class="co">-- Learner&#39;s policy.</span></a>
+<a class="sourceLine" id="cb4-287" data-line-number="287">  ,<span class="ot"> polO  ::</span> <span class="dt">Policy</span> <span class="dt">IO</span>  <span class="co">-- Opponent&#39;s policy.</span></a>
+<a class="sourceLine" id="cb4-288" data-line-number="288">  ,<span class="ot"> num   ::</span> <span class="dt">Integer</span>    <span class="co">-- Number of games to play.</span></a>
+<a class="sourceLine" id="cb4-289" data-line-number="289">  ,<span class="ot"> lRate ::</span> <span class="dt">Double</span>     <span class="co">-- Learning rate.</span></a>
+<a class="sourceLine" id="cb4-290" data-line-number="290">  }</a>
+<a class="sourceLine" id="cb4-291" data-line-number="291"></a>
+<a class="sourceLine" id="cb4-292" data-line-number="292">runDefs <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-293" data-line-number="293">  [ <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Dummy&quot;</span>     dumb                      dumb   <span class="dv">2</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-294" data-line-number="294">  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Dummy&quot;</span>    greedy                    dumb   <span class="dv">2</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-295" data-line-number="295">  , <span class="dt">RunDef</span> <span class="st">&quot;Dummy vs. Greedy&quot;</span>    dumb                      greedy <span class="dv">2</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-296" data-line-number="296">  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span>   greedy                    rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-297" data-line-number="297">  , <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Greedy&quot;</span>   greedy                    greedy <span class="dv">5</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-298" data-line-number="298">  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Random&quot;</span> (explore <span class="fl">0.1</span> greedy rand) rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-299" data-line-number="299">  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Greedy&quot;</span> (explore <span class="fl">0.1</span> greedy rand) greedy <span class="dv">5</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-300" data-line-number="300">  ]</a>
+<a class="sourceLine" id="cb4-301" data-line-number="301"></a>
+<a class="sourceLine" id="cb4-302" data-line-number="302">runDefs&#39; <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-303" data-line-number="303">  [ <span class="dt">RunDef</span> <span class="st">&quot;Greedy vs. Random&quot;</span>   greedy                    rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-304" data-line-number="304">  , <span class="dt">RunDef</span> <span class="st">&quot;Explorer vs. Random&quot;</span> (explore <span class="fl">0.1</span> greedy rand) rand   <span class="dv">5</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-305" data-line-number="305">  ]</a>
+<a class="sourceLine" id="cb4-306" data-line-number="306"></a>
+<a class="sourceLine" id="cb4-307" data-line-number="307"><span class="kw">data</span> <span class="dt">PlotDef</span> <span class="fu">=</span> <span class="dt">PlotDef</span></a>
+<a class="sourceLine" id="cb4-308" data-line-number="308">  {<span class="ot"> title  ::</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-309" data-line-number="309">  ,<span class="ot"> runMod ::</span> <span class="dt">RunDef</span> <span class="ot">-&gt;</span> <span class="dt">RunDef</span></a>
+<a class="sourceLine" id="cb4-310" data-line-number="310">  }</a>
+<a class="sourceLine" id="cb4-311" data-line-number="311"></a>
+<a class="sourceLine" id="cb4-312" data-line-number="312">plotDefs <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-313" data-line-number="313">  [ <span class="dt">PlotDef</span> <span class="st">&quot;Model Free&quot;</span>                 P.id</a>
+<a class="sourceLine" id="cb4-314" data-line-number="314">  , <span class="dt">PlotDef</span> <span class="st">&quot;Model Based (Learner Only)&quot;</span> ( \rd <span class="ot">-&gt;</span> rd{polL <span class="fu">=</span> model <span class="fu">&gt;?=</span> polL rd})</a>
+<a class="sourceLine" id="cb4-315" data-line-number="315">  , <span class="dt">PlotDef</span> <span class="st">&quot;Model Based (Both)&quot;</span>         ( \rd <span class="ot">-&gt;</span> rd{polL <span class="fu">=</span> model <span class="fu">&gt;?=</span> polL rd</a>
+<a class="sourceLine" id="cb4-316" data-line-number="316">                                         ,           polO <span class="fu">=</span> model <span class="fu">&gt;?=</span> polO rd}</a>
+<a class="sourceLine" id="cb4-317" data-line-number="317">                                         )</a>
+<a class="sourceLine" id="cb4-318" data-line-number="318">  ]</a>
+<a class="sourceLine" id="cb4-319" data-line-number="319"></a>
+<a class="sourceLine" id="cb4-320" data-line-number="320"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-321" data-line-number="321">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-322" data-line-number="322">    <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-323" data-line-number="323">    <span class="co">-- o :: Opts Unwrapped &lt;- unwrapRecord &quot;A simple Tic-Tac-Toe example using reinforcement learning.&quot;</span></a>
+<a class="sourceLine" id="cb4-324" data-line-number="324">    <span class="co">-- let n   = fromMaybe 10  (number o)</span></a>
+<a class="sourceLine" id="cb4-325" data-line-number="325">    <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span></a>
+<a class="sourceLine" id="cb4-326" data-line-number="326"></a>
+<a class="sourceLine" id="cb4-327" data-line-number="327">    <span class="co">-- Play and display the specified games.</span></a>
+<a class="sourceLine" id="cb4-328" data-line-number="328">    writeFile  <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="st">&quot;### Game Results\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-329" data-line-number="329">    playShowBoth runDefs</a>
+<a class="sourceLine" id="cb4-330" data-line-number="330"></a>
+<a class="sourceLine" id="cb4-331" data-line-number="331">    <span class="co">-- Test specified games over many trials.</span></a>
+<a class="sourceLine" id="cb4-332" data-line-number="332">    <span class="kw">let</span> labels <span class="fu">=</span> map name runDefs&#39;</a>
+<a class="sourceLine" id="cb4-333" data-line-number="333">    forM_ (zip [(<span class="dv">1</span><span class="ot"> ::</span> <span class="dt">Int</span>)<span class="fu">..</span>] plotDefs) <span class="fu">$</span> \ (i, <span class="dt">PlotDef</span>{<span class="fu">..</span>}) <span class="ot">-&gt;</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-334" data-line-number="334">      prss <span class="ot">&lt;-</span> getWins <span class="fu">$</span> map runMod runDefs&#39;</a>
+<a class="sourceLine" id="cb4-335" data-line-number="335">      plotWins (printf <span class="st">&quot;img/plot%d.png&quot;</span> i)</a>
+<a class="sourceLine" id="cb4-336" data-line-number="336">               <span class="co">-- (printf &quot;Average Probability of and Cumulative Learner Wins - %s&quot; title)</span></a>
+<a class="sourceLine" id="cb4-337" data-line-number="337">               (printf <span class="st">&quot;Expectation of, and Average Variance in, Win Probabilities - %s&quot;</span> title)</a>
+<a class="sourceLine" id="cb4-338" data-line-number="338">               <span class="co">-- (toBoth (zip labels) (unzip prss))</span></a>
+<a class="sourceLine" id="cb4-339" data-line-number="339">               (toBoth (zip labels) <span class="fu">$</span> first (fst <span class="fu">.</span> unzip) (unzip prss))</a>
+<a class="sourceLine" id="cb4-340" data-line-number="340">      appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;![](img/plot%d.png)\n&quot;</span> i</a>
+<a class="sourceLine" id="cb4-341" data-line-number="341"></a>
+<a class="sourceLine" id="cb4-342" data-line-number="342"><span class="ot">playShowBoth ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-343" data-line-number="343">playShowBoth rds <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-344" data-line-number="344">  forM_ rds <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-345" data-line-number="345">    <span class="kw">do</span> appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;#### &quot;</span> <span class="fu">&lt;&gt;</span> pack name <span class="fu">&lt;&gt;</span> <span class="st">&quot;\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-346" data-line-number="346">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model free\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-347" data-line-number="347">       res <span class="ot">&lt;-</span> playNTimes num lRate polL polO</a>
+<a class="sourceLine" id="cb4-348" data-line-number="348">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res</a>
+<a class="sourceLine" id="cb4-349" data-line-number="349">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> <span class="st">&quot;##### &quot;</span> <span class="fu">&lt;&gt;</span> <span class="st">&quot;Model based\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-350" data-line-number="350">       res&#39; <span class="ot">&lt;-</span> playNTimes num lRate (model <span class="fu">&gt;?=</span> polL) polO</a>
+<a class="sourceLine" id="cb4-351" data-line-number="351">       appendFile <span class="st">&quot;other/tictactoe.md&quot;</span> <span class="fu">$</span> (pack <span class="fu">.</span> unlines <span class="fu">.</span> map showGame) res&#39;</a>
 <a class="sourceLine" id="cb4-352" data-line-number="352"></a>
-<a class="sourceLine" id="cb4-353" data-line-number="353"><span class="ot">plotWins ::</span> <span class="dt">String</span>                    <span class="co">-- file name</span></a>
-<a class="sourceLine" id="cb4-354" data-line-number="354">         <span class="ot">-&gt;</span> <span class="dt">String</span>                    <span class="co">-- plot name</span></a>
-<a class="sourceLine" id="cb4-355" data-line-number="355">         <span class="ot">-&gt;</span> ( [(<span class="dt">String</span>, [<span class="dt">Double</span>])]    <span class="co">-- average probability plot pairs (label + y-data)</span></a>
-<a class="sourceLine" id="cb4-356" data-line-number="356">            , [(<span class="dt">String</span>, [<span class="dt">Double</span>])] )  <span class="co">-- cumulative plot pairs (label + y-data)</span></a>
-<a class="sourceLine" id="cb4-357" data-line-number="357">         <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb4-358" data-line-number="358">plotWins fname pname pr <span class="fu">=</span> toFile def fname <span class="fu">$</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-359" data-line-number="359">  layoutlr_title <span class="fu">.=</span> pname</a>
-<a class="sourceLine" id="cb4-360" data-line-number="360">  layoutlr_left_axis  <span class="fu">.</span> laxis_override <span class="fu">.=</span> axisGridHide</a>
-<a class="sourceLine" id="cb4-361" data-line-number="361">  layoutlr_right_axis <span class="fu">.</span> laxis_override <span class="fu">.=</span> axisGridHide</a>
-<a class="sourceLine" id="cb4-362" data-line-number="362">  setColors <span class="fu">$</span> map opaque [red, blue, red, blue]</a>
-<a class="sourceLine" id="cb4-363" data-line-number="363">  forM_ (fst pr) <span class="fu">$</span> \ (lbl, ys) <span class="ot">-&gt;</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-364" data-line-number="364">    plotLeft (line lbl [zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] ys])</a>
-<a class="sourceLine" id="cb4-365" data-line-number="365">  forM_ (snd pr) <span class="fu">$</span> \ (lbl, ys) <span class="ot">-&gt;</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-366" data-line-number="366">    plotRight (line lbl [zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] ys])</a>
-<a class="sourceLine" id="cb4-367" data-line-number="367"></a>
-<a class="sourceLine" id="cb4-368" data-line-number="368"></a>
-<a class="sourceLine" id="cb4-369" data-line-number="369"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-370" data-line-number="370"><span class="co">  Policy definitions.</span></a>
-<a class="sourceLine" id="cb4-371" data-line-number="371"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-353" data-line-number="353"><span class="ot">getWins ::</span> [<span class="dt">RunDef</span>] <span class="ot">-&gt;</span> <span class="dt">IO</span> [(([<span class="dt">Double</span>],[<span class="dt">Double</span>]), [<span class="dt">Double</span>])]</a>
+<a class="sourceLine" id="cb4-354" data-line-number="354">getWins rds <span class="fu">=</span> forM rds <span class="fu">$</span> \ <span class="dt">RunDef</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-355" data-line-number="355">  calcWinStats <span class="dv">1000</span> <span class="dv">100000</span> lRate polL polO</a>
+<a class="sourceLine" id="cb4-356" data-line-number="356"></a>
+<a class="sourceLine" id="cb4-357" data-line-number="357"><span class="ot">plotWins ::</span> <span class="dt">String</span>                    <span class="co">-- file name</span></a>
+<a class="sourceLine" id="cb4-358" data-line-number="358">         <span class="ot">-&gt;</span> <span class="dt">String</span>                    <span class="co">-- plot name</span></a>
+<a class="sourceLine" id="cb4-359" data-line-number="359">         <span class="ot">-&gt;</span> ( [(<span class="dt">String</span>, [<span class="dt">Double</span>])]    <span class="co">-- average probability plot pairs (label + y-data)</span></a>
+<a class="sourceLine" id="cb4-360" data-line-number="360">            , [(<span class="dt">String</span>, [<span class="dt">Double</span>])] )  <span class="co">-- cumulative plot pairs (label + y-data)</span></a>
+<a class="sourceLine" id="cb4-361" data-line-number="361">         <span class="ot">-&gt;</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-362" data-line-number="362">plotWins fname pname pr <span class="fu">=</span> toFile def fname <span class="fu">$</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-363" data-line-number="363">  layoutlr_title <span class="fu">.=</span> pname</a>
+<a class="sourceLine" id="cb4-364" data-line-number="364">  layoutlr_left_axis  <span class="fu">.</span> laxis_override <span class="fu">.=</span> axisGridHide</a>
+<a class="sourceLine" id="cb4-365" data-line-number="365">  layoutlr_right_axis <span class="fu">.</span> laxis_override <span class="fu">.=</span> axisGridHide</a>
+<a class="sourceLine" id="cb4-366" data-line-number="366">  setColors <span class="fu">$</span> map opaque [red, blue, red, blue]</a>
+<a class="sourceLine" id="cb4-367" data-line-number="367">  forM_ (fst pr) <span class="fu">$</span> \ (lbl, ys) <span class="ot">-&gt;</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-368" data-line-number="368">    plotLeft (line lbl [zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] ys])</a>
+<a class="sourceLine" id="cb4-369" data-line-number="369">  forM_ (snd pr) <span class="fu">$</span> \ (lbl, ys) <span class="ot">-&gt;</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-370" data-line-number="370">    plotRight (line lbl [zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] ys])</a>
+<a class="sourceLine" id="cb4-371" data-line-number="371"></a>
 <a class="sourceLine" id="cb4-372" data-line-number="372"></a>
-<a class="sourceLine" id="cb4-373" data-line-number="373"><span class="co">-- === General types and utilities ===</span></a>
-<a class="sourceLine" id="cb4-374" data-line-number="374"></a>
-<a class="sourceLine" id="cb4-375" data-line-number="375"><span class="kw">newtype</span> <span class="dt">Policy</span> m <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-376" data-line-number="376">  <span class="dt">Policy</span> {<span class="ot"> getPolicy ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> <span class="dt">WinProbs</span></a>
-<a class="sourceLine" id="cb4-377" data-line-number="377">                                <span class="ot">-&gt;</span> <span class="dt">BoardState</span></a>
-<a class="sourceLine" id="cb4-378" data-line-number="378">                                <span class="ot">-&gt;</span> m [<span class="dt">BoardState</span>] }</a>
-<a class="sourceLine" id="cb4-379" data-line-number="379"></a>
-<a class="sourceLine" id="cb4-380" data-line-number="380"><span class="co">-- Policy combinator tries the first one and resorts to the second, if</span></a>
-<a class="sourceLine" id="cb4-381" data-line-number="381"><span class="co">-- the first returns no options.</span></a>
-<a class="sourceLine" id="cb4-382" data-line-number="382"><span class="kw">infixl</span> <span class="dv">1</span> <span class="fu">&gt;?=</span></a>
+<a class="sourceLine" id="cb4-373" data-line-number="373"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-374" data-line-number="374"><span class="co">  Policy definitions.</span></a>
+<a class="sourceLine" id="cb4-375" data-line-number="375"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-376" data-line-number="376"></a>
+<a class="sourceLine" id="cb4-377" data-line-number="377"><span class="co">-- === General types and utilities ===</span></a>
+<a class="sourceLine" id="cb4-378" data-line-number="378"></a>
+<a class="sourceLine" id="cb4-379" data-line-number="379"><span class="kw">newtype</span> <span class="dt">Policy</span> m <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-380" data-line-number="380">  <span class="dt">Policy</span> {<span class="ot"> getPolicy ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> <span class="dt">WinProbs</span></a>
+<a class="sourceLine" id="cb4-381" data-line-number="381">                                <span class="ot">-&gt;</span> <span class="dt">BoardState</span></a>
+<a class="sourceLine" id="cb4-382" data-line-number="382">                                <span class="ot">-&gt;</span> m [<span class="dt">BoardState</span>] }</a>
 <a class="sourceLine" id="cb4-383" data-line-number="383"></a>
-<a class="sourceLine" id="cb4-384" data-line-number="384"><span class="ot">(&gt;?=) ::</span> <span class="dt">Policy</span> m <span class="ot">-&gt;</span> <span class="dt">Policy</span> m <span class="ot">-&gt;</span> <span class="dt">Policy</span> m</a>
-<a class="sourceLine" id="cb4-385" data-line-number="385"><span class="dt">Policy</span> f <span class="fu">&gt;?=</span> <span class="dt">Policy</span> g <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-386" data-line-number="386">  <span class="kw">do</span> bss <span class="ot">&lt;-</span> f wps bs</a>
-<a class="sourceLine" id="cb4-387" data-line-number="387">     <span class="kw">if</span> null bss</a>
-<a class="sourceLine" id="cb4-388" data-line-number="388">       <span class="kw">then</span> g wps bs</a>
-<a class="sourceLine" id="cb4-389" data-line-number="389">       <span class="kw">else</span> return bss</a>
-<a class="sourceLine" id="cb4-390" data-line-number="390"></a>
-<a class="sourceLine" id="cb4-391" data-line-number="391"><span class="co">-- Returns the &quot;corrected&quot; win probability, such that a larger number</span></a>
-<a class="sourceLine" id="cb4-392" data-line-number="392"><span class="co">-- always represents the better option, regardless of whos turn is next.</span></a>
-<a class="sourceLine" id="cb4-393" data-line-number="393"><span class="ot">stateToProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
-<a class="sourceLine" id="cb4-394" data-line-number="394">stateToProb wps bs <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-395" data-line-number="395">  <span class="kw">let</span> p <span class="fu">=</span> winProb wps bs</a>
-<a class="sourceLine" id="cb4-396" data-line-number="396">   <span class="kw">in</span> <span class="kw">if</span> isLearnersTurn bs</a>
-<a class="sourceLine" id="cb4-397" data-line-number="397">        <span class="kw">then</span> p</a>
-<a class="sourceLine" id="cb4-398" data-line-number="398">        <span class="kw">else</span> <span class="dv">1</span> <span class="fu">-</span> p</a>
-<a class="sourceLine" id="cb4-399" data-line-number="399"></a>
-<a class="sourceLine" id="cb4-400" data-line-number="400"><span class="co">-- Returns one of its two Policy arguments according to given probability.</span></a>
-<a class="sourceLine" id="cb4-401" data-line-number="401"><span class="ot">explore ::</span> <span class="dt">Float</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span></a>
-<a class="sourceLine" id="cb4-402" data-line-number="402">explore eps (<span class="dt">Policy</span> f) (<span class="dt">Policy</span> g) <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-403" data-line-number="403"> <span class="kw">do</span> r <span class="ot">&lt;-</span> randomIO</a>
-<a class="sourceLine" id="cb4-404" data-line-number="404">    <span class="kw">if</span> r <span class="fu">&gt;</span> eps</a>
-<a class="sourceLine" id="cb4-405" data-line-number="405">      <span class="kw">then</span> f wps bs</a>
-<a class="sourceLine" id="cb4-406" data-line-number="406">      <span class="kw">else</span> g wps bs</a>
-<a class="sourceLine" id="cb4-407" data-line-number="407"></a>
-<a class="sourceLine" id="cb4-408" data-line-number="408"></a>
-<a class="sourceLine" id="cb4-409" data-line-number="409"><span class="co">-- === Model free policies ===</span></a>
-<a class="sourceLine" id="cb4-410" data-line-number="410"></a>
-<a class="sourceLine" id="cb4-411" data-line-number="411"><span class="co">-- Just returns the list of next possible states in no particular order.</span></a>
-<a class="sourceLine" id="cb4-412" data-line-number="412">dumb <span class="fu">=</span> <span class="dt">Policy</span> (const(return <span class="fu">.</span> nextPossibleStates))</a>
-<a class="sourceLine" id="cb4-413" data-line-number="413"></a>
-<a class="sourceLine" id="cb4-414" data-line-number="414"><span class="co">-- Like `dumb`, but randomizes the list before returning.</span></a>
-<a class="sourceLine" id="cb4-415" data-line-number="415">rand <span class="fu">=</span> <span class="dt">Policy</span> (const(shuffleM <span class="fu">.</span> nextPossibleStates))</a>
-<a class="sourceLine" id="cb4-416" data-line-number="416"></a>
-<a class="sourceLine" id="cb4-417" data-line-number="417"><span class="co">-- Chooses the next state with highest probability of success.</span></a>
-<a class="sourceLine" id="cb4-418" data-line-number="418">greedy <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-419" data-line-number="419"> ( return</a>
-<a class="sourceLine" id="cb4-420" data-line-number="420"> <span class="fu">.</span> sortBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))</a>
-<a class="sourceLine" id="cb4-421" data-line-number="421">            (uncurry compare)</a>
-<a class="sourceLine" id="cb4-422" data-line-number="422">            (curry (toBoth <span class="fu">$</span> stateToProb wps))</a>
-<a class="sourceLine" id="cb4-423" data-line-number="423">          )</a>
-<a class="sourceLine" id="cb4-424" data-line-number="424"> ) <span class="fu">$</span> nextPossibleStates bs</a>
-<a class="sourceLine" id="cb4-425" data-line-number="425"></a>
-<a class="sourceLine" id="cb4-426" data-line-number="426"></a>
-<a class="sourceLine" id="cb4-427" data-line-number="427"><span class="co">-- === Model based policies ===</span></a>
-<a class="sourceLine" id="cb4-428" data-line-number="428"></a>
-<a class="sourceLine" id="cb4-429" data-line-number="429"><span class="co">-- Intended for use as a prefix to some model free policy.</span></a>
-<a class="sourceLine" id="cb4-430" data-line-number="430">model <span class="fu">=</span> win <span class="fu">&gt;?=</span> block</a>
-<a class="sourceLine" id="cb4-431" data-line-number="431"></a>
-<a class="sourceLine" id="cb4-432" data-line-number="432"><span class="co">-- Finds available winning positions.</span></a>
-<a class="sourceLine" id="cb4-433" data-line-number="433">win <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-434" data-line-number="434">  ( return</a>
-<a class="sourceLine" id="cb4-435" data-line-number="435">  <span class="fu">.</span> filter ((<span class="fu">==</span> <span class="dv">0</span>) <span class="fu">.</span> stateToProb wps)</a>
-<a class="sourceLine" id="cb4-436" data-line-number="436">  ) <span class="fu">$</span> nextPossibleStates bs</a>
-<a class="sourceLine" id="cb4-437" data-line-number="437"></a>
-<a class="sourceLine" id="cb4-438" data-line-number="438"><span class="co">-- Looks for other player&#39;s victory in next move and blocks if apropos.</span></a>
-<a class="sourceLine" id="cb4-439" data-line-number="439">block <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-440" data-line-number="440"> <span class="kw">do</span> <span class="kw">let</span> oppWins <span class="fu">=</span> filter ((<span class="fu">==</span> <span class="dv">0</span>) <span class="fu">.</span> stateToProb wps)</a>
-<a class="sourceLine" id="cb4-441" data-line-number="441">                         (nextPossibleStates <span class="fu">$</span> changeTurn bs)</a>
-<a class="sourceLine" id="cb4-442" data-line-number="442">    return <span class="fu">$</span> <span class="kw">if</span> null oppWins</a>
-<a class="sourceLine" id="cb4-443" data-line-number="443">               <span class="kw">then</span> []</a>
-<a class="sourceLine" id="cb4-444" data-line-number="444">               <span class="kw">else</span> [(chooseCell <span class="fu">.</span> P.head <span class="fu">.</span> diffCells bs <span class="fu">.</span> P.head) oppWins bs]</a>
-<a class="sourceLine" id="cb4-445" data-line-number="445"></a>
-<a class="sourceLine" id="cb4-446" data-line-number="446"></a>
-<a class="sourceLine" id="cb4-447" data-line-number="447"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-448" data-line-number="448"><span class="co">  Misc.</span></a>
-<a class="sourceLine" id="cb4-449" data-line-number="449"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-384" data-line-number="384"><span class="co">-- Policy combinator tries the first one and resorts to the second, if</span></a>
+<a class="sourceLine" id="cb4-385" data-line-number="385"><span class="co">-- the first returns no options.</span></a>
+<a class="sourceLine" id="cb4-386" data-line-number="386"><span class="kw">infixl</span> <span class="dv">1</span> <span class="fu">&gt;?=</span></a>
+<a class="sourceLine" id="cb4-387" data-line-number="387"></a>
+<a class="sourceLine" id="cb4-388" data-line-number="388"><span class="ot">(&gt;?=) ::</span> <span class="dt">Policy</span> m <span class="ot">-&gt;</span> <span class="dt">Policy</span> m <span class="ot">-&gt;</span> <span class="dt">Policy</span> m</a>
+<a class="sourceLine" id="cb4-389" data-line-number="389"><span class="dt">Policy</span> f <span class="fu">&gt;?=</span> <span class="dt">Policy</span> g <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-390" data-line-number="390">  <span class="kw">do</span> bss <span class="ot">&lt;-</span> f wps bs</a>
+<a class="sourceLine" id="cb4-391" data-line-number="391">     <span class="kw">if</span> null bss</a>
+<a class="sourceLine" id="cb4-392" data-line-number="392">       <span class="kw">then</span> g wps bs</a>
+<a class="sourceLine" id="cb4-393" data-line-number="393">       <span class="kw">else</span> return bss</a>
+<a class="sourceLine" id="cb4-394" data-line-number="394"></a>
+<a class="sourceLine" id="cb4-395" data-line-number="395"><span class="co">-- Returns the &quot;corrected&quot; win probability, such that a larger number</span></a>
+<a class="sourceLine" id="cb4-396" data-line-number="396"><span class="co">-- always represents the better option, regardless of whos turn is next.</span></a>
+<a class="sourceLine" id="cb4-397" data-line-number="397"><span class="ot">stateToProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
+<a class="sourceLine" id="cb4-398" data-line-number="398">stateToProb wps bs <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-399" data-line-number="399">  <span class="kw">let</span> p <span class="fu">=</span> winProb wps bs</a>
+<a class="sourceLine" id="cb4-400" data-line-number="400">   <span class="kw">in</span> <span class="kw">if</span> isLearnersTurn bs</a>
+<a class="sourceLine" id="cb4-401" data-line-number="401">        <span class="kw">then</span> p</a>
+<a class="sourceLine" id="cb4-402" data-line-number="402">        <span class="kw">else</span> <span class="dv">1</span> <span class="fu">-</span> p</a>
+<a class="sourceLine" id="cb4-403" data-line-number="403"></a>
+<a class="sourceLine" id="cb4-404" data-line-number="404"><span class="co">-- Returns one of its two Policy arguments according to given probability.</span></a>
+<a class="sourceLine" id="cb4-405" data-line-number="405"><span class="ot">explore ::</span> <span class="dt">Float</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span> <span class="ot">-&gt;</span> <span class="dt">Policy</span> <span class="dt">IO</span></a>
+<a class="sourceLine" id="cb4-406" data-line-number="406">explore eps (<span class="dt">Policy</span> f) (<span class="dt">Policy</span> g) <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-407" data-line-number="407"> <span class="kw">do</span> r <span class="ot">&lt;-</span> randomIO</a>
+<a class="sourceLine" id="cb4-408" data-line-number="408">    <span class="kw">if</span> r <span class="fu">&gt;</span> eps</a>
+<a class="sourceLine" id="cb4-409" data-line-number="409">      <span class="kw">then</span> f wps bs</a>
+<a class="sourceLine" id="cb4-410" data-line-number="410">      <span class="kw">else</span> g wps bs</a>
+<a class="sourceLine" id="cb4-411" data-line-number="411"></a>
+<a class="sourceLine" id="cb4-412" data-line-number="412"></a>
+<a class="sourceLine" id="cb4-413" data-line-number="413"><span class="co">-- === Model free policies ===</span></a>
+<a class="sourceLine" id="cb4-414" data-line-number="414"></a>
+<a class="sourceLine" id="cb4-415" data-line-number="415"><span class="co">-- Just returns the list of next possible states in no particular order.</span></a>
+<a class="sourceLine" id="cb4-416" data-line-number="416">dumb <span class="fu">=</span> <span class="dt">Policy</span> (const(return <span class="fu">.</span> nextPossibleStates))</a>
+<a class="sourceLine" id="cb4-417" data-line-number="417"></a>
+<a class="sourceLine" id="cb4-418" data-line-number="418"><span class="co">-- Like `dumb`, but randomizes the list before returning.</span></a>
+<a class="sourceLine" id="cb4-419" data-line-number="419">rand <span class="fu">=</span> <span class="dt">Policy</span> (const(shuffleM <span class="fu">.</span> nextPossibleStates))</a>
+<a class="sourceLine" id="cb4-420" data-line-number="420"></a>
+<a class="sourceLine" id="cb4-421" data-line-number="421"><span class="co">-- Chooses the next state with highest probability of success.</span></a>
+<a class="sourceLine" id="cb4-422" data-line-number="422">greedy <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-423" data-line-number="423"> ( return</a>
+<a class="sourceLine" id="cb4-424" data-line-number="424"> <span class="fu">.</span> sortBy ( ((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>))</a>
+<a class="sourceLine" id="cb4-425" data-line-number="425">            (uncurry compare)</a>
+<a class="sourceLine" id="cb4-426" data-line-number="426">            (curry (toBoth <span class="fu">$</span> stateToProb wps))</a>
+<a class="sourceLine" id="cb4-427" data-line-number="427">          )</a>
+<a class="sourceLine" id="cb4-428" data-line-number="428"> ) <span class="fu">$</span> nextPossibleStates bs</a>
+<a class="sourceLine" id="cb4-429" data-line-number="429"></a>
+<a class="sourceLine" id="cb4-430" data-line-number="430"></a>
+<a class="sourceLine" id="cb4-431" data-line-number="431"><span class="co">-- === Model based policies ===</span></a>
+<a class="sourceLine" id="cb4-432" data-line-number="432"></a>
+<a class="sourceLine" id="cb4-433" data-line-number="433"><span class="co">-- Intended for use as a prefix to some model free policy.</span></a>
+<a class="sourceLine" id="cb4-434" data-line-number="434">model <span class="fu">=</span> win <span class="fu">&gt;?=</span> block</a>
+<a class="sourceLine" id="cb4-435" data-line-number="435"></a>
+<a class="sourceLine" id="cb4-436" data-line-number="436"><span class="co">-- Finds available winning positions.</span></a>
+<a class="sourceLine" id="cb4-437" data-line-number="437">win <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-438" data-line-number="438">  ( return</a>
+<a class="sourceLine" id="cb4-439" data-line-number="439">  <span class="fu">.</span> filter ((<span class="fu">==</span> <span class="dv">0</span>) <span class="fu">.</span> stateToProb wps)</a>
+<a class="sourceLine" id="cb4-440" data-line-number="440">  ) <span class="fu">$</span> nextPossibleStates bs</a>
+<a class="sourceLine" id="cb4-441" data-line-number="441"></a>
+<a class="sourceLine" id="cb4-442" data-line-number="442"><span class="co">-- Looks for other player&#39;s victory in next move and blocks if apropos.</span></a>
+<a class="sourceLine" id="cb4-443" data-line-number="443">block <span class="fu">=</span> <span class="dt">Policy</span> <span class="fu">$</span> \ wps bs <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-444" data-line-number="444"> <span class="kw">do</span> <span class="kw">let</span> oppWins <span class="fu">=</span> filter ((<span class="fu">==</span> <span class="dv">0</span>) <span class="fu">.</span> stateToProb wps)</a>
+<a class="sourceLine" id="cb4-445" data-line-number="445">                         (nextPossibleStates <span class="fu">$</span> changeTurn bs)</a>
+<a class="sourceLine" id="cb4-446" data-line-number="446">    return <span class="fu">$</span> <span class="kw">if</span> null oppWins</a>
+<a class="sourceLine" id="cb4-447" data-line-number="447">               <span class="kw">then</span> []</a>
+<a class="sourceLine" id="cb4-448" data-line-number="448">               <span class="kw">else</span> [(chooseCell <span class="fu">.</span> P.head <span class="fu">.</span> diffCells bs <span class="fu">.</span> P.head) oppWins bs]</a>
+<a class="sourceLine" id="cb4-449" data-line-number="449"></a>
 <a class="sourceLine" id="cb4-450" data-line-number="450"></a>
-<a class="sourceLine" id="cb4-451" data-line-number="451"><span class="ot">toBoth ::</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> (a,a) <span class="ot">-&gt;</span> (b,b)</a>
-<a class="sourceLine" id="cb4-452" data-line-number="452">toBoth f (x1, x2) <span class="fu">=</span> (f x1, f x2)</a>
-<a class="sourceLine" id="cb4-453" data-line-number="453"></a>
-<a class="sourceLine" id="cb4-454" data-line-number="454"><span class="ot">for ::</span> (<span class="dt">Functor</span> f) <span class="ot">=&gt;</span> f a <span class="ot">-&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> f b</a>
-<a class="sourceLine" id="cb4-455" data-line-number="455">for <span class="fu">=</span> flip map</a>
-<a class="sourceLine" id="cb4-456" data-line-number="456"></a>
-<a class="sourceLine" id="cb4-457" data-line-number="457"><span class="ot">showGame ::</span> ([<span class="dt">BoardState</span>], <span class="dt">WinProbs</span>) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-458" data-line-number="458">showGame (bss, wps) <span class="fu">=</span> unlines <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-459" data-line-number="459">  <span class="st">&quot;\\begin{array}{}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-460" data-line-number="460">  ( intersperse <span class="st">&quot;&amp;&quot;</span> (map showBoard bss)</a>
-<a class="sourceLine" id="cb4-461" data-line-number="461">    <span class="fu">++</span> [<span class="st">&quot; \\\\ &quot;</span>]</a>
-<a class="sourceLine" id="cb4-462" data-line-number="462">    <span class="fu">++</span> intersperse <span class="st">&quot;&amp;&quot;</span> (map (showProb wps) bss)</a>
-<a class="sourceLine" id="cb4-463" data-line-number="463">    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
-<a class="sourceLine" id="cb4-464" data-line-number="464">  )</a>
-<a class="sourceLine" id="cb4-465" data-line-number="465"></a>
-<a class="sourceLine" id="cb4-466" data-line-number="466"><span class="ot">showBoard ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-467" data-line-number="467">showBoard bs <span class="fu">=</span> unlines</a>
-<a class="sourceLine" id="cb4-468" data-line-number="468">  ( <span class="st">&quot;\\begin{array}{c|c|c}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-469" data-line-number="469">    intersperse <span class="st">&quot;\\hline&quot;</span></a>
-<a class="sourceLine" id="cb4-470" data-line-number="470">      ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show <span class="fu">.</span> VS.toList)</a>
-<a class="sourceLine" id="cb4-471" data-line-number="471">            (VS.toList (cells bs))</a>
-<a class="sourceLine" id="cb4-472" data-line-number="472">      )</a>
-<a class="sourceLine" id="cb4-473" data-line-number="473">    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
-<a class="sourceLine" id="cb4-474" data-line-number="474">  )</a>
-<a class="sourceLine" id="cb4-475" data-line-number="475"></a>
-<a class="sourceLine" id="cb4-476" data-line-number="476"><span class="ot">showProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-477" data-line-number="477">showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;</span> <span class="fu">.</span> VS.index wps <span class="fu">.</span> stateToIndex</a>
-<a class="sourceLine" id="cb4-478" data-line-number="478"></a>
-<a class="sourceLine" id="cb4-479" data-line-number="479"><span class="co">-- boolToFloat :: Bool -&gt; Float</span></a>
-<a class="sourceLine" id="cb4-480" data-line-number="480"><span class="co">-- boolToFloat True = 1.0</span></a>
-<a class="sourceLine" id="cb4-481" data-line-number="481"><span class="co">-- boolToFloat _    = 0.0</span></a>
+<a class="sourceLine" id="cb4-451" data-line-number="451"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-452" data-line-number="452"><span class="co">  Misc.</span></a>
+<a class="sourceLine" id="cb4-453" data-line-number="453"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-454" data-line-number="454"></a>
+<a class="sourceLine" id="cb4-455" data-line-number="455"><span class="ot">toBoth ::</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> (a,a) <span class="ot">-&gt;</span> (b,b)</a>
+<a class="sourceLine" id="cb4-456" data-line-number="456">toBoth f (x1, x2) <span class="fu">=</span> (f x1, f x2)</a>
+<a class="sourceLine" id="cb4-457" data-line-number="457"></a>
+<a class="sourceLine" id="cb4-458" data-line-number="458"><span class="ot">for ::</span> (<span class="dt">Functor</span> f) <span class="ot">=&gt;</span> f a <span class="ot">-&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> f b</a>
+<a class="sourceLine" id="cb4-459" data-line-number="459">for <span class="fu">=</span> flip map</a>
+<a class="sourceLine" id="cb4-460" data-line-number="460"></a>
+<a class="sourceLine" id="cb4-461" data-line-number="461"><span class="ot">showGame ::</span> ([<span class="dt">BoardState</span>], <span class="dt">WinProbs</span>) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-462" data-line-number="462">showGame (bss, wps) <span class="fu">=</span> unlines <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-463" data-line-number="463">  <span class="st">&quot;\\begin{array}{}&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-464" data-line-number="464">  ( intersperse <span class="st">&quot;&amp;&quot;</span> (map showBoard bss)</a>
+<a class="sourceLine" id="cb4-465" data-line-number="465">    <span class="fu">++</span> [<span class="st">&quot; \\\\ &quot;</span>]</a>
+<a class="sourceLine" id="cb4-466" data-line-number="466">    <span class="fu">++</span> intersperse <span class="st">&quot;&amp;&quot;</span> (map (showProb wps) bss)</a>
+<a class="sourceLine" id="cb4-467" data-line-number="467">    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
+<a class="sourceLine" id="cb4-468" data-line-number="468">  )</a>
+<a class="sourceLine" id="cb4-469" data-line-number="469"></a>
+<a class="sourceLine" id="cb4-470" data-line-number="470"><span class="ot">showBoard ::</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-471" data-line-number="471">showBoard bs <span class="fu">=</span> unlines</a>
+<a class="sourceLine" id="cb4-472" data-line-number="472">  ( <span class="st">&quot;\\begin{array}{c|c|c}&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-473" data-line-number="473">    intersperse <span class="st">&quot;\\hline&quot;</span></a>
+<a class="sourceLine" id="cb4-474" data-line-number="474">      ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show <span class="fu">.</span> VS.toList)</a>
+<a class="sourceLine" id="cb4-475" data-line-number="475">            (VS.toList (cells bs))</a>
+<a class="sourceLine" id="cb4-476" data-line-number="476">      )</a>
+<a class="sourceLine" id="cb4-477" data-line-number="477">    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
+<a class="sourceLine" id="cb4-478" data-line-number="478">  )</a>
+<a class="sourceLine" id="cb4-479" data-line-number="479"></a>
+<a class="sourceLine" id="cb4-480" data-line-number="480"><span class="ot">showProb ::</span> <span class="dt">WinProbs</span> <span class="ot">-&gt;</span> <span class="dt">BoardState</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-481" data-line-number="481">showProb wps <span class="fu">=</span> printf <span class="st">&quot;%5.3f&quot;</span> <span class="fu">.</span> VS.index wps <span class="fu">.</span> stateToIndex</a>
 <a class="sourceLine" id="cb4-482" data-line-number="482"></a>
-<a class="sourceLine" id="cb4-483" data-line-number="483"><span class="co">-- movingAve :: Fractional a =&gt; Int -&gt; [a] -&gt; [a]</span></a>
-<a class="sourceLine" id="cb4-484" data-line-number="484"><span class="co">-- movingAve w xs =</span></a>
-<a class="sourceLine" id="cb4-485" data-line-number="485"><span class="co">--   ( take (length xs - w) . map mean . transpose</span></a>
-<a class="sourceLine" id="cb4-486" data-line-number="486"><span class="co">--   ) [drop n xs | n &lt;- [0..(w - 1)]]</span></a>
-<a class="sourceLine" id="cb4-487" data-line-number="487"></a>
-<a class="sourceLine" id="cb4-488" data-line-number="488"><span class="co">-- | Mean value of a collection</span></a>
-<a class="sourceLine" id="cb4-489" data-line-number="489"><span class="co">-- mean :: (Foldable f, Fractional a) =&gt; f a -&gt; a</span></a>
-<a class="sourceLine" id="cb4-490" data-line-number="490"><span class="co">-- mean = uncurry (/) . second fromIntegral . foldl&#39; (\ (!s, !n) x -&gt; (s+x, n+1)) (0,0)</span></a>
+<a class="sourceLine" id="cb4-483" data-line-number="483"><span class="co">-- boolToFloat :: Bool -&gt; Float</span></a>
+<a class="sourceLine" id="cb4-484" data-line-number="484"><span class="co">-- boolToFloat True = 1.0</span></a>
+<a class="sourceLine" id="cb4-485" data-line-number="485"><span class="co">-- boolToFloat _    = 0.0</span></a>
+<a class="sourceLine" id="cb4-486" data-line-number="486"></a>
+<a class="sourceLine" id="cb4-487" data-line-number="487"><span class="co">-- movingAve :: Fractional a =&gt; Int -&gt; [a] -&gt; [a]</span></a>
+<a class="sourceLine" id="cb4-488" data-line-number="488"><span class="co">-- movingAve w xs =</span></a>
+<a class="sourceLine" id="cb4-489" data-line-number="489"><span class="co">--   ( take (length xs - w) . map mean . transpose</span></a>
+<a class="sourceLine" id="cb4-490" data-line-number="490"><span class="co">--   ) [drop n xs | n &lt;- [0..(w - 1)]]</span></a>
 <a class="sourceLine" id="cb4-491" data-line-number="491"></a>
-<a class="sourceLine" id="cb4-492" data-line-number="492"><span class="co">-- takeEvery :: Int -&gt; [a] -&gt; [a]</span></a>
-<a class="sourceLine" id="cb4-493" data-line-number="493"><span class="co">-- takeEvery _ [] = []</span></a>
-<a class="sourceLine" id="cb4-494" data-line-number="494"><span class="co">-- takeEvery n xs = P.head xs : takeEvery n (drop n xs)</span></a>
+<a class="sourceLine" id="cb4-492" data-line-number="492"><span class="co">-- | Mean value of a collection</span></a>
+<a class="sourceLine" id="cb4-493" data-line-number="493"><span class="ot">mean ::</span> (<span class="dt">Foldable</span> f, <span class="dt">Fractional</span> a) <span class="ot">=&gt;</span> f a <span class="ot">-&gt;</span> a</a>
+<a class="sourceLine" id="cb4-494" data-line-number="494">mean <span class="fu">=</span> uncurry (<span class="fu">/</span>) <span class="fu">.</span> second fromIntegral <span class="fu">.</span> foldl&#39; (\ (<span class="fu">!</span>s, <span class="fu">!</span>n) x <span class="ot">-&gt;</span> (s<span class="fu">+</span>x, n<span class="fu">+</span><span class="dv">1</span>)) (<span class="dv">0</span>,<span class="dv">0</span>)</a>
 <a class="sourceLine" id="cb4-495" data-line-number="495"></a>
-<a class="sourceLine" id="cb4-496" data-line-number="496"><span class="co">-- randItem :: [a] -&gt; IO a</span></a>
-<a class="sourceLine" id="cb4-497" data-line-number="497"><span class="co">-- randItem = generate . elements</span></a></code></pre></div>
+<a class="sourceLine" id="cb4-496" data-line-number="496"><span class="co">-- | Square a numerical value.</span></a>
+<a class="sourceLine" id="cb4-497" data-line-number="497"><span class="ot">sqr ::</span> <span class="dt">Num</span> a <span class="ot">=&gt;</span> a <span class="ot">-&gt;</span> a</a>
+<a class="sourceLine" id="cb4-498" data-line-number="498">sqr x <span class="fu">=</span> x <span class="fu">*</span> x</a>
+<a class="sourceLine" id="cb4-499" data-line-number="499"></a>
+<a class="sourceLine" id="cb4-500" data-line-number="500"><span class="co">-- takeEvery :: Int -&gt; [a] -&gt; [a]</span></a>
+<a class="sourceLine" id="cb4-501" data-line-number="501"><span class="co">-- takeEvery _ [] = []</span></a>
+<a class="sourceLine" id="cb4-502" data-line-number="502"><span class="co">-- takeEvery n xs = P.head xs : takeEvery n (drop n xs)</span></a>
+<a class="sourceLine" id="cb4-503" data-line-number="503"></a>
+<a class="sourceLine" id="cb4-504" data-line-number="504"><span class="co">-- randItem :: [a] -&gt; IO a</span></a>
+<a class="sourceLine" id="cb4-505" data-line-number="505"><span class="co">-- randItem = generate . elements</span></a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="game-results">Game Results</h3>
 <h4 id="dummy-vs.-dummy">Dummy vs. Dummy</h4>
@@ -1611,224 +1619,68 @@ Original date: March 30, 2018</p>
 <h5 id="model-free-3">Model free</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
  \\ 
-0.500
-&amp;
-0.500
-&amp;
 0.500
 &amp;
 0.500
@@ -1845,125 +1697,7 @@ Original date: March 30, 2018</p>
 \end{array}\]</span>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.499
-&amp;
-0.490
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
@@ -1972,7 +1706,7 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
@@ -1981,7 +1715,7 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{O} &amp; \text{O} &amp; \text{ } \\
 \hline
@@ -1990,9 +1724,134 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -2001,7 +1860,16 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -2010,18 +1878,27 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -2035,89 +1912,87 @@ Original date: March 30, 2018</p>
 &amp;
 0.500
 &amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
 0.500
 &amp;
-0.495
+0.500
 &amp;
-0.450
+0.501
 &amp;
-0.000
+0.510
+&amp;
+0.550
+&amp;
+1.000
 \end{array}\]</span>
 <h5 id="model-based-3">Model based</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
@@ -2126,81 +2001,14 @@ Original date: March 30, 2018</p>
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -2209,7 +2017,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -2218,7 +2026,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -2227,7 +2035,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
@@ -2249,7 +2057,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -2258,7 +2066,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -2266,17 +2074,79 @@ Original date: March 30, 2018</p>
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -2285,7 +2155,7 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
@@ -2294,36 +2164,130 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{ } &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{X} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{O} &amp; \text{X} \\
 \hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
 \text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \end{array}
 
  \\ 
@@ -2349,54 +2313,54 @@ Original date: March 30, 2018</p>
 \begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{O} &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{O} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
+\text{O} &amp; \text{O} &amp; \text{X} \\
 \end{array}
 
  \\ 
@@ -3133,298 +3097,11 @@ Original date: March 30, 2018</p>
 <h5 id="model-free-5">Model free</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
@@ -3433,137 +3110,46 @@ Original date: March 30, 2018</p>
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{O} \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
  \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.495
-&amp;
-0.450
-&amp;
-0.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
 0.500
 &amp;
 0.500
@@ -3575,375 +3161,665 @@ Original date: March 30, 2018</p>
 0.550
 &amp;
 1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
 \end{array}\]</span>
 <h5 id="model-based-5">Model based</h5>
 <span class="math display">\[\begin{array}{}
 \begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{X} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
 \text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{X} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
- \\ 
-0.500
-&amp;
-0.500
-&amp;
-0.500
-&amp;
-0.505
-&amp;
-0.550
-&amp;
-1.000
-\end{array}\]</span>
-<span class="math display">\[\begin{array}{}
-\begin{array}{c|c|c}
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
-\hline
 \text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
 \text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{X} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{O} \\
 \hline
-\text{X} &amp; \text{O} &amp; \text{O} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
 \hline
 \text{X} &amp; \text{ } &amp; \text{O} \\
 \end{array}
 
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\end{array}
+
  \\ 
 0.500
 &amp;
 0.500
 &amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.495
+&amp;
+0.450
+&amp;
+0.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{X} \\
+\hline
+\text{ } &amp; \text{O} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{O} &amp; \text{X} \\
+\end{array}
+
+ \\ 
+0.500
+&amp;
+0.500
+&amp;
+0.500
+&amp;
+0.505
+&amp;
+0.550
+&amp;
+1.000
+\end{array}\]</span>
+<span class="math display">\[\begin{array}{}
+\begin{array}{c|c|c}
+\text{ } &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{X} &amp; \text{ } &amp; \text{O} \\
+\hline
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{X} \\
+\end{array}
+
+ \\ 
 0.500
 &amp;
 0.500
@@ -4181,7 +4057,25 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{X} &amp; \text{ } \\
 \hline
@@ -4190,25 +4084,7 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
@@ -4217,11 +4093,11 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{O} &amp; \text{X} &amp; \text{O} \\
 \hline
 \text{O} &amp; \text{X} &amp; \text{ } \\
 \hline
-\text{X} &amp; \text{ } &amp; \text{ } \\
+\text{ } &amp; \text{X} &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -4248,47 +4124,38 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\hline
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{ } \\
+\hline
 \text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
+\end{array}
+
+&amp;
+\begin{array}{c|c|c}
+\text{O} &amp; \text{X} &amp; \text{X} \\
+\hline
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{ } &amp; \text{O} \\
+\text{O} &amp; \text{X} &amp; \text{X} \\
 \hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{ } \\
-\end{array}
-
-&amp;
-\begin{array}{c|c|c}
-\text{O} &amp; \text{X} &amp; \text{O} \\
-\hline
-\text{O} &amp; \text{X} &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{X} &amp; \text{ } \\
+\text{O} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
@@ -4296,13 +4163,11 @@ Original date: March 30, 2018</p>
 &amp;
 0.500
 &amp;
-0.500
+0.495
 &amp;
-0.505
+0.450
 &amp;
-0.550
-&amp;
-1.000
+0.000
 \end{array}\]</span>
 <h5 id="model-based-6">Model based</h5>
 <span class="math display">\[\begin{array}{}
@@ -4617,47 +4482,47 @@ Original date: March 30, 2018</p>
 
 &amp;
 \begin{array}{c|c|c}
-\text{ } &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
+\hline
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \hline
 \text{ } &amp; \text{ } &amp; \text{ } \\
-\hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{ } \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{ } &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
 &amp;
 \begin{array}{c|c|c}
-\text{O} &amp; \text{O} &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{O} \\
 \hline
-\text{O} &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{O} &amp; \text{ } \\
 \hline
-\text{ } &amp; \text{ } &amp; \text{X} \\
+\text{X} &amp; \text{ } &amp; \text{ } \\
 \end{array}
 
  \\ 
