@@ -331,18 +331,17 @@ move p wps bs =
                        else P.head bss
 
 -- | Calculate moving average, as well as cumulative, number of learner wins.
-calcWinStats :: Monad m
-             => Int       -- Moving average window size.
+calcWinStats :: Int       -- Moving average window size.
              -> Integer   -- Number of games to play.
              -> Double    -- Learning rate.
-             -> Policy m  -- Learner's policy.
-             -> Policy m  -- Opponent's policy.
-             -> m ([Double],[Double]) -- (ave., cum.)
-calcWinStats m n r p p' = calcWinStats' initProbs (V.replicate m 0) 0 [] 0 [] m n r p p'
+             -> Policy IO -- Learner's policy.
+             -> Policy IO -- Opponent's policy.
+             -> String    -- Prefix for progress bar.
+             -> IO ([Double],[Double]) -- (ave., cum.)
+calcWinStats m n r p p' pref = calcWinStats' initProbs (V.replicate m 0) 0 [] 0 [] m n r p p' pref n
                           >>= \xss -> return $ toBoth (drop m) xss
 
-calcWinStats' :: Monad m
-              => WinProbs         -- current win probabilities
+calcWinStats' :: WinProbs         -- current win probabilities
               -> V.Vector Double  -- averaging window storage
               -> Double           -- current expected win probability
               -> [Double]         -- expected win probabilities
@@ -351,19 +350,47 @@ calcWinStats' :: Monad m
               -> Int
               -> Integer
               -> Double
-              -> Policy m
-              -> Policy m
-              -> m ([Double],[Double])
-calcWinStats' wps xs acc ys wins zs m n r p p'
-  | n == 0    = return $ toBoth reverse (ys,zs)
-  | otherwise = do bs <- play p p' wps
-                   let !wps' = updateProbs r wps bs
-                       !z    = (winnerToProb . winner . last) bs
-                       !y    = z / (fromIntegral m)
-                       !acc' = acc + y - V.last xs     -- Update the running average.
-                       !xs'  = y `V.cons` (V.init xs)  -- Shift y in and oldest element out.
-                   calcWinStats' wps' xs' acc' (acc : ys) (wins + z) (wins : zs) m (n - 1) r p p'
+              -> Policy IO
+              -> Policy IO
+              -> String
+              -> Integer          -- original number of games to play
+              -> IO ([Double],[Double])
+calcWinStats' wps xs acc ys wins zs m n r p p' pref n'
+  | n == 0 =
+    do putStrLn $ "\r" ++ pref ++ (progBar 100)
+       return $ toBoth reverse (ys,zs)
+  | ((n' - n) * 100 `div` n') `mod` 5 == 0 =
+    do putStr $ "\r" ++ pref ++ (progBar ((n' - n) * 100 `div` n'))
+       calcWinStats'' wps xs acc ys wins zs m n r p p' pref n'
+  | otherwise = calcWinStats'' wps xs acc ys wins zs m n r p p' pref n'
 
+calcWinStats'' :: WinProbs
+               -> V.Vector Double
+               -> Double
+               -> [Double]
+               -> Double
+               -> [Double]
+               -> Int
+               -> Integer
+               -> Double
+               -> Policy IO
+               -> Policy IO
+               -> String
+               -> Integer
+               -> IO ([Double],[Double])
+calcWinStats'' wps xs acc ys wins zs m n r p p' pref n' =
+  do bs <- play p p' wps
+     let !wps' = updateProbs r wps bs
+         !z    = (winnerToProb . winner . last) bs
+         !y    = z / (fromIntegral m)
+         !acc' = acc + y - V.last xs     -- Update the running average.
+         !xs'  = y `V.cons` (V.init xs)  -- Shift y in and oldest element out.
+     calcWinStats' wps' xs' acc' (acc : ys) (wins + z) (wins : zs) m (n - 1) r p p' pref n'
+
+progBar :: Integer -> String
+progBar n = replicate k '#' ++ (replicate l ' ') ++ (printf " %3d%%" n)
+ where k = fromIntegral $ 20 * n `div` 100
+       l = 20 - k
 
 {----------------------------------------------------------------------
   main()
@@ -418,7 +445,9 @@ main = do
 
     -- Test specified games over many trials.
     let labels = map name runDefs'
+        nPDefs = length plotDefs
     forM_ (zip [(1 :: Int)..] plotDefs) $ \ (i, PlotDef{..}) -> do
+      putStrLn $ ((printf "Running plot definition %d of %d..." i nPDefs) :: String)
       prss <- getWins $ map runMod runDefs'
       plotWins (printf "img/plot%d.png" i)
                (printf "Average Probability of and Cumulative Learner Wins - %s" title)
@@ -437,8 +466,8 @@ playShowBoth rds =
        appendFile "other/tictactoe.md" $ (pack . unlines . map showGame) res'
 
 getWins :: [RunDef] -> IO [([Double],[Double])]
-getWins rds = forM rds $ \ RunDef{..} -> do
-  calcWinStats 1000 100000 lRate polL polO
+getWins rds = forM (zip [(1 :: Int)..] rds) $ \ (i, RunDef{..}) -> do
+  calcWinStats 1000 100000 lRate polL polO $ printf "\tRunning trial %d of %d: " i (length rds)
 
 plotWins :: String                    -- file name
          -> String                    -- plot name
