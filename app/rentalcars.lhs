@@ -63,7 +63,7 @@ code
 \begin{code}
 import qualified Prelude as P
 -- import Prelude (tail, last, unlines, String, Show(..))
-import Prelude (unlines, Show(..))
+import Prelude (unlines, Show(..), String)
 
 import Protolude  hiding (show, for)
 import Options.Generic
@@ -136,29 +136,32 @@ instance ParseRecord (Opts Wrapped)
 -- TODO: Make second argument to optPol' general, perhaps by choosing
 --       randomly from among the legal actions for a given state.
 optPol :: Num a  -- TEMPORARY; See TODO above.
-       => (s -> a -> [(s, [(Float, Float)])])  -- ^ pdf (filtered for non-zero probs.)
+       => Integer                              -- ^ max. iterations
+       -> (s -> a -> [(s, [(Float, Float)])])  -- ^ pdf (filtered for non-zero probs.)
        -> Float                                -- ^ convergence tolerance
        -> Float                                -- ^ discount rate
        -> (s -> [a])                           -- ^ A(s)
        -> [s]                                  -- ^ S
-       -> (s -> a)
-optPol = optPol' (const 0) (const 0)
+       -> [s -> a]
+optPol = optPol' (const 0) [(const 0)] 0
 
 optPol' :: forall s a.
            (s -> Float)                     -- ^ initial value function estimate
-        -> (s -> a)                         -- ^ initial policy guess
+        -> [s -> a]                         -- ^ results from previous iterations
+        -> Integer                          -- ^ iterations so far
+        -> Integer
         -> (s -> a -> [(s, [(Float, Float)])])
         -> Float
         -> Float
         -> (s -> [a])
         -> [s]
-        -> (s -> a)
-optPol' v pol gen eps gamma asofs ss =
-  if stable
-    then pol
-    else optPol' v' pol' gen eps gamma asofs ss
+        -> [s -> a]
+optPol' v pols nIter maxIter gen eps gamma asofs ss =
+  if nIter >= maxIter || stable
+    then reverse pols
+    else optPol' v' (pol' : pols) (nIter + 1) maxIter gen eps gamma asofs ss
  where stable  = none ( uncurry (<)
-                        . ( (uncurry (actVal gamma gen v) . (P.id &&& pol))
+                        . ( (uncurry (actVal gamma gen v) . (P.id &&& P.head pols))
                             &&& (snd . bestA)
                           )
                       ) ss
@@ -207,7 +210,7 @@ actVal gamma gen vofs s a =
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-eps' = 0.001  -- my choice
+eps' = 0.1  -- my choice
 gamma' = 0.9  -- dictated by Exercise 4.7.
 
 newtype RCState  = RCState (Int, Int)  -- ^ # of cars at locations 1 & 2
@@ -270,20 +273,37 @@ main = do
   --     r   = fromMaybe 0.1 (rate   o)
 
   -- Plot the pdfs.
+  writeFile  "other/rentalcars.md" "### Return/Request Probability Distribution Functions\n\n"
   toFile def "img/pdfs.png" $
     do layout_title .= "Return/Request Probability Distribution Functions"
        setColors $ map opaque [red, blue, green, yellow]
        forM_ ( zip ["Req1", "Req2", "Ret1", "Ret2"]
                    [3,      4,      3,      2]
              ) $ \ (lbl, n) -> plot (line lbl [[(x, poisson n x) | x <- [0..20]]])
-  appendFile "other/rentalcars.md" $ pack $ "![](img/pdfs.png)\n"
+  -- appendFile "other/rentalcars.md" $ pack $ "![](img/pdfs.png)\n"
+  appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
-  -- Calculate optimum policy.
+  -- Calculate and display optimum policy.
   -- print $ optPol pdfGen eps' gamma' asOfS allStates
+  appendFile "other/rentalcars.md" "\n### First 3 policies\n\n"
+  -- forM_ (take 3 $ optPol pdfGen eps' gamma' asOfS allStates) $ \p ->
+  --       appendFile "other/rentalcars.md" $ pack $ showPol p
+  forM_ (take 3 $ optPol 2 pdfGen eps' gamma' asOfS allStates)
+        $ appendFile "other/rentalcars.md" . pack . showPol
 
 {----------------------------------------------------------------------
   Misc.
 ----------------------------------------------------------------------}
+
+showPol :: Policy -> String
+showPol pol = unlines
+  ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}" :
+    intersperse "\\hline"
+      ( map ((++ " \\\\") . intercalate " & " . map show)
+            [ [(m,n) | n <- [0..20]] | m <- [0..20]]
+      )
+    ++ ["\\end{array}"]
+  )
 
 -- toBoth :: (a -> b) -> (a,a) -> (b,b)
 -- toBoth f (x1, x2) = (f x1, f x2)
