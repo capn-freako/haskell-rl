@@ -76,7 +76,7 @@ import Control.Arrow              ((&&&), (***))
 -- import Data.Finite
 import Data.List                  (groupBy)
 import Data.Text                  (pack)
-import System.Random              (randomIO)
+-- import System.Random              (randomIO)
 -- import System.Random.Shuffle      (shuffleM)
 import Text.Printf                (printf)
 -- import Test.QuickCheck            (generate, elements)
@@ -142,11 +142,11 @@ optPol :: Num a  -- TEMPORARY; See TODO above.
        -> Float                                -- ^ discount rate
        -> (s -> [a])                           -- ^ A(s)
        -> [s]                                  -- ^ S
-       -> [s -> a]
-optPol = optPol' (const 0) [(const 0)] 0
+       -> ([s -> a], [[((s -> Float), Float)]])
+optPol = optPol' [[((const 0), 0)]] [const 0] 0
 
 optPol' :: forall s a.
-           (s -> Float)                     -- ^ initial value function estimate
+           [[((s -> Float), Float)]]          -- ^ previous evalPol results
         -> [s -> a]                         -- ^ results from previous iterations
         -> Integer                          -- ^ iterations so far
         -> Integer
@@ -155,17 +155,19 @@ optPol' :: forall s a.
         -> Float
         -> (s -> [a])
         -> [s]
-        -> [s -> a]
-optPol' v pols nIter maxIter gen eps gamma asofs ss =
+        -> ([s -> a], [[((s -> Float), Float)]])
+optPol' vs pols nIter maxIter gen eps gamma asofs ss =
   if nIter >= maxIter || stable
-    then reverse pols
-    else optPol' v' (pol' : pols) (nIter + 1) maxIter gen eps gamma asofs ss
+    then (reverse pols, reverse vs)
+    -- else optPol' v' (pol' : pols) (nIter + 1) maxIter gen eps gamma asofs ss
+    else optPol' (vofss : vs) (pol' : pols) (nIter + 1) maxIter gen eps gamma asofs ss
  where stable  = none ( uncurry (<)
                         . ( (uncurry (actVal gamma gen v) . (P.id &&& P.head pols))
                             &&& (snd . bestA)
                           )
                       ) ss
-       v'      = evalPol eps gamma gen pol' ss v
+       v       = (fst . P.last . P.head) vs
+       vofss   = evalPol eps gamma 10 0 gen pol' ss (P.head vs)
        pol'    = fst . bestA
        bestA :: s -> (a, Float)
        bestA s = maximumBy (compare `on` snd)
@@ -175,20 +177,24 @@ optPol' v pols nIter maxIter gen eps gamma asofs ss =
 
 -- | Policy evaluator
 --
--- Returns the value function for a given policy.
+-- Returns a list of better and better approximations to the value
+-- function for a given policy, along with their deltas.
 evalPol :: Float                                -- ^ tolerance of convergence
         -> Float                                -- ^ discount rate
+        -> Integer                              -- ^ max. iterations
+        -> Integer                              -- ^ iterations so far
         -> (s -> a -> [(s, [(Float, Float)])])  -- ^ pdf (filtered for non-zero probs.)
         -> (s -> a)                             -- ^ policy to be evaluated
         -> [s]                                  -- ^ S (all possible states)
-        -> (s -> Float)                         -- ^ initial value function estimate
-        -> (s -> Float)
-evalPol eps gamma gen pol ss vofs =
-  if delta < eps
-    then vofs'
-    else evalPol eps gamma gen pol ss vofs'
+        -> [((s -> Float), Float)]              -- ^ results of previous iterations
+        -> [((s -> Float), Float)]
+evalPol eps gamma maxIter nIter gen pol ss vofss =
+  if nIter >= maxIter || delta < eps
+    then reverse ((vofs', delta) : vofss)
+    else evalPol eps gamma maxIter (nIter + 1) gen pol ss ((vofs', delta) : vofss)
  where delta   = maximum $ map (abs . uncurry (-) . (vofs &&& vofs')) ss
        vofs' s = actVal gamma gen vofs s (pol s)
+       vofs    = (fst . P.head) vofss
 
 -- | Action-value function.
 --
@@ -280,27 +286,39 @@ main = do
        forM_ ( zip ["Req1", "Req2", "Ret1", "Ret2"]
                    [3,      4,      3,      2]
              ) $ \ (lbl, n) -> plot (line lbl [[(x, poisson n x) | x <- [0..20]]])
-  -- appendFile "other/rentalcars.md" $ pack $ "![](img/pdfs.png)\n"
   appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
   -- Calculate and display optimum policy.
   -- print $ optPol pdfGen eps' gamma' asOfS allStates
-  appendFile "other/rentalcars.md" "\n### First 3 policies\n\n"
+  -- appendFile "other/rentalcars.md" "\n### First 3 policies\n\n"
   -- forM_ (take 3 $ optPol pdfGen eps' gamma' asOfS allStates) $ \p ->
   --       appendFile "other/rentalcars.md" $ pack $ showPol p
-  forM_ (take 3 $ optPol 2 pdfGen eps' gamma' asOfS allStates)
-        $ appendFile "other/rentalcars.md" . pack . showPol
+  -- forM_ (take 3 $ optPol 2 pdfGen eps' gamma' asOfS allStates)
+  --       $ appendFile "other/rentalcars.md" . pack . showPol
+  let (pols, vss) = optPol 1 pdfGen eps' gamma' asOfS allStates  -- :: ([s -> a], [[((s -> Float), Float)]])
+  appendFile "other/rentalcars.md" "\n### Second policy\n\n"
+  -- appendFile "other/rentalcars.md" . pack . showPol $ P.head pols
+  appendFile "other/rentalcars.md" . pack . showPol $ pols P.!! 1
+  appendFile "other/rentalcars.md" "\n### Second policy's value function\n\n"
+  -- forM_ (vss P.!! 1) (appendFile "other/rentalcars.md" . pack . showVal)
+  (appendFile "other/rentalcars.md" . pack . showVal) (P.last $ vss P.!! 1)
 
 {----------------------------------------------------------------------
   Misc.
 ----------------------------------------------------------------------}
 
 showPol :: Policy -> String
-showPol pol = unlines
+showPol pol = showFofState pol
+
+showVal :: ((RCState -> Float), Float) -> String
+showVal (v, delta) = showFofState v ++ (printf "$\\quad \\delta = %5.3f$" delta)
+
+showFofState :: (Show a) => (RCState -> a) -> String
+showFofState g = unlines
   ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}" :
     intersperse "\\hline"
       ( map ((++ " \\\\") . intercalate " & " . map show)
-            [ [(m,n) | n <- [0..20]] | m <- [0..20]]
+            [ [g (RCState (m,n)) | n <- [0..20]] | m <- [0..20]]
       )
     ++ ["\\end{array}"]
   )
