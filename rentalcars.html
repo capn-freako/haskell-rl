@@ -272,53 +272,54 @@ Original date: April 20, 2018</p>
 <a class="sourceLine" id="cb4-204" data-line-number="204">  <span class="co">-- forM_ (take 3 $ optPol 2 pdfGen eps&#39; gamma&#39; asOfS allStates)</span></a>
 <a class="sourceLine" id="cb4-205" data-line-number="205">  <span class="co">--       $ appendFile &quot;other/rentalcars.md&quot; . pack . showPol</span></a>
 <a class="sourceLine" id="cb4-206" data-line-number="206">  <span class="kw">let</span> (pols, vss) <span class="fu">=</span> optPol <span class="dv">1</span> pdfGen eps&#39; gamma&#39; asOfS allStates  <span class="co">-- :: ([s -&gt; a], [[((s -&gt; Float), Float)]])</span></a>
-<a class="sourceLine" id="cb4-207" data-line-number="207">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Last policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-207" data-line-number="207">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Second policy\n\n&quot;</span></a>
 <a class="sourceLine" id="cb4-208" data-line-number="208">  <span class="co">-- appendFile &quot;other/rentalcars.md&quot; . pack . showPol $ P.head pols</span></a>
 <a class="sourceLine" id="cb4-209" data-line-number="209">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">.</span> pack <span class="fu">.</span> showPol <span class="fu">$</span> pols <span class="fu">P.!!</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb4-210" data-line-number="210">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Last policy&#39;s value function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-211" data-line-number="211">  forM_ (P.head vss) (appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">.</span> pack <span class="fu">.</span> showVal)</a>
-<a class="sourceLine" id="cb4-212" data-line-number="212"></a>
-<a class="sourceLine" id="cb4-213" data-line-number="213"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-214" data-line-number="214"><span class="co">  Misc.</span></a>
-<a class="sourceLine" id="cb4-215" data-line-number="215"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-216" data-line-number="216"></a>
-<a class="sourceLine" id="cb4-217" data-line-number="217"><span class="ot">showPol ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-218" data-line-number="218">showPol pol <span class="fu">=</span> showFofState pol</a>
-<a class="sourceLine" id="cb4-219" data-line-number="219"></a>
-<a class="sourceLine" id="cb4-220" data-line-number="220"><span class="ot">showVal ::</span> ((<span class="dt">RCState</span> <span class="ot">-&gt;</span> <span class="dt">Float</span>), <span class="dt">Float</span>) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-221" data-line-number="221">showVal (v, delta) <span class="fu">=</span> showFofState v <span class="fu">++</span> (printf <span class="st">&quot;$\\quad \\delta = %5.3f$&quot;</span> delta)</a>
-<a class="sourceLine" id="cb4-222" data-line-number="222"></a>
-<a class="sourceLine" id="cb4-223" data-line-number="223"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> (<span class="dt">RCState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-224" data-line-number="224">showFofState g <span class="fu">=</span> unlines</a>
-<a class="sourceLine" id="cb4-225" data-line-number="225">  ( <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-226" data-line-number="226">    intersperse <span class="st">&quot;\\hline&quot;</span></a>
-<a class="sourceLine" id="cb4-227" data-line-number="227">      ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show)</a>
-<a class="sourceLine" id="cb4-228" data-line-number="228">            [ [g (<span class="dt">RCState</span> (m,n)) <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]] <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]]</a>
-<a class="sourceLine" id="cb4-229" data-line-number="229">      )</a>
-<a class="sourceLine" id="cb4-230" data-line-number="230">    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
-<a class="sourceLine" id="cb4-231" data-line-number="231">  )</a>
-<a class="sourceLine" id="cb4-232" data-line-number="232"></a>
-<a class="sourceLine" id="cb4-233" data-line-number="233"><span class="co">-- toBoth :: (a -&gt; b) -&gt; (a,a) -&gt; (b,b)</span></a>
-<a class="sourceLine" id="cb4-234" data-line-number="234"><span class="co">-- toBoth f (x1, x2) = (f x1, f x2)</span></a>
-<a class="sourceLine" id="cb4-235" data-line-number="235"></a>
-<a class="sourceLine" id="cb4-236" data-line-number="236"><span class="co">-- for :: (Functor f) =&gt; f a -&gt; (a -&gt; b) -&gt; f b</span></a>
-<a class="sourceLine" id="cb4-237" data-line-number="237"><span class="co">-- for = flip map</span></a>
-<a class="sourceLine" id="cb4-238" data-line-number="238"></a>
-<a class="sourceLine" id="cb4-239" data-line-number="239"><span class="ot">poisson ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Float</span></a>
-<a class="sourceLine" id="cb4-240" data-line-number="240"><span class="co">-- poisson lambda n = pow lambda n * exp (-lambda) / fact n</span></a>
-<a class="sourceLine" id="cb4-241" data-line-number="241">poisson lambda n <span class="fu">=</span> lambda&#39; <span class="fu">^</span> n&#39; <span class="fu">*</span> exp (<span class="fu">-</span>lambda&#39;) <span class="fu">/</span> (fromIntegral <span class="fu">$</span> fact n)</a>
-<a class="sourceLine" id="cb4-242" data-line-number="242"> <span class="kw">where</span> lambda&#39; <span class="fu">=</span> fromIntegral lambda</a>
-<a class="sourceLine" id="cb4-243" data-line-number="243">       n&#39;      <span class="fu">=</span> fromIntegral n</a>
-<a class="sourceLine" id="cb4-244" data-line-number="244"></a>
-<a class="sourceLine" id="cb4-245" data-line-number="245"><span class="ot">fact ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb4-246" data-line-number="246">fact <span class="dv">0</span> <span class="fu">=</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb4-247" data-line-number="247">fact n <span class="fu">=</span> n <span class="fu">*</span> fact (n <span class="fu">-</span> <span class="dv">1</span>)</a></code></pre></div>
+<a class="sourceLine" id="cb4-210" data-line-number="210">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Second policy&#39;s initial value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-211" data-line-number="211">  <span class="co">-- forM_ (vss P.!! 1) (appendFile &quot;other/rentalcars.md&quot; . pack . showVal)</span></a>
+<a class="sourceLine" id="cb4-212" data-line-number="212">  (appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">.</span> pack <span class="fu">.</span> showVal) (vss <span class="fu">P.!!</span> <span class="dv">0</span> <span class="fu">P.!!</span> <span class="dv">0</span>)</a>
+<a class="sourceLine" id="cb4-213" data-line-number="213"></a>
+<a class="sourceLine" id="cb4-214" data-line-number="214"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-215" data-line-number="215"><span class="co">  Misc.</span></a>
+<a class="sourceLine" id="cb4-216" data-line-number="216"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-217" data-line-number="217"></a>
+<a class="sourceLine" id="cb4-218" data-line-number="218"><span class="ot">showPol ::</span> <span class="dt">Policy</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-219" data-line-number="219">showPol pol <span class="fu">=</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-220" data-line-number="220"></a>
+<a class="sourceLine" id="cb4-221" data-line-number="221"><span class="ot">showVal ::</span> ((<span class="dt">RCState</span> <span class="ot">-&gt;</span> <span class="dt">Float</span>), <span class="dt">Float</span>) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-222" data-line-number="222">showVal (v, delta) <span class="fu">=</span> showFofState v <span class="fu">++</span> (printf <span class="st">&quot;$\\quad \\delta = %5.3f$&quot;</span> delta)</a>
+<a class="sourceLine" id="cb4-223" data-line-number="223"></a>
+<a class="sourceLine" id="cb4-224" data-line-number="224"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> (<span class="dt">RCState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-225" data-line-number="225">showFofState g <span class="fu">=</span> unlines</a>
+<a class="sourceLine" id="cb4-226" data-line-number="226">  ( <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-227" data-line-number="227">    intersperse <span class="st">&quot;\\hline&quot;</span></a>
+<a class="sourceLine" id="cb4-228" data-line-number="228">      ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">.</span> map show)</a>
+<a class="sourceLine" id="cb4-229" data-line-number="229">            [ [g (<span class="dt">RCState</span> (m,n)) <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]] <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]]</a>
+<a class="sourceLine" id="cb4-230" data-line-number="230">      )</a>
+<a class="sourceLine" id="cb4-231" data-line-number="231">    <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
+<a class="sourceLine" id="cb4-232" data-line-number="232">  )</a>
+<a class="sourceLine" id="cb4-233" data-line-number="233"></a>
+<a class="sourceLine" id="cb4-234" data-line-number="234"><span class="co">-- toBoth :: (a -&gt; b) -&gt; (a,a) -&gt; (b,b)</span></a>
+<a class="sourceLine" id="cb4-235" data-line-number="235"><span class="co">-- toBoth f (x1, x2) = (f x1, f x2)</span></a>
+<a class="sourceLine" id="cb4-236" data-line-number="236"></a>
+<a class="sourceLine" id="cb4-237" data-line-number="237"><span class="co">-- for :: (Functor f) =&gt; f a -&gt; (a -&gt; b) -&gt; f b</span></a>
+<a class="sourceLine" id="cb4-238" data-line-number="238"><span class="co">-- for = flip map</span></a>
+<a class="sourceLine" id="cb4-239" data-line-number="239"></a>
+<a class="sourceLine" id="cb4-240" data-line-number="240"><span class="ot">poisson ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Float</span></a>
+<a class="sourceLine" id="cb4-241" data-line-number="241"><span class="co">-- poisson lambda n = pow lambda n * exp (-lambda) / fact n</span></a>
+<a class="sourceLine" id="cb4-242" data-line-number="242">poisson lambda n <span class="fu">=</span> lambda&#39; <span class="fu">^</span> n&#39; <span class="fu">*</span> exp (<span class="fu">-</span>lambda&#39;) <span class="fu">/</span> (fromIntegral <span class="fu">$</span> fact n)</a>
+<a class="sourceLine" id="cb4-243" data-line-number="243"> <span class="kw">where</span> lambda&#39; <span class="fu">=</span> fromIntegral lambda</a>
+<a class="sourceLine" id="cb4-244" data-line-number="244">       n&#39;      <span class="fu">=</span> fromIntegral n</a>
+<a class="sourceLine" id="cb4-245" data-line-number="245"></a>
+<a class="sourceLine" id="cb4-246" data-line-number="246"><span class="ot">fact ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-247" data-line-number="247">fact <span class="dv">0</span> <span class="fu">=</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-248" data-line-number="248">fact n <span class="fu">=</span> n <span class="fu">*</span> fact (n <span class="fu">-</span> <span class="dv">1</span>)</a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="returnrequest-probability-distribution-functions">Return/Request Probability Distribution Functions</h3>
 <figure>
 <img src="img/pdfs.png" />
 </figure>
-<h3 id="last-policy">Last policy</h3>
+<h3 id="second-policy">Second policy</h3>
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}
 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 \\
 \hline
@@ -362,7 +363,7 @@ Original date: April 20, 2018</p>
 \hline
 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
 \end{array}\]</span>
-<h3 id="last-policys-value-function">Last policy's value function</h3>
+<h3 id="second-policys-initial-value-function">Second policy's initial value function</h3>
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}
 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 &amp; 0.0 \\
 \hline

@@ -146,7 +146,7 @@ optPol :: Num a  -- TEMPORARY; See TODO above.
 optPol = optPol' [[((const 0), 0)]] [const 0] 0
 
 optPol' :: forall s a.
-           [[((s -> Float), Float)]]          -- ^ previous evalPol results
+           [[((s -> Float), Float)]]        -- ^ previous evalPol results
         -> [s -> a]                         -- ^ results from previous iterations
         -> Integer                          -- ^ iterations so far
         -> Integer
@@ -167,7 +167,7 @@ optPol' vs pols nIter maxIter gen eps gamma asofs ss =
                           )
                       ) ss
        v       = (fst . P.last . P.head) vs
-       vofss   = evalPol eps gamma 10 0 gen pol' ss (P.head vs)
+       vofss   = evalPol eps gamma 2 0 gen pol' ss (P.head vs)
        pol'    = fst . bestA
        bestA :: s -> (a, Float)
        bestA s = maximumBy (compare `on` snd)
@@ -298,10 +298,10 @@ main = do
   let (pols, vss) = optPol 1 pdfGen eps' gamma' asOfS allStates  -- :: ([s -> a], [[((s -> Float), Float)]])
   appendFile "other/rentalcars.md" "\n### Second policy\n\n"
   -- appendFile "other/rentalcars.md" . pack . showPol $ P.head pols
-  appendFile "other/rentalcars.md" . pack . showPol $ pols P.!! 1
-  appendFile "other/rentalcars.md" "\n### Second policy's value function\n\n"
+  -- appendFile "other/rentalcars.md" . pack . showPol $ pols P.!! 1
+  appendFile "other/rentalcars.md" "\n### Second policy's initial value function\n\n"
   -- forM_ (vss P.!! 1) (appendFile "other/rentalcars.md" . pack . showVal)
-  (appendFile "other/rentalcars.md" . pack . showVal) (P.last $ vss P.!! 1)
+  appendFile "other/rentalcars.md" . pack . showVal $ vss P.!! 1 P.!! 0
 
 {----------------------------------------------------------------------
   Misc.
