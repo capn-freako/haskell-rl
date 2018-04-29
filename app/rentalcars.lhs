@@ -109,17 +109,11 @@ instance ParseRecord (Opts Wrapped)
 ----------------------------------------------------------------------}
 
 -- | An optimum policy, given:
---   - p(s', r | s, a) - pdf of (next_state, reward),
---                       given (current_state, action),
+--   - A(s)            - all possible actions in state s,
 --   - S'(s, a)        - all possible next states, for a given state/action pair,
 --   - R(s, a, s')     - all possible rewards for a given state/action/next-state triple,
---   - A(s)            - all actions possible in state s, and
+--                       along with their probabilities of occurence, and
 --   - S               - all possible states.
---
--- Note: In the code, the first 3 elements above are combined into a
---       single input function (first argument, below), which combines
---       the pdf with the 2 needed generators (i.e. - one for next states,
---       and another for rewards).
 --
 -- Note: I use the pure random number generator, instead of its IO
 --       counterpart, for two reasons:
@@ -136,12 +130,13 @@ instance ParseRecord (Opts Wrapped)
 -- TODO: Make second argument to optPol' general, perhaps by choosing
 --       randomly from among the legal actions for a given state.
 optPol :: Num a  -- TEMPORARY; See TODO above.
-       => Integer                              -- ^ max. iterations
-       -> (s -> a -> [(s, [(Float, Float)])])  -- ^ pdf (filtered for non-zero probs.)
-       -> Float                                -- ^ convergence tolerance
-       -> Float                                -- ^ discount rate
-       -> (s -> [a])                           -- ^ A(s)
-       -> [s]                                  -- ^ S
+       => Integer                          -- ^ max. iterations
+       -> Float                            -- ^ convergence tolerance
+       -> Float                            -- ^ discount rate
+       -> (s -> [a])                       -- ^ A(s)
+       -> (s -> a -> [s])                  -- ^ S'(s, a)
+       -> (s -> a -> s -> [(Int, Float)])  -- ^ R(s, a, s')
+       -> [s]                              -- ^ S
        -> ([s -> a], [[((s -> Float), Float)]])
 optPol = optPol' [[((const 0), 0)]] [const 0] 0
 
@@ -150,29 +145,29 @@ optPol' :: forall s a.
         -> [s -> a]                         -- ^ results from previous iterations
         -> Integer                          -- ^ iterations so far
         -> Integer
-        -> (s -> a -> [(s, [(Float, Float)])])
         -> Float
         -> Float
         -> (s -> [a])
+        -> (s -> a -> [s])
+        -> (s -> a -> s -> [(Int, Float)])
         -> [s]
         -> ([s -> a], [[((s -> Float), Float)]])
-optPol' vs pols nIter maxIter gen eps gamma asofs ss =
+optPol' vs pols nIter maxIter eps gamma acts s's rs ss =
   if nIter >= maxIter || stable
     then (reverse pols, reverse vs)
-    -- else optPol' v' (pol' : pols) (nIter + 1) maxIter gen eps gamma asofs ss
-    else optPol' (vofss : vs) (pol' : pols) (nIter + 1) maxIter gen eps gamma asofs ss
+    else optPol' (v's : vs) (pol' : pols) (nIter + 1) maxIter eps gamma acts s's rs ss
  where stable  = none ( uncurry (<)
-                        . ( (uncurry (actVal gamma gen v) . (P.id &&& P.head pols))
+                        . ( (uncurry (actVal gamma s's rs v) . (P.id &&& P.head pols))
                             &&& (snd . bestA)
                           )
                       ) ss
-       v       = (fst . P.last . P.head) vs
-       vofss   = evalPol eps gamma 2 0 gen pol' ss (P.head vs)
-       pol'    = fst . bestA
+       v    = (fst . P.last . P.head) vs
+       v's  = evalPol eps gamma 2 0 pol' s's rs ss (P.head vs)
+       pol' = fst . bestA
        bestA :: s -> (a, Float)
        bestA s = maximumBy (compare `on` snd)
-                   [ (a, actVal gamma gen v s a)
-                   | a <- asofs s
+                   [ (a, actVal gamma s's rs v s a)
+                   | a <- acts s
                    ]
 
 -- | Policy evaluator
@@ -183,33 +178,35 @@ evalPol :: Float                                -- ^ tolerance of convergence
         -> Float                                -- ^ discount rate
         -> Integer                              -- ^ max. iterations
         -> Integer                              -- ^ iterations so far
-        -> (s -> a -> [(s, [(Float, Float)])])  -- ^ pdf (filtered for non-zero probs.)
         -> (s -> a)                             -- ^ policy to be evaluated
+        -> (s -> a -> [s])                      -- ^ S'(s, a)
+        -> (s -> a -> s -> [(Int, Float)])      -- ^ R(s, a, s')
         -> [s]                                  -- ^ S (all possible states)
         -> [((s -> Float), Float)]              -- ^ results of previous iterations
         -> [((s -> Float), Float)]
-evalPol eps gamma maxIter nIter gen pol ss vofss =
+evalPol eps gamma maxIter nIter pol s's rs ss vs =
   if nIter >= maxIter || delta < eps
-    then reverse ((vofs', delta) : vofss)
-    else evalPol eps gamma maxIter (nIter + 1) gen pol ss ((vofs', delta) : vofss)
- where delta   = maximum $ map (abs . uncurry (-) . (vofs &&& vofs')) ss
-       vofs' s = actVal gamma gen vofs s (pol s)
-       vofs    = (fst . P.head) vofss
+    then reverse ((v', delta) : vs)
+    else evalPol eps gamma maxIter (nIter + 1) pol s's rs ss ((v', delta) : vs)
+ where delta = maximum $ map (abs . uncurry (-) . (v &&& v')) ss
+       v' s  = actVal gamma s's rs v s (pol s)
+       v     = (fst . P.head) vs
 
 -- | Action-value function.
 --
 -- Note: See the documentation for `optPol` for an explanation of the
 --       second argument.
 actVal :: Float                                -- ^ discount rate
-       -> (s -> a -> [(s, [(Float, Float)])])  -- ^ pdf (filtered for non-zero probs.)
+       -> (s -> a -> [s])                      -- ^ S'(s, a)
+       -> (s -> a -> s -> [(Int, Float)])      -- ^ R(s, a, s')
        -> (s -> Float)                         -- ^ value function
        -> s                                    -- ^ initial state
        -> a                                    -- ^ next action
        -> Float
-actVal gamma gen vofs s a =
-  sum [ p * (r + gamma * vofs s')
-      | (s', rs) <- gen s a
-      , (r, p)   <- rs
+actVal gamma s's rs v s a =
+  sum [ p * (fromIntegral r + gamma * v s')
+      | s'     <- s's s a
+      , (r, p) <- rs s a s'
       ]
 
 {----------------------------------------------------------------------
@@ -232,6 +229,7 @@ instance Show Policy where
     | m <- [0..20]
     ]
 
+-- | S
 allStates :: [RCState]
 allStates = [RCState (m,n) | m <- [0..20], n <- [0..20]]
 
@@ -240,32 +238,34 @@ pReq2 = poisson 4
 pRet1 = poisson 3
 pRet2 = poisson 2
 
--- | PDF generator, for original problem (i.e. - Example 4.2).
-pdfGen :: RCState   -- ^ current state
-       -> RCAction  -- ^ next action
-       -> [(RCState, [(Float, Float)])]
-pdfGen (RCState s) a =
-  map ((P.head *** map (first fromIntegral)) . unzip)
-  . groupBy ((==) `on` fst)
-  . sortOn fst
-  $ [ ( RCState (( (+ (nRet1 - a - nReq1)) *** (+ (nRet2 + a - nReq2)) ) s)
-      , ( 10 * (nReq1 + nReq2) - 2 * abs(a)
-        , product $
-            zipWith ($) [pReq1, pRet1, pReq2, pRet2]
-                        [nReq1, nRet1, nReq2, nRet2]
-        )
-      )
-    | nRet1 <- [0..20-n1]
-    , nRet2 <- [0..20-n2]
-    , nReq1 <- [0..n1+nRet1-a]
-    , nReq2 <- [0..n2+nRet2+a]
-    ]
- where n1 = fst s
-       n2 = snd s
-
 -- | A(s)
 asOfS :: RCState -> [RCAction]
 asOfS (RCState s) = [-(min 5 (snd s)) .. min 5 (fst s)]
+
+-- | S'(s, a)
+nextStates :: RCState -> RCAction -> [RCState]
+nextStates _ _ = allStates
+
+-- | R(s, a, s')
+--
+-- Returns a list of pairs, each containing:
+-- - a unique reward value, and
+-- - the probability of occurence for that value.
+rewards :: RCState -> RCAction -> RCState -> [(Int, Float)]
+rewards (RCState (n1, n2)) a (RCState (n1', n2')) =
+  map ((P.head *** sum) . unzip)
+  . groupBy ((==) `on` fst)
+  . sortOn fst $
+  [ ( 10 * (nReq1 + nReq2) - 2 * abs(a)
+    , sum [ product $ zipWith ($) [pReq1, pRet1, pReq2, pRet2]
+                                  [nReq1, nRet1, nReq2, nRet2]
+          ]
+    )
+  | nRet1 <- [max 0 (n1'+a-n1) .. 20-n1]
+  , nRet2 <- [max 0 (n2'-a-n2) .. 20-n2]
+  , let nReq1 = n1 + nRet1 - a - n1'  -- >= 0 => nRet1 >= n1' + a - n1
+        nReq2 = n2 + nRet2 + a - n2'  -- >= 0 => nRet2 >= n2' - a - n2
+  ]
 
 {----------------------------------------------------------------------
   main()
@@ -295,7 +295,7 @@ main = do
   --       appendFile "other/rentalcars.md" $ pack $ showPol p
   -- forM_ (take 3 $ optPol 2 pdfGen eps' gamma' asOfS allStates)
   --       $ appendFile "other/rentalcars.md" . pack . showPol
-  let (pols, vss) = optPol 1 pdfGen eps' gamma' asOfS allStates  -- :: ([s -> a], [[((s -> Float), Float)]])
+  let (pols, vss) = optPol 1 eps' gamma' asOfS nextStates rewards allStates
   appendFile "other/rentalcars.md" "\n### Second policy\n\n"
   -- appendFile "other/rentalcars.md" . pack . showPol $ P.head pols
   -- appendFile "other/rentalcars.md" . pack . showPol $ pols P.!! 1
