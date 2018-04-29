@@ -212,7 +212,8 @@ executable rentalcars
     random-shuffle,
     random,
     Chart,
-    Chart-cairo
+    Chart-cairo,
+    MemoTrie
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,

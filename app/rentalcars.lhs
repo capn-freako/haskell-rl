@@ -59,6 +59,7 @@ code
 - [random-shuffle](https://www.stackage.org/package/random-shuffle)
 - [Chart](https://www.stackage.org/package/Chart)
 - [Chart-cairo](https://www.stackage.org/package/Chart-cairo)
+- [MemoTrie](https://hackage.haskell.org/package/MemoTrie)
 
 \begin{code}
 import qualified Prelude as P
@@ -75,6 +76,7 @@ import Control.Arrow              ((&&&), (***))
 -- import Control.Monad.Extra        (unfoldM)
 import Data.Finite
 import Data.List                  (groupBy)
+import Data.MemoTrie              (memo)
 import Data.Text                  (pack)
 -- import System.Random              (randomIO)
 -- import System.Random.Shuffle      (shuffleM)
@@ -250,10 +252,14 @@ allStates = [RCState (m,n) | m <- [0..20], n <- [0..20]]
 stateToIndex :: RCState -> Finite 441
 stateToIndex (RCState (n1, n2)) = (finite . fromIntegral) $ n1 * 21 + n2
 
-pReq1 = poisson 3
-pReq2 = poisson 4
-pRet1 = poisson 3
-pRet2 = poisson 2
+pReq1  = poisson 3
+pReq1' = memo pReq1
+pReq2  = poisson 4
+pReq2' = memo pReq2
+pRet1  = poisson 3
+pRet1' = memo pRet1
+pRet2  = poisson 2
+pRet2' = memo pRet2
 
 -- | A(s)
 asOfS :: RCState -> [RCAction]
@@ -274,8 +280,8 @@ rewards (RCState (n1, n2)) a (RCState (n1', n2')) =
   . groupBy ((==) `on` fst)
   . sortOn fst $
   [ ( 10 * (nReq1 + nReq2) - 2 * abs(a)
-    , sum [ product $ zipWith ($) [pReq1, pRet1, pReq2, pRet2]
-                                  [nReq1, nRet1, nReq2, nRet2]
+    , sum [ product $ zipWith ($) [pReq1', pRet1', pReq2', pRet2']
+                                  [nReq1,  nRet1,  nReq2,  nRet2]
           ]
     )
   | nRet1 <- [max 0 (n1'+a-n1) .. 20-n1]
@@ -357,6 +363,13 @@ fact :: Int -> Int
 fact 0 = 1
 fact n = n * fact (n - 1)
 
+poissonVals :: VS.Vector 5 (VS.Vector 21 Float)
+poissonVals = VS.generate $
+                (\n -> VS.generate (poisson n . fromIntegral . getFinite))
+                . fromIntegral . getFinite
+
+poisson' :: Finite 5 -> Finite 21 -> Float
+poisson' n x = poissonVals `VS.index` n `VS.index` x
 \end{code}
 
 output
