@@ -68,12 +68,12 @@ import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for)
 import Options.Generic
 
--- import qualified Data.Vector.Sized   as VS
+import qualified Data.Vector.Sized   as VS
 -- import qualified Data.Vector.Unboxed as V
 
 import Control.Arrow              ((&&&), (***))
 -- import Control.Monad.Extra        (unfoldM)
--- import Data.Finite
+import Data.Finite
 import Data.List                  (groupBy)
 import Data.Text                  (pack)
 -- import System.Random              (randomIO)
@@ -129,44 +129,46 @@ instance ParseRecord (Opts Wrapped)
 --
 -- TODO: Make second argument to optPol' general, perhaps by choosing
 --       randomly from among the legal actions for a given state.
-optPol :: Num a  -- TEMPORARY; See TODO above.
+optPol :: (KnownNat n, Num a)  -- "Num a" is TEMPORARY; See TODO above.
        => Integer                          -- ^ max. iterations
        -> Float                            -- ^ convergence tolerance
        -> Float                            -- ^ discount rate
+       -> (s -> Finite n)                  -- ^ function from state to vector index
        -> (s -> [a])                       -- ^ A(s)
        -> (s -> a -> [s])                  -- ^ S'(s, a)
        -> (s -> a -> s -> [(Int, Float)])  -- ^ R(s, a, s')
        -> [s]                              -- ^ S
-       -> ([s -> a], [[((s -> Float), Float)]])
-optPol = optPol' [[((const 0), 0)]] [const 0] 0
+       -> ([s -> a], [[(VS.Vector n Float, Float)]])
+optPol = optPol' [[(pure 0, 0)]] [const 0] 0
 
-optPol' :: forall s a.
-           [[((s -> Float), Float)]]        -- ^ previous evalPol results
+optPol' :: forall s a n. (KnownNat n)
+        => [[(VS.Vector n Float, Float)]]   -- ^ results from previous iterations
         -> [s -> a]                         -- ^ results from previous iterations
         -> Integer                          -- ^ iterations so far
         -> Integer
         -> Float
         -> Float
+        -> (s -> Finite n)
         -> (s -> [a])
         -> (s -> a -> [s])
         -> (s -> a -> s -> [(Int, Float)])
         -> [s]
-        -> ([s -> a], [[((s -> Float), Float)]])
-optPol' vs pols nIter maxIter eps gamma acts s's rs ss =
+        -> ([s -> a], [[(VS.Vector n Float, Float)]])
+optPol' vs pols nIter maxIter eps gamma sToI acts s's rs ss =
   if nIter >= maxIter || stable
     then (reverse pols, reverse vs)
-    else optPol' (v's : vs) (pol' : pols) (nIter + 1) maxIter eps gamma acts s's rs ss
+    else optPol' (v's : vs) (pol' : pols) (nIter + 1) maxIter eps gamma sToI acts s's rs ss
  where stable  = none ( uncurry (<)
-                        . ( (uncurry (actVal gamma s's rs v) . (P.id &&& P.head pols))
+                        . ( (uncurry (actVal gamma sToI s's rs v) . (P.id &&& P.head pols))
                             &&& (snd . bestA)
                           )
                       ) ss
        v    = (fst . P.last . P.head) vs
-       v's  = evalPol eps gamma 2 0 pol' s's rs ss (P.head vs)
+       v's  = evalPol eps gamma 2 0 pol' sToI s's rs ss (P.head vs)
        pol' = fst . bestA
        bestA :: s -> (a, Float)
        bestA s = maximumBy (compare `on` snd)
-                   [ (a, actVal gamma s's rs v s a)
+                   [ (a, actVal gamma sToI s's rs v s a)
                    | a <- acts s
                    ]
 
@@ -174,37 +176,49 @@ optPol' vs pols nIter maxIter eps gamma acts s's rs ss =
 --
 -- Returns a list of better and better approximations to the value
 -- function for a given policy, along with their deltas.
-evalPol :: Float                                -- ^ tolerance of convergence
+evalPol :: KnownNat n
+        => Float                                -- ^ tolerance of convergence
         -> Float                                -- ^ discount rate
         -> Integer                              -- ^ max. iterations
         -> Integer                              -- ^ iterations so far
         -> (s -> a)                             -- ^ policy to be evaluated
+        -> (s -> Finite n)                      -- ^ function from state to vector index
         -> (s -> a -> [s])                      -- ^ S'(s, a)
         -> (s -> a -> s -> [(Int, Float)])      -- ^ R(s, a, s')
         -> [s]                                  -- ^ S (all possible states)
-        -> [((s -> Float), Float)]              -- ^ results of previous iterations
-        -> [((s -> Float), Float)]
-evalPol eps gamma maxIter nIter pol s's rs ss vs =
+        -> [(VS.Vector n Float, Float)]         -- ^ results of previous iterations
+        -> [(VS.Vector n Float, Float)]
+evalPol eps gamma maxIter nIter pol sToI s's rs ss vs =
   if nIter >= maxIter || delta < eps
     then reverse ((v', delta) : vs)
-    else evalPol eps gamma maxIter (nIter + 1) pol s's rs ss ((v', delta) : vs)
- where delta = maximum $ map (abs . uncurry (-) . (v &&& v')) ss
-       v' s  = actVal gamma s's rs v s (pol s)
+    else evalPol eps gamma maxIter (nIter + 1) pol sToI s's rs ss ((v', delta) : vs)
+ where delta = maximum $ map ( abs
+                             . uncurry (-)
+                             . (appVal sToI v &&& appVal sToI v')
+                             ) ss
+       v'    = fromMaybe (VS.replicate 0) $ VS.fromList $ map (\s -> actVal gamma sToI s's rs v s (pol s)) ss
        v     = (fst . P.head) vs
 
+-- | Apply the vector representation of a value function to a particular state.
+appVal :: KnownNat n
+       => (s -> Finite n)    -- ^ function from state to vector index
+       -> VS.Vector n Float  -- ^ vector representation of value function
+       -> s                  -- ^ state
+       -> Float
+appVal f v s = v `VS.index` (f s)
+
 -- | Action-value function.
---
--- Note: See the documentation for `optPol` for an explanation of the
---       second argument.
-actVal :: Float                                -- ^ discount rate
+actVal :: KnownNat n
+       => Float                                -- ^ discount rate
+       -> (s -> Finite n)                      -- ^ function from state to vector index
        -> (s -> a -> [s])                      -- ^ S'(s, a)
        -> (s -> a -> s -> [(Int, Float)])      -- ^ R(s, a, s')
-       -> (s -> Float)                         -- ^ value function
+       -> VS.Vector n Float                    -- ^ vector representation of value function
        -> s                                    -- ^ initial state
        -> a                                    -- ^ next action
        -> Float
-actVal gamma s's rs v s a =
-  sum [ p * (fromIntegral r + gamma * v s')
+actVal gamma sToI s's rs v s a =
+  sum [ p * (fromIntegral r + gamma * appVal sToI v s')
       | s'     <- s's s a
       , (r, p) <- rs s a s'
       ]
@@ -232,6 +246,9 @@ instance Show Policy where
 -- | S
 allStates :: [RCState]
 allStates = [RCState (m,n) | m <- [0..20], n <- [0..20]]
+
+stateToIndex :: RCState -> Finite 441
+stateToIndex (RCState (n1, n2)) = (finite . fromIntegral) $ n1 * 21 + n2
 
 pReq1 = poisson 3
 pReq2 = poisson 4
@@ -295,7 +312,7 @@ main = do
   --       appendFile "other/rentalcars.md" $ pack $ showPol p
   -- forM_ (take 3 $ optPol 2 pdfGen eps' gamma' asOfS allStates)
   --       $ appendFile "other/rentalcars.md" . pack . showPol
-  let (pols, vss) = optPol 1 eps' gamma' asOfS nextStates rewards allStates
+  let (pols, vss) = optPol 1 eps' gamma' stateToIndex asOfS nextStates rewards allStates
   appendFile "other/rentalcars.md" "\n### Second policy\n\n"
   -- appendFile "other/rentalcars.md" . pack . showPol $ P.head pols
   -- appendFile "other/rentalcars.md" . pack . showPol $ pols P.!! 1
@@ -310,8 +327,9 @@ main = do
 showPol :: Policy -> String
 showPol pol = showFofState pol
 
-showVal :: ((RCState -> Float), Float) -> String
-showVal (v, delta) = showFofState v ++ (printf "$\\quad \\delta = %5.3f$" delta)
+-- showVal :: ((RCState -> Float), Float) -> String
+showVal :: (VS.Vector 441 Float, Float) -> String
+showVal (v, delta) = showFofState (appVal stateToIndex v) ++ (printf "$\\quad \\delta = %5.3f$" delta)
 
 showFofState :: (Show a) => (RCState -> a) -> String
 showFofState g = unlines
