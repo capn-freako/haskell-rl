@@ -240,7 +240,7 @@ Original date: April 20, 2018</p>
 <a class="sourceLine" id="cb4-178" data-line-number="178"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> (<span class="dt">RCState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
 <a class="sourceLine" id="cb4-179" data-line-number="179">showFofState g <span class="fu">=</span> unlines</a>
 <a class="sourceLine" id="cb4-180" data-line-number="180">  ( <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-181" data-line-number="181">    ( (<span class="st">&quot;\\text{cars at loc. 1} &amp;&quot;</span> <span class="fu">++</span> (intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate <span class="dv">20</span> <span class="ch">&#39; &#39;</span>)) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-181" data-line-number="181">    ( (<span class="st">&quot;\\text{cars at loc. 1} &amp;&quot;</span> <span class="fu">++</span> (intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate <span class="dv">21</span> <span class="ch">&#39; &#39;</span>)) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
 <a class="sourceLine" id="cb4-182" data-line-number="182">      [<span class="st">&quot;\\hline&quot;</span>] <span class="fu">++</span></a>
 <a class="sourceLine" id="cb4-183" data-line-number="183">      intersperse <span class="st">&quot;\\hline&quot;</span></a>
 <a class="sourceLine" id="cb4-184" data-line-number="184">        ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
@@ -278,97 +278,97 @@ Original date: April 20, 2018</p>
 </figure>
 <h3 id="final-policy">Final policy</h3>
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
-\text{cars at loc. 1} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
+\text{cars at loc. 1} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 \\
+0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 \\
 \hline
-1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 \\
+1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 \\
 \hline
-2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 \\
+2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -5 \\
 \hline
-3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 \\
+3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 \\
 \hline
-4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 \\
+4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -4 \\
 \hline
-5 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 \\
+5 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -4 \\
 \hline
-6 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 \\
+6 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -3 &amp; -4 \\
 \hline
-7 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
+7 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -3 &amp; -4 \\
 \hline
-8 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
+8 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -3 &amp; -3 \\
 \hline
-9 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
+9 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -2 &amp; -3 \\
 \hline
-10 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
+10 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -3 \\
 \hline
-11 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
+11 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -3 \\
 \hline
-12 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
+12 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -3 \\
 \hline
-13 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
+13 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -2 \\
 \hline
-14 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
+14 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 \\
 \hline
-15 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
+15 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
 \hline
-16 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
+16 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
 \hline
-17 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
+17 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\
 \hline
-18 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 \\
+18 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 \\
 \hline
-19 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 \\
+19 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 \\
 \hline
-20 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 \\
+20 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 \\
 \hline
 \text{cars at loc. 2:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 &amp; 11 &amp; 12 &amp; 13 &amp; 14 &amp; 15 &amp; 16 &amp; 17 &amp; 18 &amp; 19 &amp; 20
 \end{array}\]</span>
 <h3 id="final-value-function">Final value function</h3>
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
-\text{cars at loc. 1} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
+\text{cars at loc. 1} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-0 &amp;  6.8 &amp; 11.6 &amp; 17.4 &amp; 23.1 &amp; 29.3 &amp; 35.4 &amp; 41.0 &amp; 46.2 &amp; 49.9 &amp; 53.4 &amp; 55.4 &amp; 57.0 &amp; 58.0 &amp; 58.5 &amp; 58.6 &amp; 58.7 &amp; 58.7 &amp; 58.7 &amp; 58.7 &amp; 58.7 &amp; 58.6 \\
+0 &amp; 13.2 &amp; 22.7 &amp; 34.5 &amp; 47.6 &amp; 63.8 &amp; 81.1 &amp; 100.6 &amp; 120.1 &amp; 140.2 &amp; 160.3 &amp; 179.2 &amp; 198.4 &amp; 215.9 &amp; 232.9 &amp; 249.1 &amp; 264.0 &amp; 277.9 &amp; 290.8 &amp; 302.7 &amp; 313.5 &amp; 323.2 \\
 \hline
-1 &amp; 11.1 &amp; 16.7 &amp; 22.9 &amp; 30.4 &amp; 36.6 &amp; 42.5 &amp; 47.7 &amp; 51.6 &amp; 55.2 &amp; 57.2 &amp; 58.9 &amp; 59.9 &amp; 60.4 &amp; 60.6 &amp; 60.6 &amp; 60.7 &amp; 60.7 &amp; 60.7 &amp; 60.6 &amp; 60.6 &amp; 60.5 \\
+1 &amp; 22.2 &amp; 33.8 &amp; 47.4 &amp; 64.9 &amp; 82.3 &amp; 102.0 &amp; 121.7 &amp; 141.9 &amp; 162.0 &amp; 181.0 &amp; 200.3 &amp; 217.8 &amp; 234.8 &amp; 251.0 &amp; 266.0 &amp; 279.9 &amp; 293.1 &amp; 305.4 &amp; 316.7 &amp; 326.9 &amp; 335.9 \\
 \hline
-2 &amp; 16.0 &amp; 22.0 &amp; 29.3 &amp; 36.5 &amp; 43.9 &amp; 49.3 &amp; 53.3 &amp; 57.0 &amp; 59.0 &amp; 60.8 &amp; 61.9 &amp; 62.3 &amp; 62.5 &amp; 62.6 &amp; 62.6 &amp; 62.6 &amp; 62.6 &amp; 62.6 &amp; 62.6 &amp; 62.5 &amp; 62.2 \\
+2 &amp; 33.1 &amp; 46.5 &amp; 63.8 &amp; 82.0 &amp; 103.4 &amp; 123.2 &amp; 143.7 &amp; 163.8 &amp; 182.9 &amp; 202.2 &amp; 219.7 &amp; 236.8 &amp; 253.0 &amp; 268.0 &amp; 281.9 &amp; 295.1 &amp; 307.4 &amp; 318.6 &amp; 328.9 &amp; 337.9 &amp; 346.0 \\
 \hline
-3 &amp; 21.2 &amp; 28.2 &amp; 35.2 &amp; 42.5 &amp; 49.1 &amp; 55.1 &amp; 58.8 &amp; 60.8 &amp; 62.7 &amp; 63.8 &amp; 64.3 &amp; 64.4 &amp; 64.5 &amp; 64.5 &amp; 64.5 &amp; 64.6 &amp; 64.5 &amp; 64.5 &amp; 64.4 &amp; 64.2 &amp; 63.4 \\
+3 &amp; 45.6 &amp; 62.8 &amp; 80.8 &amp; 102.0 &amp; 122.7 &amp; 145.4 &amp; 165.6 &amp; 184.8 &amp; 204.1 &amp; 221.6 &amp; 238.8 &amp; 255.0 &amp; 269.9 &amp; 283.8 &amp; 297.1 &amp; 309.4 &amp; 320.6 &amp; 330.8 &amp; 339.9 &amp; 348.0 &amp; 354.6 \\
 \hline
-4 &amp; 27.1 &amp; 34.0 &amp; 41.0 &amp; 47.5 &amp; 53.3 &amp; 58.5 &amp; 62.5 &amp; 64.6 &amp; 65.7 &amp; 66.2 &amp; 66.4 &amp; 66.4 &amp; 66.5 &amp; 66.5 &amp; 66.5 &amp; 66.5 &amp; 66.5 &amp; 66.4 &amp; 66.1 &amp; 65.4 &amp; 64.3 \\
+4 &amp; 61.7 &amp; 79.5 &amp; 100.6 &amp; 121.1 &amp; 143.7 &amp; 164.8 &amp; 186.6 &amp; 206.0 &amp; 223.6 &amp; 240.7 &amp; 256.9 &amp; 271.9 &amp; 285.8 &amp; 299.1 &amp; 311.4 &amp; 322.6 &amp; 332.8 &amp; 341.9 &amp; 350.0 &amp; 356.6 &amp; 362.2 \\
 \hline
-5 &amp; 32.7 &amp; 39.6 &amp; 45.9 &amp; 51.6 &amp; 56.7 &amp; 60.6 &amp; 64.4 &amp; 66.6 &amp; 67.7 &amp; 68.2 &amp; 68.4 &amp; 68.5 &amp; 68.5 &amp; 68.5 &amp; 68.5 &amp; 68.5 &amp; 68.4 &amp; 68.1 &amp; 67.3 &amp; 66.3 &amp; 64.7 \\
+5 &amp; 78.3 &amp; 99.1 &amp; 119.6 &amp; 141.9 &amp; 163.0 &amp; 184.8 &amp; 205.0 &amp; 224.9 &amp; 242.7 &amp; 258.9 &amp; 273.9 &amp; 287.8 &amp; 301.0 &amp; 313.4 &amp; 324.6 &amp; 334.8 &amp; 343.8 &amp; 352.0 &amp; 358.6 &amp; 364.2 &amp; 368.3 \\
 \hline
-6 &amp; 38.1 &amp; 44.4 &amp; 49.9 &amp; 55.0 &amp; 58.7 &amp; 62.5 &amp; 65.3 &amp; 67.5 &amp; 68.6 &amp; 69.1 &amp; 69.3 &amp; 69.4 &amp; 69.4 &amp; 69.4 &amp; 69.4 &amp; 69.4 &amp; 69.3 &amp; 69.0 &amp; 68.2 &amp; 66.6 &amp; 64.8 \\
+6 &amp; 97.7 &amp; 118.0 &amp; 140.2 &amp; 161.2 &amp; 182.9 &amp; 203.1 &amp; 223.0 &amp; 241.6 &amp; 259.2 &amp; 275.1 &amp; 289.7 &amp; 303.0 &amp; 315.3 &amp; 326.6 &amp; 336.8 &amp; 345.8 &amp; 354.0 &amp; 360.6 &amp; 366.2 &amp; 370.3 &amp; 373.3 \\
 \hline
-7 &amp; 42.8 &amp; 48.2 &amp; 53.2 &amp; 56.9 &amp; 60.6 &amp; 63.3 &amp; 65.6 &amp; 67.9 &amp; 69.0 &amp; 69.5 &amp; 69.7 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.4 &amp; 68.6 &amp; 66.7 &amp; 64.8 \\
+7 &amp; 116.4 &amp; 138.5 &amp; 159.4 &amp; 181.0 &amp; 201.2 &amp; 221.0 &amp; 239.6 &amp; 257.2 &amp; 274.0 &amp; 289.3 &amp; 303.3 &amp; 316.0 &amp; 327.6 &amp; 338.2 &amp; 347.7 &amp; 356.0 &amp; 362.6 &amp; 368.2 &amp; 372.3 &amp; 375.3 &amp; 377.0 \\
 \hline
-8 &amp; 46.5 &amp; 51.4 &amp; 55.0 &amp; 58.7 &amp; 61.4 &amp; 63.7 &amp; 65.9 &amp; 68.0 &amp; 69.1 &amp; 69.6 &amp; 69.8 &amp; 69.9 &amp; 69.9 &amp; 69.9 &amp; 69.9 &amp; 69.9 &amp; 69.8 &amp; 69.5 &amp; 68.7 &amp; 66.8 &amp; 64.9 \\
+8 &amp; 136.8 &amp; 157.7 &amp; 179.2 &amp; 199.3 &amp; 219.1 &amp; 237.6 &amp; 255.3 &amp; 272.0 &amp; 287.4 &amp; 302.1 &amp; 315.3 &amp; 327.3 &amp; 338.2 &amp; 348.0 &amp; 356.8 &amp; 364.3 &amp; 370.2 &amp; 374.3 &amp; 377.3 &amp; 379.0 &amp; 379.5 \\
 \hline
-9 &amp; 49.6 &amp; 53.1 &amp; 56.8 &amp; 59.5 &amp; 61.8 &amp; 64.0 &amp; 66.1 &amp; 68.1 &amp; 69.2 &amp; 69.7 &amp; 69.9 &amp; 69.9 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 69.9 &amp; 69.9 &amp; 69.6 &amp; 68.7 &amp; 66.8 &amp; 64.9 \\
+9 &amp; 155.9 &amp; 177.3 &amp; 197.4 &amp; 217.1 &amp; 235.7 &amp; 253.3 &amp; 270.0 &amp; 285.4 &amp; 300.1 &amp; 313.7 &amp; 326.1 &amp; 337.3 &amp; 347.5 &amp; 356.5 &amp; 364.5 &amp; 371.3 &amp; 376.3 &amp; 379.3 &amp; 381.0 &amp; 381.5 &amp; 381.0 \\
 \hline
-10 &amp; 51.2 &amp; 54.9 &amp; 57.6 &amp; 59.8 &amp; 62.0 &amp; 64.1 &amp; 66.1 &amp; 68.1 &amp; 69.2 &amp; 69.7 &amp; 69.9 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 69.9 &amp; 69.6 &amp; 68.7 &amp; 66.8 &amp; 64.9 \\
+10 &amp; 173.0 &amp; 195.5 &amp; 215.2 &amp; 233.7 &amp; 251.3 &amp; 268.0 &amp; 283.4 &amp; 298.1 &amp; 311.7 &amp; 324.2 &amp; 335.8 &amp; 346.2 &amp; 355.6 &amp; 363.8 &amp; 371.0 &amp; 377.0 &amp; 381.3 &amp; 383.0 &amp; 383.5 &amp; 382.9 &amp; 380.8 \\
 \hline
-11 &amp; 52.0 &amp; 55.7 &amp; 57.9 &amp; 60.0 &amp; 62.1 &amp; 64.1 &amp; 66.1 &amp; 68.1 &amp; 69.2 &amp; 69.7 &amp; 69.9 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 69.9 &amp; 69.6 &amp; 68.7 &amp; 66.8 &amp; 64.9 \\
+11 &amp; 188.8 &amp; 211.9 &amp; 231.8 &amp; 249.3 &amp; 266.0 &amp; 281.4 &amp; 296.1 &amp; 309.7 &amp; 322.2 &amp; 333.8 &amp; 344.5 &amp; 354.1 &amp; 362.6 &amp; 370.0 &amp; 376.4 &amp; 381.6 &amp; 385.0 &amp; 385.4 &amp; 384.9 &amp; 382.8 &amp; 378.4 \\
 \hline
-12 &amp; 52.3 &amp; 56.0 &amp; 58.1 &amp; 60.1 &amp; 62.2 &amp; 64.1 &amp; 66.1 &amp; 68.1 &amp; 69.2 &amp; 69.7 &amp; 69.9 &amp; 69.9 &amp; 70.0 &amp; 70.0 &amp; 70.0 &amp; 69.9 &amp; 69.9 &amp; 69.6 &amp; 68.7 &amp; 66.7 &amp; 64.8 \\
+12 &amp; 203.6 &amp; 227.1 &amp; 246.9 &amp; 264.0 &amp; 279.5 &amp; 294.1 &amp; 307.7 &amp; 320.2 &amp; 331.8 &amp; 342.5 &amp; 352.1 &amp; 360.8 &amp; 368.5 &amp; 375.1 &amp; 380.7 &amp; 384.9 &amp; 387.4 &amp; 386.9 &amp; 384.7 &amp; 380.3 &amp; 372.6 \\
 \hline
-13 &amp; 52.4 &amp; 56.1 &amp; 58.2 &amp; 60.2 &amp; 62.2 &amp; 64.1 &amp; 66.1 &amp; 68.0 &amp; 69.1 &amp; 69.6 &amp; 69.8 &amp; 69.9 &amp; 69.9 &amp; 69.9 &amp; 69.9 &amp; 69.9 &amp; 69.8 &amp; 69.5 &amp; 68.7 &amp; 66.7 &amp; 64.7 \\
+13 &amp; 217.7 &amp; 241.3 &amp; 260.8 &amp; 277.5 &amp; 292.1 &amp; 305.7 &amp; 318.2 &amp; 329.8 &amp; 340.5 &amp; 350.1 &amp; 358.8 &amp; 366.5 &amp; 373.2 &amp; 378.9 &amp; 383.6 &amp; 386.9 &amp; 388.3 &amp; 386.7 &amp; 382.3 &amp; 374.6 &amp; 365.0 \\
 \hline
-14 &amp; 52.4 &amp; 56.2 &amp; 58.2 &amp; 60.2 &amp; 62.2 &amp; 64.1 &amp; 66.0 &amp; 67.9 &amp; 69.0 &amp; 69.5 &amp; 69.7 &amp; 69.7 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.6 &amp; 69.3 &amp; 68.5 &amp; 66.5 &amp; 64.3 \\
+14 &amp; 231.0 &amp; 254.6 &amp; 273.8 &amp; 289.8 &amp; 303.7 &amp; 316.2 &amp; 327.8 &amp; 338.5 &amp; 348.1 &amp; 356.8 &amp; 364.5 &amp; 371.2 &amp; 376.9 &amp; 381.6 &amp; 384.9 &amp; 386.8 &amp; 387.1 &amp; 384.3 &amp; 376.5 &amp; 366.9 &amp; 352.6 \\
 \hline
-15 &amp; 52.5 &amp; 56.2 &amp; 58.2 &amp; 60.2 &amp; 62.2 &amp; 64.1 &amp; 65.9 &amp; 67.4 &amp; 68.6 &amp; 69.0 &amp; 69.2 &amp; 69.3 &amp; 69.3 &amp; 69.3 &amp; 69.3 &amp; 69.3 &amp; 69.2 &amp; 68.9 &amp; 68.1 &amp; 66.1 &amp; 63.3 \\
+15 &amp; 243.4 &amp; 267.0 &amp; 285.7 &amp; 301.1 &amp; 314.2 &amp; 325.8 &amp; 336.5 &amp; 346.1 &amp; 354.8 &amp; 362.5 &amp; 369.2 &amp; 374.9 &amp; 379.6 &amp; 382.9 &amp; 384.9 &amp; 385.2 &amp; 382.7 &amp; 378.5 &amp; 368.8 &amp; 354.4 &amp; 334.9 \\
 \hline
-16 &amp; 52.5 &amp; 56.2 &amp; 58.2 &amp; 60.2 &amp; 62.1 &amp; 63.9 &amp; 65.5 &amp; 66.6 &amp; 67.5 &amp; 68.0 &amp; 68.2 &amp; 68.3 &amp; 68.3 &amp; 68.3 &amp; 68.3 &amp; 68.3 &amp; 68.2 &amp; 67.9 &amp; 67.1 &amp; 65.1 &amp; 61.3 \\
+16 &amp; 255.0 &amp; 278.5 &amp; 296.7 &amp; 311.4 &amp; 323.7 &amp; 334.5 &amp; 344.1 &amp; 352.8 &amp; 360.5 &amp; 367.2 &amp; 372.9 &amp; 377.6 &amp; 380.9 &amp; 382.9 &amp; 383.2 &amp; 380.8 &amp; 376.5 &amp; 367.3 &amp; 356.3 &amp; 336.7 &amp; 314.0 \\
 \hline
-17 &amp; 52.4 &amp; 56.2 &amp; 58.2 &amp; 60.1 &amp; 62.0 &amp; 63.6 &amp; 64.6 &amp; 65.6 &amp; 66.1 &amp; 66.3 &amp; 66.3 &amp; 66.4 &amp; 66.4 &amp; 66.4 &amp; 66.3 &amp; 66.3 &amp; 66.0 &amp; 65.7 &amp; 64.9 &amp; 63.0 &amp; 59.2 \\
+17 &amp; 265.6 &amp; 289.0 &amp; 306.7 &amp; 320.7 &amp; 332.2 &amp; 342.1 &amp; 350.8 &amp; 358.5 &amp; 365.2 &amp; 370.9 &amp; 375.6 &amp; 378.9 &amp; 380.9 &amp; 381.2 &amp; 378.8 &amp; 374.6 &amp; 365.4 &amp; 354.4 &amp; 335.7 &amp; 315.7 &amp; 284.5 \\
 \hline
-18 &amp; 52.4 &amp; 56.1 &amp; 58.2 &amp; 60.0 &amp; 61.6 &amp; 62.7 &amp; 63.7 &amp; 64.1 &amp; 64.3 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.3 &amp; 64.1 &amp; 63.8 &amp; 63.1 &amp; 61.3 &amp; 58.9 &amp; 55.3 \\
+18 &amp; 275.0 &amp; 298.3 &amp; 315.5 &amp; 328.8 &amp; 339.5 &amp; 348.6 &amp; 356.4 &amp; 363.2 &amp; 368.9 &amp; 373.6 &amp; 376.9 &amp; 378.9 &amp; 379.2 &amp; 376.8 &amp; 372.6 &amp; 363.5 &amp; 352.6 &amp; 333.9 &amp; 314.0 &amp; 284.4 &amp; 255.2 \\
 \hline
-19 &amp; 52.3 &amp; 56.0 &amp; 58.1 &amp; 59.7 &amp; 60.7 &amp; 61.8 &amp; 62.2 &amp; 62.4 &amp; 62.5 &amp; 62.5 &amp; 62.5 &amp; 62.5 &amp; 62.5 &amp; 62.4 &amp; 62.2 &amp; 62.0 &amp; 61.3 &amp; 59.5 &amp; 57.3 &amp; 53.9 &amp; 49.1 \\
+19 &amp; 283.0 &amp; 306.0 &amp; 322.7 &amp; 335.2 &amp; 345.1 &amp; 353.3 &amp; 360.3 &amp; 366.2 &amp; 371.0 &amp; 374.6 &amp; 376.9 &amp; 377.2 &amp; 374.8 &amp; 370.7 &amp; 361.6 &amp; 350.7 &amp; 332.1 &amp; 312.3 &amp; 282.9 &amp; 253.8 &amp; 216.0 \\
 \hline
-20 &amp; 52.0 &amp; 55.7 &amp; 57.7 &amp; 58.8 &amp; 59.8 &amp; 60.3 &amp; 60.5 &amp; 60.5 &amp; 60.6 &amp; 60.6 &amp; 60.6 &amp; 60.5 &amp; 60.5 &amp; 60.4 &amp; 60.2 &amp; 59.5 &amp; 57.8 &amp; 55.8 &amp; 52.4 &amp; 47.9 &amp; 42.6 \\
+20 &amp; 288.4 &amp; 311.1 &amp; 327.1 &amp; 338.9 &amp; 348.0 &amp; 355.3 &amp; 361.4 &amp; 366.3 &amp; 370.2 &amp; 372.8 &amp; 373.8 &amp; 372.9 &amp; 368.7 &amp; 359.7 &amp; 348.8 &amp; 330.3 &amp; 310.5 &amp; 281.3 &amp; 252.3 &amp; 214.7 &amp; 180.6 \\
 \hline
 \text{cars at loc. 2:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 &amp; 11 &amp; 12 &amp; 13 &amp; 14 &amp; 15 &amp; 16 &amp; 17 &amp; 18 &amp; 19 &amp; 20
 \end{array}\]</span>
