@@ -42,7 +42,7 @@ code
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE BangPatterns #-}
+-- {-# LANGUAGE BangPatterns #-}
 \end{code}
 
 [libraries](https://www.stackage.org/)
@@ -63,27 +63,19 @@ code
 
 \begin{code}
 import qualified Prelude as P
--- import Prelude (tail, last, unlines, String, Show(..))
 import Prelude (unlines, Show(..), String)
 
 import Protolude  hiding (show, for)
 import Options.Generic
 
 import qualified Data.Vector.Sized   as VS
--- import qualified Data.Vector.Unboxed as V
-
-import Control.Arrow              ((&&&), (***))
--- import Control.Monad.Extra        (unfoldM)
 import Data.Finite
-import Data.List                  (groupBy)
-import Data.MemoTrie              (memo)
-import Data.Text                  (pack)
--- import System.Random              (randomIO)
--- import System.Random.Shuffle      (shuffleM)
-import Text.Printf                (printf)
--- import Test.QuickCheck            (generate, elements)
-import Graphics.Rendering.Chart.Easy hiding (Wrapped, Empty)
+import Data.Finite.Internal
+import Data.MemoTrie
+import Data.Text                            (pack)
+import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
+import Text.Printf
 \end{code}
 
 code
@@ -93,13 +85,20 @@ code
 
 \begin{code}
 {----------------------------------------------------------------------
+  Orphans
+----------------------------------------------------------------------}
+instance (KnownNat n) => HasTrie (Finite n) where
+  data Finite n :->: x     = FiniteTrie (VS.Vector n x)
+  trie f                   = FiniteTrie (VS.generate (f . finite . fromIntegral))
+  untrie (FiniteTrie v)    = VS.index v
+  enumerate (FiniteTrie v) = map (first (finite . fromIntegral)) $ (VS.toList . VS.indexed) v
+
+{----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
 
 data Opts w = Opts
-    {
-    -- { number :: w ::: Maybe Integer <?> "The number of games to play"
-    -- , rate   :: w ::: Maybe Double  <?> "The learning rate"
+    { nIter :: w ::: Maybe Int <?> "The number of iterations"
     }
     deriving (Generic)
 
@@ -110,13 +109,24 @@ instance ParseRecord (Opts Wrapped)
   General policy iterator
 ----------------------------------------------------------------------}
 
--- | An optimum policy, given:
+-- | An infinite list of better and better policies, given:
+--   - gamma           - discount rate
 --   - A(s)            - all possible actions in state s,
 --   - S'(s, a)        - all possible next states, for a given state/action pair,
 --   - R(s, a, s')     - all possible rewards for a given state/action/next-state triple,
 --                       along with their probabilities of occurence, and
---   - S               - all possible states.
 --
+-- Returns an infinite list of functions from state to pair of:
+-- - action, and
+-- - value.
+--
+-- Note: This code uses the "Value Iteration" technique (See Sec. 4.4.),
+--       because it dramatically simplifies the code. However, note that
+--       this enforces a 1:1 correspondance between policy evaluation
+--       and iteration cycles.
+--
+-- Note: The following note doesn't make sense, now, but will soon.
+--       (See TODO item below.)
 -- Note: I use the pure random number generator, instead of its IO
 --       counterpart, for two reasons:
 --       - It allows me to keep this function pure, as opposed to
@@ -131,139 +141,54 @@ instance ParseRecord (Opts Wrapped)
 --
 -- TODO: Make second argument to optPol' general, perhaps by choosing
 --       randomly from among the legal actions for a given state.
-optPol :: (KnownNat n, Num a)  -- "Num a" is TEMPORARY; See TODO above.
-       => Integer                          -- ^ max. iterations
-       -> Float                            -- ^ convergence tolerance
-       -> Float                            -- ^ discount rate
-       -> (s -> Finite n)                  -- ^ function from state to vector index
-       -> (s -> [a])                       -- ^ A(s)
-       -> (s -> a -> [s])                  -- ^ S'(s, a)
-       -> (s -> a -> s -> [(Int, Float)])  -- ^ R(s, a, s')
-       -> [s]                              -- ^ S
-       -> ([s -> a], [[(VS.Vector n Float, Float)]])
-optPol = optPol' [[(pure 0, 0)]] [const 0] 0
-
-optPol' :: forall s a n. (KnownNat n)
-        => [[(VS.Vector n Float, Float)]]   -- ^ results from previous iterations
-        -> [s -> a]                         -- ^ results from previous iterations
-        -> Integer                          -- ^ iterations so far
-        -> Integer
-        -> Float
-        -> Float
-        -> (s -> Finite n)
-        -> (s -> [a])
-        -> (s -> a -> [s])
-        -> (s -> a -> s -> [(Int, Float)])
-        -> [s]
-        -> ([s -> a], [[(VS.Vector n Float, Float)]])
-optPol' vs pols nIter maxIter eps gamma sToI acts s's rs ss =
-  if nIter >= maxIter || stable
-    then (reverse pols, reverse vs)
-    else optPol' (v's : vs) (pol' : pols) (nIter + 1) maxIter eps gamma sToI acts s's rs ss
- where stable  = none ( uncurry (<)
-                        . ( (uncurry (actVal gamma sToI s's rs v) . (P.id &&& P.head pols))
-                            &&& (snd . bestA)
-                          )
-                      ) ss
-       v    = (fst . P.last . P.head) vs
-       v's  = evalPol eps gamma 2 0 pol' sToI s's rs ss (P.head vs)
-       pol' = fst . bestA
-       bestA :: s -> (a, Float)
-       bestA s = maximumBy (compare `on` snd)
-                   [ (a, actVal gamma sToI s's rs v s a)
-                   | a <- acts s
-                   ]
-
--- | Policy evaluator
---
--- Returns a list of better and better approximations to the value
--- function for a given policy, along with their deltas.
-evalPol :: KnownNat n
-        => Float                                -- ^ tolerance of convergence
-        -> Float                                -- ^ discount rate
-        -> Integer                              -- ^ max. iterations
-        -> Integer                              -- ^ iterations so far
-        -> (s -> a)                             -- ^ policy to be evaluated
-        -> (s -> Finite n)                      -- ^ function from state to vector index
-        -> (s -> a -> [s])                      -- ^ S'(s, a)
-        -> (s -> a -> s -> [(Int, Float)])      -- ^ R(s, a, s')
-        -> [s]                                  -- ^ S (all possible states)
-        -> [(VS.Vector n Float, Float)]         -- ^ results of previous iterations
-        -> [(VS.Vector n Float, Float)]
-evalPol eps gamma maxIter nIter pol sToI s's rs ss vs =
-  if nIter >= maxIter || delta < eps
-    then reverse ((v', delta) : vs)
-    else evalPol eps gamma maxIter (nIter + 1) pol sToI s's rs ss ((v', delta) : vs)
- where delta = maximum $ map ( abs
-                             . uncurry (-)
-                             . (appVal sToI v &&& appVal sToI v')
-                             ) ss
-       v'    = fromMaybe (VS.replicate 0) $ VS.fromList $ map (\s -> actVal gamma sToI s's rs v s (pol s)) ss
-       v     = (fst . P.head) vs
-
--- | Apply the vector representation of a value function to a particular state.
-appVal :: KnownNat n
-       => (s -> Finite n)    -- ^ function from state to vector index
-       -> VS.Vector n Float  -- ^ vector representation of value function
-       -> s                  -- ^ state
-       -> Float
-appVal f v s = v `VS.index` (f s)
-
--- | Action-value function.
-actVal :: KnownNat n
-       => Float                                -- ^ discount rate
-       -> (s -> Finite n)                      -- ^ function from state to vector index
-       -> (s -> a -> [s])                      -- ^ S'(s, a)
-       -> (s -> a -> s -> [(Int, Float)])      -- ^ R(s, a, s')
-       -> VS.Vector n Float                    -- ^ vector representation of value function
-       -> s                                    -- ^ initial state
-       -> a                                    -- ^ next action
-       -> Float
-actVal gamma sToI s's rs v s a =
-  sum [ p * (fromIntegral r + gamma * appVal sToI v s')
-      | s'     <- s's s a
-      , (r, p) <- rs s a s'
-      ]
+optPol :: (Data.MemoTrie.HasTrie s, HasTrie a, Num a)  -- "Num a" is TEMPORARY; See TODO above.
+       => Float                              -- ^ discount rate
+       -> (s -> [a])                         -- ^ A(s)
+       -> (s -> a -> [s])                    -- ^ S'(s, a)
+       -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
+       -> [s -> (a, Float)]
+optPol gamma as s's rs = optPol' (const (0, 0))
+ where
+  optPol' g = g : optPol' bestA
+   where
+    bestA s = maximumBy (compare `on` snd)
+                            [ (a, actVal' (s, a))
+                            | a <- as s
+                            ]
+    actVal' = memo $ uncurry actVal
+    actVal s a =
+      sum [ pt * gamma * v' + rt
+          | s' <- s's s a
+          , let v' = v s'
+          , let (pt, rt) = foldl prSum (0,0)
+                                 [ (p, p * r)
+                                 | (r, p) <- rs s a s'
+                                 ]
+          ]
+    prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
+    v = snd . g
 
 {----------------------------------------------------------------------
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-eps' = 0.1  -- my choice
+-- eps' = 0.1  -- my choice
 gamma' = 0.9  -- dictated by Exercise 4.7.
+pReq1  = poisson' 3
+pReq2  = poisson' 4
+pRet1  = pReq1
+pRet2  = poisson' 2
 
-newtype RCState  = RCState (Int, Int)  -- ^ # of cars at locations 1 & 2
-  deriving (Show, Eq, Ord)
-
-type    RCAction = Int                 -- ^ # of cars to move from 1 to 2
-type    Policy   = RCState -> RCAction
-
-instance Show Policy where
-  show p = unlines $
-    -- [ printf ((concat . replicate 21) "%2d  ") (map p [RCState (m,n) | n <- [0..20]])
-    [ P.unwords . map (show . p) $ [RCState (m,n) | n <- [0..20]]
-    | m <- [0..20]
-    ]
+type RCState  = (Finite 21, Finite 21)  -- ^ # of cars at locations 1 and 2.
+type RCAction = Int                     -- ^ # of cars to move from 1 to 2
 
 -- | S
 allStates :: [RCState]
-allStates = [RCState (m,n) | m <- [0..20], n <- [0..20]]
-
-stateToIndex :: RCState -> Finite 441
-stateToIndex (RCState (n1, n2)) = (finite . fromIntegral) $ n1 * 21 + n2
-
-pReq1  = poisson 3
-pReq1' = memo pReq1
-pReq2  = poisson 4
-pReq2' = memo pReq2
-pRet1  = poisson 3
-pRet1' = memo pRet1
-pRet2  = poisson 2
-pRet2' = memo pRet2
+allStates = [(finite m, finite n) | m <- [0..20], n <- [0..20]]
 
 -- | A(s)
-asOfS :: RCState -> [RCAction]
-asOfS (RCState s) = [-(min 5 (snd s)) .. min 5 (fst s)]
+actions :: RCState -> [RCAction]
+actions (Finite n1, Finite n2) = map fromIntegral [-(min 5 n2) .. min 5 n1]
 
 -- | S'(s, a)
 nextStates :: RCState -> RCAction -> [RCState]
@@ -274,21 +199,26 @@ nextStates _ _ = allStates
 -- Returns a list of pairs, each containing:
 -- - a unique reward value, and
 -- - the probability of occurence for that value.
-rewards :: RCState -> RCAction -> RCState -> [(Int, Float)]
-rewards (RCState (n1, n2)) a (RCState (n1', n2')) =
-  map ((P.head *** sum) . unzip)
-  . groupBy ((==) `on` fst)
-  . sortOn fst $
-  [ ( 10 * (nReq1 + nReq2) - 2 * abs(a)
-    , sum [ product $ zipWith ($) [pReq1', pRet1', pReq2', pRet2']
-                                  [nReq1,  nRet1,  nReq2,  nRet2]
-          ]
+rewards :: RCState -> RCAction -> RCState -> [(Float, Float)]
+rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
+  [ ( fromIntegral (10 * (nReq1 + nReq2) - 2 * abs a)
+    , product $
+        zipWith ($) [ pReq1, pRet1, pReq2, pRet2]
+                    [ (finite . fromIntegral) nReq1
+                    , (finite . fromIntegral) nRet1
+                    , (finite . fromIntegral) nReq2
+                    , (finite . fromIntegral) nRet2
+                    ]
     )
-  | nRet1 <- [max 0 (n1'+a-n1) .. 20-n1]
-  , nRet2 <- [max 0 (n2'-a-n2) .. 20-n2]
-  , let nReq1 = n1 + nRet1 - a - n1'  -- >= 0 => nRet1 >= n1' + a - n1
-        nReq2 = n2 + nRet2 + a - n2'  -- >= 0 => nRet2 >= n2' - a - n2
+  | nRet1 <- [max 0 (n1'+a'-n1) .. 20 + n1' + a' - n1]
+  , nRet2 <- [max 0 (n2'-a'-n2) .. 20 + n2' - a' - n2]
+  , let nReq1 = fromIntegral (n1 + nRet1 - a' - n1')  -- >= 0 => nRet1 >= n1' + a - n1
+                                                      -- < 21 => nRet1 < 21 + n1' + a - n1
+        nReq2 = fromIntegral (n2 + nRet2 + a' - n2')  -- >= 0 => nRet2 >= n2' - a - n2
+                                                      -- < 21 => nRet2 < 21 + n2' - a - n2
+  , nRet1 < 21 && nRet2 < 21 && nReq1 < 21 && nReq2 < 21
   ]
+ where a' = fromIntegral a
 
 {----------------------------------------------------------------------
   main()
@@ -297,8 +227,8 @@ rewards (RCState (n1, n2)) a (RCState (n1', n2')) =
 main :: IO ()
 main = do
   -- Process command line options.
-  -- o :: Opts Unwrapped <- unwrapRecord "A simple Tic-Tac-Toe example using reinforcement learning."
-  -- let n   = fromMaybe 10  (number o)
+  o :: Opts Unwrapped <- unwrapRecord "A solution to the 'Jack's Rental Cars' problem (Ex. 4.7)."
+  let nIters = fromMaybe 2 (nIter o)
   --     r   = fromMaybe 0.1 (rate   o)
 
   -- Plot the pdfs.
@@ -308,65 +238,60 @@ main = do
        setColors $ map opaque [red, blue, green, yellow]
        forM_ ( zip ["Req1", "Req2", "Ret1", "Ret2"]
                    [3,      4,      3,      2]
-             ) $ \ (lbl, n) -> plot (line lbl [[(x, poisson n x) | x <- [0..20]]])
+             ) $ \ (lbl, n) -> plot (line lbl [[(x, poisson' (finite n) (finite x)) | x <- [0..20]]])
   appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
   -- Calculate and display optimum policy.
-  -- print $ optPol pdfGen eps' gamma' asOfS allStates
-  -- appendFile "other/rentalcars.md" "\n### First 3 policies\n\n"
-  -- forM_ (take 3 $ optPol pdfGen eps' gamma' asOfS allStates) $ \p ->
-  --       appendFile "other/rentalcars.md" $ pack $ showPol p
-  -- forM_ (take 3 $ optPol 2 pdfGen eps' gamma' asOfS allStates)
-  --       $ appendFile "other/rentalcars.md" . pack . showPol
-  let (pols, vss) = optPol 1 eps' gamma' stateToIndex asOfS nextStates rewards allStates
-  appendFile "other/rentalcars.md" "\n### Second policy\n\n"
-  -- appendFile "other/rentalcars.md" . pack . showPol $ P.head pols
-  -- appendFile "other/rentalcars.md" . pack . showPol $ pols P.!! 1
-  appendFile "other/rentalcars.md" "\n### Second policy's initial value function\n\n"
-  -- forM_ (vss P.!! 1) (appendFile "other/rentalcars.md" . pack . showVal)
-  appendFile "other/rentalcars.md" . pack . showVal $ vss P.!! 1 P.!! 0
+  let g = P.last $ take nIters $ optPol gamma' actions nextStates rewards
+  let pol = fst . g
+  let val = snd . g
+  appendFile "other/rentalcars.md" "\n### Final policy\n\n"
+  appendFile "other/rentalcars.md" $ pack $ showFofState pol
+  appendFile "other/rentalcars.md" "\n### Final value function\n\n"
+  appendFile "other/rentalcars.md" $ pack $ showFofState (Pfloat . val)
 
 {----------------------------------------------------------------------
   Misc.
 ----------------------------------------------------------------------}
 
-showPol :: Policy -> String
-showPol pol = showFofState pol
+--- | To control the formatting of printed floats in output matrices.
+newtype Pfloat = Pfloat { unPfloat :: Float}
+  deriving (Eq)
 
--- showVal :: ((RCState -> Float), Float) -> String
-showVal :: (VS.Vector 441 Float, Float) -> String
-showVal (v, delta) = showFofState (appVal stateToIndex v) ++ (printf "$\\quad \\delta = %5.3f$" delta)
+instance Show Pfloat where
+  show x = printf "%4.1f" (unPfloat x)
 
 showFofState :: (Show a) => (RCState -> a) -> String
 showFofState g = unlines
-  ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c}" :
-    intersperse "\\hline"
-      ( map ((++ " \\\\") . intercalate " & " . map show)
-            [ [g (RCState (m,n)) | n <- [0..20]] | m <- [0..20]]
-      )
-    ++ ["\\end{array}"]
+  ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}" :
+    ( ("\\text{cars at loc. 1} &" ++ (intersperse '&' (replicate 21 ' ')) ++ " \\\\") :
+      ["\\hline"] ++
+      intersperse "\\hline"
+        ( map ((++ " \\\\") . intercalate " & ")
+              [ (show m :) $ map show
+                [ g (finite m, finite n)
+                | n <- [0..20]
+                ]
+              | m <- [0..20]
+              ]
+        )
+      ++ ["\\hline"]
+      ++ [(intercalate " & " $ "\\text{cars at loc. 2:} " : [show n | n <- [0..20]])]
+      ++ ["\\end{array}"]
+    )
   )
 
--- toBoth :: (a -> b) -> (a,a) -> (b,b)
--- toBoth f (x1, x2) = (f x1, f x2)
-
--- for :: (Functor f) => f a -> (a -> b) -> f b
--- for = flip map
-
 poisson :: Int -> Int -> Float
--- poisson lambda n = pow lambda n * exp (-lambda) / fact n
-poisson lambda n = lambda' ^ n' * exp (-lambda') / (fromIntegral $ fact n)
+poisson lambda n = lambda' ^ n' * exp (-lambda') / fromIntegral (fact n)
  where lambda' = fromIntegral lambda
        n'      = fromIntegral n
 
 fact :: Int -> Int
 fact 0 = 1
-fact n = n * fact (n - 1)
+fact n = product [1..n]
 
 poissonVals :: VS.Vector 5 (VS.Vector 21 Float)
-poissonVals = VS.generate $
-                (\n -> VS.generate (poisson n . fromIntegral . getFinite))
-                . fromIntegral . getFinite
+poissonVals = VS.generate (VS.generate . poisson)
 
 poisson' :: Finite 5 -> Finite 21 -> Float
 poisson' n x = poissonVals `VS.index` n `VS.index` x
