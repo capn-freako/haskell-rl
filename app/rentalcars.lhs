@@ -28,6 +28,7 @@ code
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -94,36 +95,18 @@ instance (KnownNat n) => HasTrie (Finite n) where
   enumerate (FiniteTrie v) = map (first (finite . fromIntegral)) $ (VS.toList . VS.indexed) v
 
 {----------------------------------------------------------------------
-  Command line options defintions.
-----------------------------------------------------------------------}
-
-data Opts w = Opts
-    { nIter :: w ::: Maybe Int <?> "The number of iterations"
-    }
-    deriving (Generic)
-
-instance ParseRecord (Opts Wrapped)
-
-
-{----------------------------------------------------------------------
   General policy iterator
 ----------------------------------------------------------------------}
 
--- | An infinite list of better and better policies, given:
+-- | Yields a single policy improvment iteration, given:
 --   - gamma           - discount rate
+--   - n               - max. policy evaluation iterations
 --   - A(s)            - all possible actions in state s,
---   - S'(s, a)        - all possible next states, for a given state/action pair,
+--   - S'(s, a)        - all possible next states, for a given state/action pair, and
 --   - R(s, a, s')     - all possible rewards for a given state/action/next-state triple,
---                       along with their probabilities of occurence, and
+--                       along with their probabilities of occurence.
 --
--- Returns an infinite list of functions from state to pair of:
--- - action, and
--- - value.
---
--- Note: This code uses the "Value Iteration" technique (See Sec. 4.4.),
---       because it dramatically simplifies the code. However, note that
---       this enforces a 1:1 correspondance between policy evaluation
---       and iteration cycles.
+-- Returns a combined policy & value function.
 --
 -- Note: The following note doesn't make sense, now, but will soon.
 --       (See TODO item below.)
@@ -143,36 +126,37 @@ instance ParseRecord (Opts Wrapped)
 --       randomly from among the legal actions for a given state.
 optPol :: (Data.MemoTrie.HasTrie s, HasTrie a, Num a)  -- "Num a" is TEMPORARY; See TODO above.
        => Float                              -- ^ discount rate
+       -> Int                                -- ^ max. # of evaluation iterations per improvement iteration
        -> (s -> [a])                         -- ^ A(s)
        -> (s -> a -> [s])                    -- ^ S'(s, a)
        -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
-       -> [s -> (a, Float)]
-optPol gamma as s's rs = optPol' (const (0, 0))
+       -> (s -> (a, Float))                  -- ^ initial (combined) policy & value function
+       -> s -> (a, Float)
+optPol gamma n as s's rs g = bestA
  where
-  optPol' g = g : optPol' bestA
-   where
-    bestA s = maximumBy (compare `on` snd)
-                            [ (a, actVal' (s, a))
-                            | a <- as s
-                            ]
-    actVal' = memo $ uncurry actVal
-    actVal s a =
-      sum [ pt * gamma * v' + rt
-          | s' <- s's s a
-          , let v' = v s'
-          , let (pt, rt) = foldl prSum (0,0)
-                                 [ (p, p * r)
-                                 | (r, p) <- rs s a s'
-                                 ]
-          ]
-    prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
-    v = snd . g
+  bestA     = maximumBy (compare `on` snd) . aVals v'
+  aVals v s = [ (a, actVal' v (s, a))
+              | a <- as s
+              ]
+  actVal'   = memo . uncurry . actVal
+  actVal v s a =
+    sum [ pt * gamma * u + rt
+        | s' <- s's s a
+        , let u = v s'
+        , let (pt, rt) = foldl prSum (0,0)
+                               [ (p, p * r)
+                               | (r, p) <- rs s a s'
+                               ]
+        ]
+  prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
+  v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
+  evalPol p v = \s -> actVal' v (s, p s)
 
 {----------------------------------------------------------------------
   Problem specific definitions
 ----------------------------------------------------------------------}
 
--- eps' = 0.1  -- my choice
+eps'   = 0.1  -- my choice
 gamma' = 0.9  -- dictated by Exercise 4.7.
 pReq1  = poisson' 3
 pReq2  = poisson' 4
@@ -185,6 +169,10 @@ type RCAction = Int                     -- ^ # of cars to move from 1 to 2
 -- | S
 allStates :: [RCState]
 allStates = [(finite m, finite n) | m <- [0..20], n <- [0..20]]
+
+allStatesV :: VS.Vector 441 (Finite 21, Finite 21)
+allStatesV = fromMaybe (VS.replicate (finite 0, finite 0))
+                       $ VS.fromList allStates
 
 -- | A(s)
 actions :: RCState -> [RCAction]
@@ -221,6 +209,19 @@ rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
  where a' = fromIntegral a
 
 {----------------------------------------------------------------------
+  Command line options defintions.
+----------------------------------------------------------------------}
+
+data Opts w = Opts
+    { nIter :: w ::: Maybe Int <?> "The number of policy improvement iterations"
+    , nEval :: w ::: Maybe Int <?> "The number of policy evaluation iterations per policy improvement iteration"
+    }
+    deriving (Generic)
+
+instance ParseRecord (Opts Wrapped)
+
+
+{----------------------------------------------------------------------
   main()
 ----------------------------------------------------------------------}
 
@@ -229,7 +230,7 @@ main = do
   -- Process command line options.
   o :: Opts Unwrapped <- unwrapRecord "A solution to the 'Jack's Rental Cars' problem (Ex. 4.7)."
   let nIters = fromMaybe 2 (nIter o)
-  --     r   = fromMaybe 0.1 (rate   o)
+      nEvals = fromMaybe 1 (nEval o)
 
   -- Plot the pdfs.
   writeFile  "other/rentalcars.md" "### Return/Request Probability Distribution Functions\n\n"
@@ -242,9 +243,16 @@ main = do
   appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
   -- Calculate and display optimum policy.
-  let g = P.last $ take nIters $ optPol gamma' actions nextStates rewards
-  let pol = fst . g
-  let val = snd . g
+  -- let g = P.last $ take nIters $ iterate (optPol gamma' nEvals actions nextStates rewards) (const (0,0))
+  let g     = take nIters
+                   $ iterate (optPol gamma' nEvals actions nextStates rewards)
+                             (const (0,0))
+      acts  = map (\f -> VS.map (fst . f) allStatesV) g
+      diffs = map (VS.maximum . VS.map (fromIntegral . abs) . uncurry (-))
+                  $ zip acts (P.tail acts)
+      g'    = snd . fromMaybe (0, const (0,0)) $ withinOn eps' fst $ zip diffs (P.tail g)
+      pol   = fst . g'
+      val   = snd . g'
   appendFile "other/rentalcars.md" "\n### Final policy\n\n"
   appendFile "other/rentalcars.md" $ pack $ showFofState pol
   appendFile "other/rentalcars.md" "\n### Final value function\n\n"
@@ -290,11 +298,24 @@ fact :: Int -> Int
 fact 0 = 1
 fact n = product [1..n]
 
-poissonVals :: VS.Vector 5 (VS.Vector 21 Float)
+poissonVals :: VS.Vector 5 (VS.Vector 12 Float)
 poissonVals = VS.generate (VS.generate . poisson)
 
 poisson' :: Finite 5 -> Finite 21 -> Float
-poisson' n x = poissonVals `VS.index` n `VS.index` x
+poisson' n x@(Finite x') =
+  if x > 11  -- The Python code enforces this limit. And we're trying
+    then 0   -- for an "apples-to-apples" performance comparison.
+    else poissonVals `VS.index` n `VS.index` (finite x')
+
+-- TODO: Eliminate the double work going on here.
+withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
+withinOn _   _ []              = Nothing
+withinOn _   _ (x : [])        = Just x
+withinOn eps f (x : xs@(y:_)) =
+  if abs (f x - f y) < eps
+    then Just y
+    else withinOn eps f xs
+
 \end{code}
 
 output

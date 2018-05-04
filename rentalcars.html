@@ -16,7 +16,8 @@ Original date: April 20, 2018</p>
 <h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" data-line-number="1"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span></a>
 <a class="sourceLine" id="cb1-2" data-line-number="2"><span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></a>
-<a class="sourceLine" id="cb1-3" data-line-number="3"><span class="ot">{-# OPTIONS_GHC -Wno-missing-signatures #-}</span></a></code></pre></div>
+<a class="sourceLine" id="cb1-3" data-line-number="3"><span class="ot">{-# OPTIONS_GHC -Wno-missing-signatures #-}</span></a>
+<a class="sourceLine" id="cb1-4" data-line-number="4"><span class="ot">{-# OPTIONS_GHC -Wno-orphans #-}</span></a></code></pre></div>
 <h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
 <div class="sourceCode" id="cb2"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></a>
 <a class="sourceLine" id="cb2-2" data-line-number="2"><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></a>
@@ -70,207 +71,207 @@ Original date: April 20, 2018</p>
 <a class="sourceLine" id="cb4-8" data-line-number="8">  enumerate (<span class="dt">FiniteTrie</span> v) <span class="fu">=</span> map (first (finite <span class="fu">.</span> fromIntegral)) <span class="fu">$</span> (VS.toList <span class="fu">.</span> VS.indexed) v</a>
 <a class="sourceLine" id="cb4-9" data-line-number="9"></a>
 <a class="sourceLine" id="cb4-10" data-line-number="10"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-11" data-line-number="11"><span class="co">  Command line options defintions.</span></a>
+<a class="sourceLine" id="cb4-11" data-line-number="11"><span class="co">  General policy iterator</span></a>
 <a class="sourceLine" id="cb4-12" data-line-number="12"><span class="co">----------------------------------------------------------------------}</span></a>
 <a class="sourceLine" id="cb4-13" data-line-number="13"></a>
-<a class="sourceLine" id="cb4-14" data-line-number="14"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
-<a class="sourceLine" id="cb4-15" data-line-number="15">    {<span class="ot"> nIter ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The number of iterations&quot;</span></a>
-<a class="sourceLine" id="cb4-16" data-line-number="16">    }</a>
-<a class="sourceLine" id="cb4-17" data-line-number="17">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
-<a class="sourceLine" id="cb4-18" data-line-number="18"></a>
-<a class="sourceLine" id="cb4-19" data-line-number="19"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
-<a class="sourceLine" id="cb4-20" data-line-number="20"></a>
-<a class="sourceLine" id="cb4-21" data-line-number="21"></a>
-<a class="sourceLine" id="cb4-22" data-line-number="22"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-23" data-line-number="23"><span class="co">  General policy iterator</span></a>
-<a class="sourceLine" id="cb4-24" data-line-number="24"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-25" data-line-number="25"></a>
-<a class="sourceLine" id="cb4-26" data-line-number="26"><span class="co">-- | An infinite list of better and better policies, given:</span></a>
-<a class="sourceLine" id="cb4-27" data-line-number="27"><span class="co">--   - gamma           - discount rate</span></a>
-<a class="sourceLine" id="cb4-28" data-line-number="28"><span class="co">--   - A(s)            - all possible actions in state s,</span></a>
-<a class="sourceLine" id="cb4-29" data-line-number="29"><span class="co">--   - S&#39;(s, a)        - all possible next states, for a given state/action pair,</span></a>
-<a class="sourceLine" id="cb4-30" data-line-number="30"><span class="co">--   - R(s, a, s&#39;)     - all possible rewards for a given state/action/next-state triple,</span></a>
-<a class="sourceLine" id="cb4-31" data-line-number="31"><span class="co">--                       along with their probabilities of occurence, and</span></a>
-<a class="sourceLine" id="cb4-32" data-line-number="32"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-33" data-line-number="33"><span class="co">-- Returns an infinite list of functions from state to pair of:</span></a>
-<a class="sourceLine" id="cb4-34" data-line-number="34"><span class="co">-- - action, and</span></a>
-<a class="sourceLine" id="cb4-35" data-line-number="35"><span class="co">-- - value.</span></a>
-<a class="sourceLine" id="cb4-36" data-line-number="36"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-37" data-line-number="37"><span class="co">-- Note: This code uses the &quot;Value Iteration&quot; technique (See Sec. 4.4.),</span></a>
-<a class="sourceLine" id="cb4-38" data-line-number="38"><span class="co">--       because it dramatically simplifies the code. However, note that</span></a>
-<a class="sourceLine" id="cb4-39" data-line-number="39"><span class="co">--       this enforces a 1:1 correspondance between policy evaluation</span></a>
-<a class="sourceLine" id="cb4-40" data-line-number="40"><span class="co">--       and iteration cycles.</span></a>
-<a class="sourceLine" id="cb4-41" data-line-number="41"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-42" data-line-number="42"><span class="co">-- Note: The following note doesn&#39;t make sense, now, but will soon.</span></a>
-<a class="sourceLine" id="cb4-43" data-line-number="43"><span class="co">--       (See TODO item below.)</span></a>
-<a class="sourceLine" id="cb4-44" data-line-number="44"><span class="co">-- Note: I use the pure random number generator, instead of its IO</span></a>
-<a class="sourceLine" id="cb4-45" data-line-number="45"><span class="co">--       counterpart, for two reasons:</span></a>
-<a class="sourceLine" id="cb4-46" data-line-number="46"><span class="co">--       - It allows me to keep this function pure, as opposed to</span></a>
-<a class="sourceLine" id="cb4-47" data-line-number="47"><span class="co">--         running it inside the IO monad.</span></a>
-<a class="sourceLine" id="cb4-48" data-line-number="48"><span class="co">--       - Initialized with a constant &#39;1&#39;, the way it is here, it</span></a>
-<a class="sourceLine" id="cb4-49" data-line-number="49"><span class="co">--         provides the same stream of pseudo-random numbers each time</span></a>
-<a class="sourceLine" id="cb4-50" data-line-number="50"><span class="co">--         the program is run. This repeatability is a nice feature,</span></a>
-<a class="sourceLine" id="cb4-51" data-line-number="51"><span class="co">--         during program development/debug.</span></a>
-<a class="sourceLine" id="cb4-52" data-line-number="52"><span class="co">--       (Note, however, that it should be replaced by its IO</span></a>
-<a class="sourceLine" id="cb4-53" data-line-number="53"><span class="co">--       counterpart, once the code is stable, so as to provide better</span></a>
-<a class="sourceLine" id="cb4-54" data-line-number="54"><span class="co">--       corner case exposure.)</span></a>
-<a class="sourceLine" id="cb4-55" data-line-number="55"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-56" data-line-number="56"><span class="co">-- TODO: Make second argument to optPol&#39; general, perhaps by choosing</span></a>
-<a class="sourceLine" id="cb4-57" data-line-number="57"><span class="co">--       randomly from among the legal actions for a given state.</span></a>
-<a class="sourceLine" id="cb4-58" data-line-number="58"><span class="ot">optPol ::</span> (<span class="dt">Data.MemoTrie.HasTrie</span> s, <span class="dt">HasTrie</span> a, <span class="dt">Num</span> a)  <span class="co">-- &quot;Num a&quot; is TEMPORARY; See TODO above.</span></a>
-<a class="sourceLine" id="cb4-59" data-line-number="59">       <span class="ot">=&gt;</span> <span class="dt">Float</span>                              <span class="co">-- ^ discount rate</span></a>
-<a class="sourceLine" id="cb4-60" data-line-number="60">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> [a])                         <span class="co">-- ^ A(s)</span></a>
-<a class="sourceLine" id="cb4-61" data-line-number="61">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> [s])                    <span class="co">-- ^ S&#39;(s, a)</span></a>
-<a class="sourceLine" id="cb4-62" data-line-number="62">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> s <span class="ot">-&gt;</span> [(<span class="dt">Float</span>, <span class="dt">Float</span>)])  <span class="co">-- ^ R(s, a, s&#39;)</span></a>
-<a class="sourceLine" id="cb4-63" data-line-number="63">       <span class="ot">-&gt;</span> [s <span class="ot">-&gt;</span> (a, <span class="dt">Float</span>)]</a>
-<a class="sourceLine" id="cb4-64" data-line-number="64">optPol gamma as s&#39;s rs <span class="fu">=</span> optPol&#39; (const (<span class="dv">0</span>, <span class="dv">0</span>))</a>
-<a class="sourceLine" id="cb4-65" data-line-number="65"> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb4-66" data-line-number="66">  optPol&#39; g <span class="fu">=</span> g <span class="fu">:</span> optPol&#39; bestA</a>
-<a class="sourceLine" id="cb4-67" data-line-number="67">   <span class="kw">where</span></a>
-<a class="sourceLine" id="cb4-68" data-line-number="68">    bestA s <span class="fu">=</span> maximumBy (compare <span class="ot">`on`</span> snd)</a>
-<a class="sourceLine" id="cb4-69" data-line-number="69">                            [ (a, actVal&#39; (s, a))</a>
-<a class="sourceLine" id="cb4-70" data-line-number="70">                            <span class="fu">|</span> a <span class="ot">&lt;-</span> as s</a>
-<a class="sourceLine" id="cb4-71" data-line-number="71">                            ]</a>
-<a class="sourceLine" id="cb4-72" data-line-number="72">    actVal&#39; <span class="fu">=</span> memo <span class="fu">$</span> uncurry actVal</a>
-<a class="sourceLine" id="cb4-73" data-line-number="73">    actVal s a <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-74" data-line-number="74">      sum [ pt <span class="fu">*</span> gamma <span class="fu">*</span> v&#39; <span class="fu">+</span> rt</a>
-<a class="sourceLine" id="cb4-75" data-line-number="75">          <span class="fu">|</span> s&#39; <span class="ot">&lt;-</span> s&#39;s s a</a>
-<a class="sourceLine" id="cb4-76" data-line-number="76">          , <span class="kw">let</span> v&#39; <span class="fu">=</span> v s&#39;</a>
-<a class="sourceLine" id="cb4-77" data-line-number="77">          , <span class="kw">let</span> (pt, rt) <span class="fu">=</span> foldl prSum (<span class="dv">0</span>,<span class="dv">0</span>)</a>
-<a class="sourceLine" id="cb4-78" data-line-number="78">                                 [ (p, p <span class="fu">*</span> r)</a>
-<a class="sourceLine" id="cb4-79" data-line-number="79">                                 <span class="fu">|</span> (r, p) <span class="ot">&lt;-</span> rs s a s&#39;</a>
-<a class="sourceLine" id="cb4-80" data-line-number="80">                                 ]</a>
-<a class="sourceLine" id="cb4-81" data-line-number="81">          ]</a>
-<a class="sourceLine" id="cb4-82" data-line-number="82">    prSum (x1,y1) (x2,y2) <span class="fu">=</span> (x1<span class="fu">+</span>x2,y1<span class="fu">+</span>y2)</a>
-<a class="sourceLine" id="cb4-83" data-line-number="83">    v <span class="fu">=</span> snd <span class="fu">.</span> g</a>
-<a class="sourceLine" id="cb4-84" data-line-number="84"></a>
-<a class="sourceLine" id="cb4-85" data-line-number="85"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-86" data-line-number="86"><span class="co">  Problem specific definitions</span></a>
-<a class="sourceLine" id="cb4-87" data-line-number="87"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-88" data-line-number="88"></a>
-<a class="sourceLine" id="cb4-89" data-line-number="89"><span class="co">-- eps&#39; = 0.1  -- my choice</span></a>
-<a class="sourceLine" id="cb4-90" data-line-number="90">gamma&#39; <span class="fu">=</span> <span class="fl">0.9</span>  <span class="co">-- dictated by Exercise 4.7.</span></a>
-<a class="sourceLine" id="cb4-91" data-line-number="91">pReq1  <span class="fu">=</span> poisson&#39; <span class="dv">3</span></a>
-<a class="sourceLine" id="cb4-92" data-line-number="92">pReq2  <span class="fu">=</span> poisson&#39; <span class="dv">4</span></a>
-<a class="sourceLine" id="cb4-93" data-line-number="93">pRet1  <span class="fu">=</span> pReq1</a>
-<a class="sourceLine" id="cb4-94" data-line-number="94">pRet2  <span class="fu">=</span> poisson&#39; <span class="dv">2</span></a>
-<a class="sourceLine" id="cb4-95" data-line-number="95"></a>
-<a class="sourceLine" id="cb4-96" data-line-number="96"><span class="kw">type</span> <span class="dt">RCState</span>  <span class="fu">=</span> (<span class="dt">Finite</span> <span class="dv">21</span>, <span class="dt">Finite</span> <span class="dv">21</span>)  <span class="co">-- ^ # of cars at locations 1 and 2.</span></a>
-<a class="sourceLine" id="cb4-97" data-line-number="97"><span class="kw">type</span> <span class="dt">RCAction</span> <span class="fu">=</span> <span class="dt">Int</span>                     <span class="co">-- ^ # of cars to move from 1 to 2</span></a>
-<a class="sourceLine" id="cb4-98" data-line-number="98"></a>
-<a class="sourceLine" id="cb4-99" data-line-number="99"><span class="co">-- | S</span></a>
-<a class="sourceLine" id="cb4-100" data-line-number="100"><span class="ot">allStates ::</span> [<span class="dt">RCState</span>]</a>
-<a class="sourceLine" id="cb4-101" data-line-number="101">allStates <span class="fu">=</span> [(finite m, finite n) <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>], n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]]</a>
-<a class="sourceLine" id="cb4-102" data-line-number="102"></a>
-<a class="sourceLine" id="cb4-103" data-line-number="103"><span class="co">-- | A(s)</span></a>
-<a class="sourceLine" id="cb4-104" data-line-number="104"><span class="ot">actions ::</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> [<span class="dt">RCAction</span>]</a>
-<a class="sourceLine" id="cb4-105" data-line-number="105">actions (<span class="dt">Finite</span> n1, <span class="dt">Finite</span> n2) <span class="fu">=</span> map fromIntegral [<span class="fu">-</span>(min <span class="dv">5</span> n2) <span class="fu">..</span> min <span class="dv">5</span> n1]</a>
-<a class="sourceLine" id="cb4-106" data-line-number="106"></a>
-<a class="sourceLine" id="cb4-107" data-line-number="107"><span class="co">-- | S&#39;(s, a)</span></a>
-<a class="sourceLine" id="cb4-108" data-line-number="108"><span class="ot">nextStates ::</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> <span class="dt">RCAction</span> <span class="ot">-&gt;</span> [<span class="dt">RCState</span>]</a>
-<a class="sourceLine" id="cb4-109" data-line-number="109">nextStates _ _ <span class="fu">=</span> allStates</a>
-<a class="sourceLine" id="cb4-110" data-line-number="110"></a>
-<a class="sourceLine" id="cb4-111" data-line-number="111"><span class="co">-- | R(s, a, s&#39;)</span></a>
-<a class="sourceLine" id="cb4-112" data-line-number="112"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-113" data-line-number="113"><span class="co">-- Returns a list of pairs, each containing:</span></a>
-<a class="sourceLine" id="cb4-114" data-line-number="114"><span class="co">-- - a unique reward value, and</span></a>
-<a class="sourceLine" id="cb4-115" data-line-number="115"><span class="co">-- - the probability of occurence for that value.</span></a>
-<a class="sourceLine" id="cb4-116" data-line-number="116"><span class="ot">rewards ::</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> <span class="dt">RCAction</span> <span class="ot">-&gt;</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> [(<span class="dt">Float</span>, <span class="dt">Float</span>)]</a>
-<a class="sourceLine" id="cb4-117" data-line-number="117">rewards (<span class="dt">Finite</span> n1, <span class="dt">Finite</span> n2) a (<span class="dt">Finite</span> n1&#39;, <span class="dt">Finite</span> n2&#39;) <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-118" data-line-number="118">  [ ( fromIntegral (<span class="dv">10</span> <span class="fu">*</span> (nReq1 <span class="fu">+</span> nReq2) <span class="fu">-</span> <span class="dv">2</span> <span class="fu">*</span> abs a)</a>
-<a class="sourceLine" id="cb4-119" data-line-number="119">    , product <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-120" data-line-number="120">        zipWith (<span class="fu">$</span>) [ pReq1, pRet1, pReq2, pRet2]</a>
-<a class="sourceLine" id="cb4-121" data-line-number="121">                    [ (finite <span class="fu">.</span> fromIntegral) nReq1</a>
-<a class="sourceLine" id="cb4-122" data-line-number="122">                    , (finite <span class="fu">.</span> fromIntegral) nRet1</a>
-<a class="sourceLine" id="cb4-123" data-line-number="123">                    , (finite <span class="fu">.</span> fromIntegral) nReq2</a>
-<a class="sourceLine" id="cb4-124" data-line-number="124">                    , (finite <span class="fu">.</span> fromIntegral) nRet2</a>
-<a class="sourceLine" id="cb4-125" data-line-number="125">                    ]</a>
-<a class="sourceLine" id="cb4-126" data-line-number="126">    )</a>
-<a class="sourceLine" id="cb4-127" data-line-number="127">  <span class="fu">|</span> nRet1 <span class="ot">&lt;-</span> [max <span class="dv">0</span> (n1&#39;<span class="fu">+</span>a&#39;<span class="fu">-</span>n1) <span class="fu">..</span> <span class="dv">20</span> <span class="fu">+</span> n1&#39; <span class="fu">+</span> a&#39; <span class="fu">-</span> n1]</a>
-<a class="sourceLine" id="cb4-128" data-line-number="128">  , nRet2 <span class="ot">&lt;-</span> [max <span class="dv">0</span> (n2&#39;<span class="fu">-</span>a&#39;<span class="fu">-</span>n2) <span class="fu">..</span> <span class="dv">20</span> <span class="fu">+</span> n2&#39; <span class="fu">-</span> a&#39; <span class="fu">-</span> n2]</a>
-<a class="sourceLine" id="cb4-129" data-line-number="129">  , <span class="kw">let</span> nReq1 <span class="fu">=</span> fromIntegral (n1 <span class="fu">+</span> nRet1 <span class="fu">-</span> a&#39; <span class="fu">-</span> n1&#39;)  <span class="co">-- &gt;= 0 =&gt; nRet1 &gt;= n1&#39; + a - n1</span></a>
-<a class="sourceLine" id="cb4-130" data-line-number="130">                                                      <span class="co">-- &lt; 21 =&gt; nRet1 &lt; 21 + n1&#39; + a - n1</span></a>
-<a class="sourceLine" id="cb4-131" data-line-number="131">        nReq2 <span class="fu">=</span> fromIntegral (n2 <span class="fu">+</span> nRet2 <span class="fu">+</span> a&#39; <span class="fu">-</span> n2&#39;)  <span class="co">-- &gt;= 0 =&gt; nRet2 &gt;= n2&#39; - a - n2</span></a>
-<a class="sourceLine" id="cb4-132" data-line-number="132">                                                      <span class="co">-- &lt; 21 =&gt; nRet2 &lt; 21 + n2&#39; - a - n2</span></a>
-<a class="sourceLine" id="cb4-133" data-line-number="133">  , nRet1 <span class="fu">&lt;</span> <span class="dv">21</span> <span class="fu">&amp;&amp;</span> nRet2 <span class="fu">&lt;</span> <span class="dv">21</span> <span class="fu">&amp;&amp;</span> nReq1 <span class="fu">&lt;</span> <span class="dv">21</span> <span class="fu">&amp;&amp;</span> nReq2 <span class="fu">&lt;</span> <span class="dv">21</span></a>
-<a class="sourceLine" id="cb4-134" data-line-number="134">  ]</a>
-<a class="sourceLine" id="cb4-135" data-line-number="135"> <span class="kw">where</span> a&#39; <span class="fu">=</span> fromIntegral a</a>
+<a class="sourceLine" id="cb4-14" data-line-number="14"><span class="co">-- | Yields a single policy improvment iteration, given:</span></a>
+<a class="sourceLine" id="cb4-15" data-line-number="15"><span class="co">--   - gamma           - discount rate</span></a>
+<a class="sourceLine" id="cb4-16" data-line-number="16"><span class="co">--   - n               - max. policy evaluation iterations</span></a>
+<a class="sourceLine" id="cb4-17" data-line-number="17"><span class="co">--   - A(s)            - all possible actions in state s,</span></a>
+<a class="sourceLine" id="cb4-18" data-line-number="18"><span class="co">--   - S&#39;(s, a)        - all possible next states, for a given state/action pair, and</span></a>
+<a class="sourceLine" id="cb4-19" data-line-number="19"><span class="co">--   - R(s, a, s&#39;)     - all possible rewards for a given state/action/next-state triple,</span></a>
+<a class="sourceLine" id="cb4-20" data-line-number="20"><span class="co">--                       along with their probabilities of occurence.</span></a>
+<a class="sourceLine" id="cb4-21" data-line-number="21"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-22" data-line-number="22"><span class="co">-- Returns a combined policy &amp; value function.</span></a>
+<a class="sourceLine" id="cb4-23" data-line-number="23"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-24" data-line-number="24"><span class="co">-- Note: The following note doesn&#39;t make sense, now, but will soon.</span></a>
+<a class="sourceLine" id="cb4-25" data-line-number="25"><span class="co">--       (See TODO item below.)</span></a>
+<a class="sourceLine" id="cb4-26" data-line-number="26"><span class="co">-- Note: I use the pure random number generator, instead of its IO</span></a>
+<a class="sourceLine" id="cb4-27" data-line-number="27"><span class="co">--       counterpart, for two reasons:</span></a>
+<a class="sourceLine" id="cb4-28" data-line-number="28"><span class="co">--       - It allows me to keep this function pure, as opposed to</span></a>
+<a class="sourceLine" id="cb4-29" data-line-number="29"><span class="co">--         running it inside the IO monad.</span></a>
+<a class="sourceLine" id="cb4-30" data-line-number="30"><span class="co">--       - Initialized with a constant &#39;1&#39;, the way it is here, it</span></a>
+<a class="sourceLine" id="cb4-31" data-line-number="31"><span class="co">--         provides the same stream of pseudo-random numbers each time</span></a>
+<a class="sourceLine" id="cb4-32" data-line-number="32"><span class="co">--         the program is run. This repeatability is a nice feature,</span></a>
+<a class="sourceLine" id="cb4-33" data-line-number="33"><span class="co">--         during program development/debug.</span></a>
+<a class="sourceLine" id="cb4-34" data-line-number="34"><span class="co">--       (Note, however, that it should be replaced by its IO</span></a>
+<a class="sourceLine" id="cb4-35" data-line-number="35"><span class="co">--       counterpart, once the code is stable, so as to provide better</span></a>
+<a class="sourceLine" id="cb4-36" data-line-number="36"><span class="co">--       corner case exposure.)</span></a>
+<a class="sourceLine" id="cb4-37" data-line-number="37"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-38" data-line-number="38"><span class="co">-- TODO: Make second argument to optPol&#39; general, perhaps by choosing</span></a>
+<a class="sourceLine" id="cb4-39" data-line-number="39"><span class="co">--       randomly from among the legal actions for a given state.</span></a>
+<a class="sourceLine" id="cb4-40" data-line-number="40"><span class="ot">optPol ::</span> (<span class="dt">Data.MemoTrie.HasTrie</span> s, <span class="dt">HasTrie</span> a, <span class="dt">Num</span> a)  <span class="co">-- &quot;Num a&quot; is TEMPORARY; See TODO above.</span></a>
+<a class="sourceLine" id="cb4-41" data-line-number="41">       <span class="ot">=&gt;</span> <span class="dt">Float</span>                              <span class="co">-- ^ discount rate</span></a>
+<a class="sourceLine" id="cb4-42" data-line-number="42">       <span class="ot">-&gt;</span> <span class="dt">Int</span>                                <span class="co">-- ^ max. # of evaluation iterations per improvement iteration</span></a>
+<a class="sourceLine" id="cb4-43" data-line-number="43">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> [a])                         <span class="co">-- ^ A(s)</span></a>
+<a class="sourceLine" id="cb4-44" data-line-number="44">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> [s])                    <span class="co">-- ^ S&#39;(s, a)</span></a>
+<a class="sourceLine" id="cb4-45" data-line-number="45">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> s <span class="ot">-&gt;</span> [(<span class="dt">Float</span>, <span class="dt">Float</span>)])  <span class="co">-- ^ R(s, a, s&#39;)</span></a>
+<a class="sourceLine" id="cb4-46" data-line-number="46">       <span class="ot">-&gt;</span> (s <span class="ot">-&gt;</span> (a, <span class="dt">Float</span>))                  <span class="co">-- ^ initial (combined) policy &amp; value function</span></a>
+<a class="sourceLine" id="cb4-47" data-line-number="47">       <span class="ot">-&gt;</span> s <span class="ot">-&gt;</span> (a, <span class="dt">Float</span>)</a>
+<a class="sourceLine" id="cb4-48" data-line-number="48">optPol gamma n as s&#39;s rs g <span class="fu">=</span> bestA</a>
+<a class="sourceLine" id="cb4-49" data-line-number="49"> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb4-50" data-line-number="50">  bestA     <span class="fu">=</span> maximumBy (compare <span class="ot">`on`</span> snd) <span class="fu">.</span> aVals v&#39;</a>
+<a class="sourceLine" id="cb4-51" data-line-number="51">  aVals v s <span class="fu">=</span> [ (a, actVal&#39; v (s, a))</a>
+<a class="sourceLine" id="cb4-52" data-line-number="52">              <span class="fu">|</span> a <span class="ot">&lt;-</span> as s</a>
+<a class="sourceLine" id="cb4-53" data-line-number="53">              ]</a>
+<a class="sourceLine" id="cb4-54" data-line-number="54">  actVal&#39;   <span class="fu">=</span> memo <span class="fu">.</span> uncurry <span class="fu">.</span> actVal</a>
+<a class="sourceLine" id="cb4-55" data-line-number="55">  actVal v s a <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-56" data-line-number="56">    sum [ pt <span class="fu">*</span> gamma <span class="fu">*</span> u <span class="fu">+</span> rt</a>
+<a class="sourceLine" id="cb4-57" data-line-number="57">        <span class="fu">|</span> s&#39; <span class="ot">&lt;-</span> s&#39;s s a</a>
+<a class="sourceLine" id="cb4-58" data-line-number="58">        , <span class="kw">let</span> u <span class="fu">=</span> v s&#39;</a>
+<a class="sourceLine" id="cb4-59" data-line-number="59">        , <span class="kw">let</span> (pt, rt) <span class="fu">=</span> foldl prSum (<span class="dv">0</span>,<span class="dv">0</span>)</a>
+<a class="sourceLine" id="cb4-60" data-line-number="60">                               [ (p, p <span class="fu">*</span> r)</a>
+<a class="sourceLine" id="cb4-61" data-line-number="61">                               <span class="fu">|</span> (r, p) <span class="ot">&lt;-</span> rs s a s&#39;</a>
+<a class="sourceLine" id="cb4-62" data-line-number="62">                               ]</a>
+<a class="sourceLine" id="cb4-63" data-line-number="63">        ]</a>
+<a class="sourceLine" id="cb4-64" data-line-number="64">  prSum (x1,y1) (x2,y2) <span class="fu">=</span> (x1<span class="fu">+</span>x2,y1<span class="fu">+</span>y2)</a>
+<a class="sourceLine" id="cb4-65" data-line-number="65">  v&#39; <span class="fu">=</span> P.last <span class="fu">$</span> take n <span class="fu">$</span> iterate (evalPol (fst <span class="fu">.</span> g)) <span class="fu">$</span> snd <span class="fu">.</span> g</a>
+<a class="sourceLine" id="cb4-66" data-line-number="66">  evalPol p v <span class="fu">=</span> \s <span class="ot">-&gt;</span> actVal&#39; v (s, p s)</a>
+<a class="sourceLine" id="cb4-67" data-line-number="67"></a>
+<a class="sourceLine" id="cb4-68" data-line-number="68"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-69" data-line-number="69"><span class="co">  Problem specific definitions</span></a>
+<a class="sourceLine" id="cb4-70" data-line-number="70"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-71" data-line-number="71"></a>
+<a class="sourceLine" id="cb4-72" data-line-number="72"><span class="co">-- eps&#39; = 0.1  -- my choice</span></a>
+<a class="sourceLine" id="cb4-73" data-line-number="73">gamma&#39; <span class="fu">=</span> <span class="fl">0.9</span>  <span class="co">-- dictated by Exercise 4.7.</span></a>
+<a class="sourceLine" id="cb4-74" data-line-number="74">pReq1  <span class="fu">=</span> poisson&#39; <span class="dv">3</span></a>
+<a class="sourceLine" id="cb4-75" data-line-number="75">pReq2  <span class="fu">=</span> poisson&#39; <span class="dv">4</span></a>
+<a class="sourceLine" id="cb4-76" data-line-number="76">pRet1  <span class="fu">=</span> pReq1</a>
+<a class="sourceLine" id="cb4-77" data-line-number="77">pRet2  <span class="fu">=</span> poisson&#39; <span class="dv">2</span></a>
+<a class="sourceLine" id="cb4-78" data-line-number="78"></a>
+<a class="sourceLine" id="cb4-79" data-line-number="79"><span class="kw">type</span> <span class="dt">RCState</span>  <span class="fu">=</span> (<span class="dt">Finite</span> <span class="dv">21</span>, <span class="dt">Finite</span> <span class="dv">21</span>)  <span class="co">-- ^ # of cars at locations 1 and 2.</span></a>
+<a class="sourceLine" id="cb4-80" data-line-number="80"><span class="kw">type</span> <span class="dt">RCAction</span> <span class="fu">=</span> <span class="dt">Int</span>                     <span class="co">-- ^ # of cars to move from 1 to 2</span></a>
+<a class="sourceLine" id="cb4-81" data-line-number="81"></a>
+<a class="sourceLine" id="cb4-82" data-line-number="82"><span class="co">-- | S</span></a>
+<a class="sourceLine" id="cb4-83" data-line-number="83"><span class="ot">allStates ::</span> [<span class="dt">RCState</span>]</a>
+<a class="sourceLine" id="cb4-84" data-line-number="84">allStates <span class="fu">=</span> [(finite m, finite n) <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>], n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]]</a>
+<a class="sourceLine" id="cb4-85" data-line-number="85"></a>
+<a class="sourceLine" id="cb4-86" data-line-number="86"><span class="co">-- | A(s)</span></a>
+<a class="sourceLine" id="cb4-87" data-line-number="87"><span class="ot">actions ::</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> [<span class="dt">RCAction</span>]</a>
+<a class="sourceLine" id="cb4-88" data-line-number="88">actions (<span class="dt">Finite</span> n1, <span class="dt">Finite</span> n2) <span class="fu">=</span> map fromIntegral [<span class="fu">-</span>(min <span class="dv">5</span> n2) <span class="fu">..</span> min <span class="dv">5</span> n1]</a>
+<a class="sourceLine" id="cb4-89" data-line-number="89"></a>
+<a class="sourceLine" id="cb4-90" data-line-number="90"><span class="co">-- | S&#39;(s, a)</span></a>
+<a class="sourceLine" id="cb4-91" data-line-number="91"><span class="ot">nextStates ::</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> <span class="dt">RCAction</span> <span class="ot">-&gt;</span> [<span class="dt">RCState</span>]</a>
+<a class="sourceLine" id="cb4-92" data-line-number="92">nextStates _ _ <span class="fu">=</span> allStates</a>
+<a class="sourceLine" id="cb4-93" data-line-number="93"></a>
+<a class="sourceLine" id="cb4-94" data-line-number="94"><span class="co">-- | R(s, a, s&#39;)</span></a>
+<a class="sourceLine" id="cb4-95" data-line-number="95"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-96" data-line-number="96"><span class="co">-- Returns a list of pairs, each containing:</span></a>
+<a class="sourceLine" id="cb4-97" data-line-number="97"><span class="co">-- - a unique reward value, and</span></a>
+<a class="sourceLine" id="cb4-98" data-line-number="98"><span class="co">-- - the probability of occurence for that value.</span></a>
+<a class="sourceLine" id="cb4-99" data-line-number="99"><span class="ot">rewards ::</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> <span class="dt">RCAction</span> <span class="ot">-&gt;</span> <span class="dt">RCState</span> <span class="ot">-&gt;</span> [(<span class="dt">Float</span>, <span class="dt">Float</span>)]</a>
+<a class="sourceLine" id="cb4-100" data-line-number="100">rewards (<span class="dt">Finite</span> n1, <span class="dt">Finite</span> n2) a (<span class="dt">Finite</span> n1&#39;, <span class="dt">Finite</span> n2&#39;) <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-101" data-line-number="101">  [ ( fromIntegral (<span class="dv">10</span> <span class="fu">*</span> (nReq1 <span class="fu">+</span> nReq2) <span class="fu">-</span> <span class="dv">2</span> <span class="fu">*</span> abs a)</a>
+<a class="sourceLine" id="cb4-102" data-line-number="102">    , product <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-103" data-line-number="103">        zipWith (<span class="fu">$</span>) [ pReq1, pRet1, pReq2, pRet2]</a>
+<a class="sourceLine" id="cb4-104" data-line-number="104">                    [ (finite <span class="fu">.</span> fromIntegral) nReq1</a>
+<a class="sourceLine" id="cb4-105" data-line-number="105">                    , (finite <span class="fu">.</span> fromIntegral) nRet1</a>
+<a class="sourceLine" id="cb4-106" data-line-number="106">                    , (finite <span class="fu">.</span> fromIntegral) nReq2</a>
+<a class="sourceLine" id="cb4-107" data-line-number="107">                    , (finite <span class="fu">.</span> fromIntegral) nRet2</a>
+<a class="sourceLine" id="cb4-108" data-line-number="108">                    ]</a>
+<a class="sourceLine" id="cb4-109" data-line-number="109">    )</a>
+<a class="sourceLine" id="cb4-110" data-line-number="110">  <span class="fu">|</span> nRet1 <span class="ot">&lt;-</span> [max <span class="dv">0</span> (n1&#39;<span class="fu">+</span>a&#39;<span class="fu">-</span>n1) <span class="fu">..</span> <span class="dv">20</span> <span class="fu">+</span> n1&#39; <span class="fu">+</span> a&#39; <span class="fu">-</span> n1]</a>
+<a class="sourceLine" id="cb4-111" data-line-number="111">  , nRet2 <span class="ot">&lt;-</span> [max <span class="dv">0</span> (n2&#39;<span class="fu">-</span>a&#39;<span class="fu">-</span>n2) <span class="fu">..</span> <span class="dv">20</span> <span class="fu">+</span> n2&#39; <span class="fu">-</span> a&#39; <span class="fu">-</span> n2]</a>
+<a class="sourceLine" id="cb4-112" data-line-number="112">  , <span class="kw">let</span> nReq1 <span class="fu">=</span> fromIntegral (n1 <span class="fu">+</span> nRet1 <span class="fu">-</span> a&#39; <span class="fu">-</span> n1&#39;)  <span class="co">-- &gt;= 0 =&gt; nRet1 &gt;= n1&#39; + a - n1</span></a>
+<a class="sourceLine" id="cb4-113" data-line-number="113">                                                      <span class="co">-- &lt; 21 =&gt; nRet1 &lt; 21 + n1&#39; + a - n1</span></a>
+<a class="sourceLine" id="cb4-114" data-line-number="114">        nReq2 <span class="fu">=</span> fromIntegral (n2 <span class="fu">+</span> nRet2 <span class="fu">+</span> a&#39; <span class="fu">-</span> n2&#39;)  <span class="co">-- &gt;= 0 =&gt; nRet2 &gt;= n2&#39; - a - n2</span></a>
+<a class="sourceLine" id="cb4-115" data-line-number="115">                                                      <span class="co">-- &lt; 21 =&gt; nRet2 &lt; 21 + n2&#39; - a - n2</span></a>
+<a class="sourceLine" id="cb4-116" data-line-number="116">  , nRet1 <span class="fu">&lt;</span> <span class="dv">21</span> <span class="fu">&amp;&amp;</span> nRet2 <span class="fu">&lt;</span> <span class="dv">21</span> <span class="fu">&amp;&amp;</span> nReq1 <span class="fu">&lt;</span> <span class="dv">21</span> <span class="fu">&amp;&amp;</span> nReq2 <span class="fu">&lt;</span> <span class="dv">21</span></a>
+<a class="sourceLine" id="cb4-117" data-line-number="117">  ]</a>
+<a class="sourceLine" id="cb4-118" data-line-number="118"> <span class="kw">where</span> a&#39; <span class="fu">=</span> fromIntegral a</a>
+<a class="sourceLine" id="cb4-119" data-line-number="119"></a>
+<a class="sourceLine" id="cb4-120" data-line-number="120"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-121" data-line-number="121"><span class="co">  Command line options defintions.</span></a>
+<a class="sourceLine" id="cb4-122" data-line-number="122"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-123" data-line-number="123"></a>
+<a class="sourceLine" id="cb4-124" data-line-number="124"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
+<a class="sourceLine" id="cb4-125" data-line-number="125">    {<span class="ot"> nIter ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The number of policy improvement iterations&quot;</span></a>
+<a class="sourceLine" id="cb4-126" data-line-number="126">    ,<span class="ot"> nEval ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The number of policy evaluation iterations per policy improvement iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-127" data-line-number="127">    }</a>
+<a class="sourceLine" id="cb4-128" data-line-number="128">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb4-129" data-line-number="129"></a>
+<a class="sourceLine" id="cb4-130" data-line-number="130"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb4-131" data-line-number="131"></a>
+<a class="sourceLine" id="cb4-132" data-line-number="132"></a>
+<a class="sourceLine" id="cb4-133" data-line-number="133"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-134" data-line-number="134"><span class="co">  main()</span></a>
+<a class="sourceLine" id="cb4-135" data-line-number="135"><span class="co">----------------------------------------------------------------------}</span></a>
 <a class="sourceLine" id="cb4-136" data-line-number="136"></a>
-<a class="sourceLine" id="cb4-137" data-line-number="137"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-138" data-line-number="138"><span class="co">  main()</span></a>
-<a class="sourceLine" id="cb4-139" data-line-number="139"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-140" data-line-number="140"></a>
-<a class="sourceLine" id="cb4-141" data-line-number="141"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb4-142" data-line-number="142">main <span class="fu">=</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-143" data-line-number="143">  <span class="co">-- Process command line options.</span></a>
-<a class="sourceLine" id="cb4-144" data-line-number="144"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span> unwrapRecord <span class="st">&quot;A solution to the &#39;Jack&#39;s Rental Cars&#39; problem (Ex. 4.7).&quot;</span></a>
-<a class="sourceLine" id="cb4-145" data-line-number="145">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe <span class="dv">2</span> (nIter o)</a>
-<a class="sourceLine" id="cb4-146" data-line-number="146">  <span class="co">--     r   = fromMaybe 0.1 (rate   o)</span></a>
-<a class="sourceLine" id="cb4-147" data-line-number="147"></a>
-<a class="sourceLine" id="cb4-148" data-line-number="148">  <span class="co">-- Plot the pdfs.</span></a>
-<a class="sourceLine" id="cb4-149" data-line-number="149">  writeFile  <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;### Return/Request Probability Distribution Functions\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-150" data-line-number="150">  toFile def <span class="st">&quot;img/pdfs.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-151" data-line-number="151">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Return/Request Probability Distribution Functions&quot;</span></a>
-<a class="sourceLine" id="cb4-152" data-line-number="152">       setColors <span class="fu">$</span> map opaque [red, blue, green, yellow]</a>
-<a class="sourceLine" id="cb4-153" data-line-number="153">       forM_ ( zip [<span class="st">&quot;Req1&quot;</span>, <span class="st">&quot;Req2&quot;</span>, <span class="st">&quot;Ret1&quot;</span>, <span class="st">&quot;Ret2&quot;</span>]</a>
-<a class="sourceLine" id="cb4-154" data-line-number="154">                   [<span class="dv">3</span>,      <span class="dv">4</span>,      <span class="dv">3</span>,      <span class="dv">2</span>]</a>
-<a class="sourceLine" id="cb4-155" data-line-number="155">             ) <span class="fu">$</span> \ (lbl, n) <span class="ot">-&gt;</span> plot (line lbl [[(x, poisson&#39; (finite n) (finite x)) <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]]])</a>
-<a class="sourceLine" id="cb4-156" data-line-number="156">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;![](img/pdfs.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-157" data-line-number="157"></a>
-<a class="sourceLine" id="cb4-158" data-line-number="158">  <span class="co">-- Calculate and display optimum policy.</span></a>
-<a class="sourceLine" id="cb4-159" data-line-number="159">  <span class="kw">let</span> g <span class="fu">=</span> P.last <span class="fu">$</span> take nIters <span class="fu">$</span> optPol gamma&#39; actions nextStates rewards</a>
-<a class="sourceLine" id="cb4-160" data-line-number="160">  <span class="kw">let</span> pol <span class="fu">=</span> fst <span class="fu">.</span> g</a>
-<a class="sourceLine" id="cb4-161" data-line-number="161">  <span class="kw">let</span> val <span class="fu">=</span> snd <span class="fu">.</span> g</a>
-<a class="sourceLine" id="cb4-162" data-line-number="162">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-163" data-line-number="163">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
-<a class="sourceLine" id="cb4-164" data-line-number="164">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-165" data-line-number="165">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pfloat</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-137" data-line-number="137"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-138" data-line-number="138">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-139" data-line-number="139">  <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-140" data-line-number="140"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span> unwrapRecord <span class="st">&quot;A solution to the &#39;Jack&#39;s Rental Cars&#39; problem (Ex. 4.7).&quot;</span></a>
+<a class="sourceLine" id="cb4-141" data-line-number="141">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe <span class="dv">2</span> (nIter o)</a>
+<a class="sourceLine" id="cb4-142" data-line-number="142">      nEvals <span class="fu">=</span> fromMaybe <span class="dv">1</span> (nEval o)</a>
+<a class="sourceLine" id="cb4-143" data-line-number="143"></a>
+<a class="sourceLine" id="cb4-144" data-line-number="144">  <span class="co">-- Plot the pdfs.</span></a>
+<a class="sourceLine" id="cb4-145" data-line-number="145">  writeFile  <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;### Return/Request Probability Distribution Functions\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-146" data-line-number="146">  toFile def <span class="st">&quot;img/pdfs.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-147" data-line-number="147">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Return/Request Probability Distribution Functions&quot;</span></a>
+<a class="sourceLine" id="cb4-148" data-line-number="148">       setColors <span class="fu">$</span> map opaque [red, blue, green, yellow]</a>
+<a class="sourceLine" id="cb4-149" data-line-number="149">       forM_ ( zip [<span class="st">&quot;Req1&quot;</span>, <span class="st">&quot;Req2&quot;</span>, <span class="st">&quot;Ret1&quot;</span>, <span class="st">&quot;Ret2&quot;</span>]</a>
+<a class="sourceLine" id="cb4-150" data-line-number="150">                   [<span class="dv">3</span>,      <span class="dv">4</span>,      <span class="dv">3</span>,      <span class="dv">2</span>]</a>
+<a class="sourceLine" id="cb4-151" data-line-number="151">             ) <span class="fu">$</span> \ (lbl, n) <span class="ot">-&gt;</span> plot (line lbl [[(x, poisson&#39; (finite n) (finite x)) <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]]])</a>
+<a class="sourceLine" id="cb4-152" data-line-number="152">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;![](img/pdfs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-153" data-line-number="153"></a>
+<a class="sourceLine" id="cb4-154" data-line-number="154">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-155" data-line-number="155">  <span class="kw">let</span> g <span class="fu">=</span> P.last <span class="fu">$</span> take nIters <span class="fu">$</span> iterate (optPol gamma&#39; nEvals actions nextStates rewards) (const (<span class="dv">0</span>,<span class="dv">0</span>))</a>
+<a class="sourceLine" id="cb4-156" data-line-number="156">  <span class="kw">let</span> pol <span class="fu">=</span> fst <span class="fu">.</span> g</a>
+<a class="sourceLine" id="cb4-157" data-line-number="157">  <span class="kw">let</span> val <span class="fu">=</span> snd <span class="fu">.</span> g</a>
+<a class="sourceLine" id="cb4-158" data-line-number="158">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-159" data-line-number="159">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-160" data-line-number="160">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-161" data-line-number="161">  appendFile <span class="st">&quot;other/rentalcars.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pfloat</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-162" data-line-number="162"></a>
+<a class="sourceLine" id="cb4-163" data-line-number="163"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-164" data-line-number="164"><span class="co">  Misc.</span></a>
+<a class="sourceLine" id="cb4-165" data-line-number="165"><span class="co">----------------------------------------------------------------------}</span></a>
 <a class="sourceLine" id="cb4-166" data-line-number="166"></a>
-<a class="sourceLine" id="cb4-167" data-line-number="167"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-168" data-line-number="168"><span class="co">  Misc.</span></a>
-<a class="sourceLine" id="cb4-169" data-line-number="169"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-167" data-line-number="167"><span class="co">--- | To control the formatting of printed floats in output matrices.</span></a>
+<a class="sourceLine" id="cb4-168" data-line-number="168"><span class="kw">newtype</span> <span class="dt">Pfloat</span> <span class="fu">=</span> <span class="dt">Pfloat</span> {<span class="ot"> unPfloat ::</span> <span class="dt">Float</span>}</a>
+<a class="sourceLine" id="cb4-169" data-line-number="169">  <span class="kw">deriving</span> (<span class="dt">Eq</span>)</a>
 <a class="sourceLine" id="cb4-170" data-line-number="170"></a>
-<a class="sourceLine" id="cb4-171" data-line-number="171"><span class="co">--- | To control the formatting of printed floats in output matrices.</span></a>
-<a class="sourceLine" id="cb4-172" data-line-number="172"><span class="kw">newtype</span> <span class="dt">Pfloat</span> <span class="fu">=</span> <span class="dt">Pfloat</span> {<span class="ot"> unPfloat ::</span> <span class="dt">Float</span>}</a>
-<a class="sourceLine" id="cb4-173" data-line-number="173">  <span class="kw">deriving</span> (<span class="dt">Eq</span>)</a>
-<a class="sourceLine" id="cb4-174" data-line-number="174"></a>
-<a class="sourceLine" id="cb4-175" data-line-number="175"><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Pfloat</span> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb4-176" data-line-number="176">  show x <span class="fu">=</span> printf <span class="st">&quot;%4.1f&quot;</span> (unPfloat x)</a>
-<a class="sourceLine" id="cb4-177" data-line-number="177"></a>
-<a class="sourceLine" id="cb4-178" data-line-number="178"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> (<span class="dt">RCState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-179" data-line-number="179">showFofState g <span class="fu">=</span> unlines</a>
-<a class="sourceLine" id="cb4-180" data-line-number="180">  ( <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-181" data-line-number="181">    ( (<span class="st">&quot;\\text{cars at loc. 1} &amp;&quot;</span> <span class="fu">++</span> (intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate <span class="dv">21</span> <span class="ch">&#39; &#39;</span>)) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-182" data-line-number="182">      [<span class="st">&quot;\\hline&quot;</span>] <span class="fu">++</span></a>
-<a class="sourceLine" id="cb4-183" data-line-number="183">      intersperse <span class="st">&quot;\\hline&quot;</span></a>
-<a class="sourceLine" id="cb4-184" data-line-number="184">        ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
-<a class="sourceLine" id="cb4-185" data-line-number="185">              [ (show m <span class="fu">:</span>) <span class="fu">$</span> map show</a>
-<a class="sourceLine" id="cb4-186" data-line-number="186">                [ g (finite m, finite n)</a>
-<a class="sourceLine" id="cb4-187" data-line-number="187">                <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]</a>
-<a class="sourceLine" id="cb4-188" data-line-number="188">                ]</a>
-<a class="sourceLine" id="cb4-189" data-line-number="189">              <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]</a>
-<a class="sourceLine" id="cb4-190" data-line-number="190">              ]</a>
-<a class="sourceLine" id="cb4-191" data-line-number="191">        )</a>
-<a class="sourceLine" id="cb4-192" data-line-number="192">      <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]</a>
-<a class="sourceLine" id="cb4-193" data-line-number="193">      <span class="fu">++</span> [(intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">$</span> <span class="st">&quot;\\text{cars at loc. 2:} &quot;</span> <span class="fu">:</span> [show n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]])]</a>
-<a class="sourceLine" id="cb4-194" data-line-number="194">      <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
-<a class="sourceLine" id="cb4-195" data-line-number="195">    )</a>
-<a class="sourceLine" id="cb4-196" data-line-number="196">  )</a>
-<a class="sourceLine" id="cb4-197" data-line-number="197"></a>
-<a class="sourceLine" id="cb4-198" data-line-number="198"><span class="ot">poisson ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Float</span></a>
-<a class="sourceLine" id="cb4-199" data-line-number="199">poisson lambda n <span class="fu">=</span> lambda&#39; <span class="fu">^</span> n&#39; <span class="fu">*</span> exp (<span class="fu">-</span>lambda&#39;) <span class="fu">/</span> fromIntegral (fact n)</a>
-<a class="sourceLine" id="cb4-200" data-line-number="200"> <span class="kw">where</span> lambda&#39; <span class="fu">=</span> fromIntegral lambda</a>
-<a class="sourceLine" id="cb4-201" data-line-number="201">       n&#39;      <span class="fu">=</span> fromIntegral n</a>
+<a class="sourceLine" id="cb4-171" data-line-number="171"><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Pfloat</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb4-172" data-line-number="172">  show x <span class="fu">=</span> printf <span class="st">&quot;%4.1f&quot;</span> (unPfloat x)</a>
+<a class="sourceLine" id="cb4-173" data-line-number="173"></a>
+<a class="sourceLine" id="cb4-174" data-line-number="174"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> (<span class="dt">RCState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-175" data-line-number="175">showFofState g <span class="fu">=</span> unlines</a>
+<a class="sourceLine" id="cb4-176" data-line-number="176">  ( <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-177" data-line-number="177">    ( (<span class="st">&quot;\\text{cars at loc. 1} &amp;&quot;</span> <span class="fu">++</span> (intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate <span class="dv">21</span> <span class="ch">&#39; &#39;</span>)) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-178" data-line-number="178">      [<span class="st">&quot;\\hline&quot;</span>] <span class="fu">++</span></a>
+<a class="sourceLine" id="cb4-179" data-line-number="179">      intersperse <span class="st">&quot;\\hline&quot;</span></a>
+<a class="sourceLine" id="cb4-180" data-line-number="180">        ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
+<a class="sourceLine" id="cb4-181" data-line-number="181">              [ (show m <span class="fu">:</span>) <span class="fu">$</span> map show</a>
+<a class="sourceLine" id="cb4-182" data-line-number="182">                [ g (finite m, finite n)</a>
+<a class="sourceLine" id="cb4-183" data-line-number="183">                <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]</a>
+<a class="sourceLine" id="cb4-184" data-line-number="184">                ]</a>
+<a class="sourceLine" id="cb4-185" data-line-number="185">              <span class="fu">|</span> m <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]</a>
+<a class="sourceLine" id="cb4-186" data-line-number="186">              ]</a>
+<a class="sourceLine" id="cb4-187" data-line-number="187">        )</a>
+<a class="sourceLine" id="cb4-188" data-line-number="188">      <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]</a>
+<a class="sourceLine" id="cb4-189" data-line-number="189">      <span class="fu">++</span> [(intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">$</span> <span class="st">&quot;\\text{cars at loc. 2:} &quot;</span> <span class="fu">:</span> [show n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]])]</a>
+<a class="sourceLine" id="cb4-190" data-line-number="190">      <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
+<a class="sourceLine" id="cb4-191" data-line-number="191">    )</a>
+<a class="sourceLine" id="cb4-192" data-line-number="192">  )</a>
+<a class="sourceLine" id="cb4-193" data-line-number="193"></a>
+<a class="sourceLine" id="cb4-194" data-line-number="194"><span class="ot">poisson ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Float</span></a>
+<a class="sourceLine" id="cb4-195" data-line-number="195">poisson lambda n <span class="fu">=</span> lambda&#39; <span class="fu">^</span> n&#39; <span class="fu">*</span> exp (<span class="fu">-</span>lambda&#39;) <span class="fu">/</span> fromIntegral (fact n)</a>
+<a class="sourceLine" id="cb4-196" data-line-number="196"> <span class="kw">where</span> lambda&#39; <span class="fu">=</span> fromIntegral lambda</a>
+<a class="sourceLine" id="cb4-197" data-line-number="197">       n&#39;      <span class="fu">=</span> fromIntegral n</a>
+<a class="sourceLine" id="cb4-198" data-line-number="198"></a>
+<a class="sourceLine" id="cb4-199" data-line-number="199"><span class="ot">fact ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-200" data-line-number="200">fact <span class="dv">0</span> <span class="fu">=</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-201" data-line-number="201">fact n <span class="fu">=</span> product [<span class="dv">1</span><span class="fu">..</span>n]</a>
 <a class="sourceLine" id="cb4-202" data-line-number="202"></a>
-<a class="sourceLine" id="cb4-203" data-line-number="203"><span class="ot">fact ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb4-204" data-line-number="204">fact <span class="dv">0</span> <span class="fu">=</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb4-205" data-line-number="205">fact n <span class="fu">=</span> product [<span class="dv">1</span><span class="fu">..</span>n]</a>
-<a class="sourceLine" id="cb4-206" data-line-number="206"></a>
-<a class="sourceLine" id="cb4-207" data-line-number="207"><span class="ot">poissonVals ::</span> <span class="dt">VS.Vector</span> <span class="dv">5</span> (<span class="dt">VS.Vector</span> <span class="dv">21</span> <span class="dt">Float</span>)</a>
-<a class="sourceLine" id="cb4-208" data-line-number="208">poissonVals <span class="fu">=</span> VS.generate (VS.generate <span class="fu">.</span> poisson)</a>
-<a class="sourceLine" id="cb4-209" data-line-number="209"></a>
-<a class="sourceLine" id="cb4-210" data-line-number="210"><span class="ot">poisson&#39; ::</span> <span class="dt">Finite</span> <span class="dv">5</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">21</span> <span class="ot">-&gt;</span> <span class="dt">Float</span></a>
-<a class="sourceLine" id="cb4-211" data-line-number="211">poisson&#39; n x <span class="fu">=</span> poissonVals <span class="ot">`VS.index`</span> n <span class="ot">`VS.index`</span> x</a></code></pre></div>
+<a class="sourceLine" id="cb4-203" data-line-number="203"><span class="ot">poissonVals ::</span> <span class="dt">VS.Vector</span> <span class="dv">5</span> (<span class="dt">VS.Vector</span> <span class="dv">12</span> <span class="dt">Float</span>)</a>
+<a class="sourceLine" id="cb4-204" data-line-number="204">poissonVals <span class="fu">=</span> VS.generate (VS.generate <span class="fu">.</span> poisson)</a>
+<a class="sourceLine" id="cb4-205" data-line-number="205"></a>
+<a class="sourceLine" id="cb4-206" data-line-number="206"><span class="ot">poisson&#39; ::</span> <span class="dt">Finite</span> <span class="dv">5</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">21</span> <span class="ot">-&gt;</span> <span class="dt">Float</span></a>
+<a class="sourceLine" id="cb4-207" data-line-number="207"><span class="co">-- poisson&#39; n x@(Finite x&#39;) =</span></a>
+<a class="sourceLine" id="cb4-208" data-line-number="208">poisson&#39; n x<span class="fu">@</span>(<span class="dt">Finite</span> x&#39;) <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-209" data-line-number="209">  <span class="kw">if</span> x <span class="fu">&gt;</span> <span class="dv">11</span>  <span class="co">-- The Python code enforces this limit. And we&#39;re trying</span></a>
+<a class="sourceLine" id="cb4-210" data-line-number="210">    <span class="kw">then</span> <span class="dv">0</span>   <span class="co">-- for an &quot;apples-to-apples&quot; performance comparison.</span></a>
+<a class="sourceLine" id="cb4-211" data-line-number="211">    <span class="kw">else</span> poissonVals <span class="ot">`VS.index`</span> n <span class="ot">`VS.index`</span> (finite x&#39;)</a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="returnrequest-probability-distribution-functions">Return/Request Probability Distribution Functions</h3>
 <figure>
@@ -280,47 +281,47 @@ Original date: April 20, 2018</p>
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
 \text{cars at loc. 1} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 \\
+0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 \\
 \hline
-1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -5 &amp; -5 &amp; -5 &amp; -5 &amp; -5 \\
+1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 \\
 \hline
-2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -4 &amp; -5 \\
+2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 \\
 \hline
-3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -3 &amp; -4 &amp; -4 \\
+3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 \\
 \hline
-4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -2 &amp; -3 &amp; -3 &amp; -4 \\
+4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 \\
 \hline
-5 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -1 &amp; -2 &amp; -2 &amp; -3 &amp; -4 \\
+5 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 \\
 \hline
-6 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -3 &amp; -4 \\
+6 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 \\
 \hline
-7 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -3 &amp; -4 \\
+7 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
 \hline
-8 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -3 &amp; -3 \\
+8 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
 \hline
-9 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -2 &amp; -3 \\
+9 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
 \hline
-10 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -3 \\
+10 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
 \hline
-11 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 &amp; -3 \\
+11 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
 \hline
-12 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -3 \\
+12 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
 \hline
-13 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -2 &amp; -2 \\
+13 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
 \hline
-14 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 &amp; -2 \\
+14 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
 \hline
-15 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 &amp; -1 \\
+15 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
 \hline
-16 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
+16 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; -1 \\
 \hline
-17 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\
+17 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
 \hline
-18 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 \\
+18 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 1 &amp; 1 &amp; 0 &amp; 0 \\
 \hline
-19 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 \\
+19 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 2 &amp; 2 &amp; 1 &amp; 1 &amp; 0 \\
 \hline
-20 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 \\
+20 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 4 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 3 &amp; 2 &amp; 2 &amp; 1 &amp; 1 \\
 \hline
 \text{cars at loc. 2:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 &amp; 11 &amp; 12 &amp; 13 &amp; 14 &amp; 15 &amp; 16 &amp; 17 &amp; 18 &amp; 19 &amp; 20
 \end{array}\]</span>
@@ -328,47 +329,47 @@ Original date: April 20, 2018</p>
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
 \text{cars at loc. 1} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-0 &amp; 13.2 &amp; 22.7 &amp; 34.5 &amp; 47.6 &amp; 63.8 &amp; 81.1 &amp; 100.6 &amp; 120.1 &amp; 140.2 &amp; 160.3 &amp; 179.2 &amp; 198.4 &amp; 215.9 &amp; 232.9 &amp; 249.1 &amp; 264.0 &amp; 277.9 &amp; 290.8 &amp; 302.7 &amp; 313.5 &amp; 323.2 \\
+0 &amp;  6.8 &amp; 11.6 &amp; 17.4 &amp; 23.1 &amp; 29.3 &amp; 35.4 &amp; 41.0 &amp; 46.2 &amp; 49.9 &amp; 53.4 &amp; 55.4 &amp; 57.0 &amp; 58.0 &amp; 58.4 &amp; 58.6 &amp; 58.6 &amp; 58.6 &amp; 58.6 &amp; 58.6 &amp; 58.6 &amp; 58.5 \\
 \hline
-1 &amp; 22.2 &amp; 33.8 &amp; 47.4 &amp; 64.9 &amp; 82.3 &amp; 102.0 &amp; 121.7 &amp; 141.9 &amp; 162.0 &amp; 181.0 &amp; 200.3 &amp; 217.8 &amp; 234.8 &amp; 251.0 &amp; 266.0 &amp; 279.9 &amp; 293.1 &amp; 305.4 &amp; 316.7 &amp; 326.9 &amp; 335.9 \\
+1 &amp; 11.1 &amp; 16.7 &amp; 22.9 &amp; 30.4 &amp; 36.6 &amp; 42.5 &amp; 47.7 &amp; 51.6 &amp; 55.2 &amp; 57.2 &amp; 58.9 &amp; 59.9 &amp; 60.4 &amp; 60.5 &amp; 60.5 &amp; 60.5 &amp; 60.5 &amp; 60.5 &amp; 60.5 &amp; 60.4 &amp; 60.4 \\
 \hline
-2 &amp; 33.1 &amp; 46.5 &amp; 63.8 &amp; 82.0 &amp; 103.4 &amp; 123.2 &amp; 143.7 &amp; 163.8 &amp; 182.9 &amp; 202.2 &amp; 219.7 &amp; 236.8 &amp; 253.0 &amp; 268.0 &amp; 281.9 &amp; 295.1 &amp; 307.4 &amp; 318.6 &amp; 328.9 &amp; 337.9 &amp; 346.0 \\
+2 &amp; 16.0 &amp; 22.0 &amp; 29.3 &amp; 36.5 &amp; 43.9 &amp; 49.3 &amp; 53.3 &amp; 57.0 &amp; 59.0 &amp; 60.8 &amp; 61.8 &amp; 62.3 &amp; 62.4 &amp; 62.5 &amp; 62.5 &amp; 62.5 &amp; 62.5 &amp; 62.4 &amp; 62.4 &amp; 62.3 &amp; 62.1 \\
 \hline
-3 &amp; 45.6 &amp; 62.8 &amp; 80.8 &amp; 102.0 &amp; 122.7 &amp; 145.4 &amp; 165.6 &amp; 184.8 &amp; 204.1 &amp; 221.6 &amp; 238.8 &amp; 255.0 &amp; 269.9 &amp; 283.8 &amp; 297.1 &amp; 309.4 &amp; 320.6 &amp; 330.8 &amp; 339.9 &amp; 348.0 &amp; 354.6 \\
+3 &amp; 21.2 &amp; 28.2 &amp; 35.2 &amp; 42.5 &amp; 49.1 &amp; 55.0 &amp; 58.8 &amp; 60.8 &amp; 62.7 &amp; 63.8 &amp; 64.2 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.4 &amp; 64.3 &amp; 64.0 &amp; 63.3 \\
 \hline
-4 &amp; 61.7 &amp; 79.5 &amp; 100.6 &amp; 121.1 &amp; 143.7 &amp; 164.8 &amp; 186.6 &amp; 206.0 &amp; 223.6 &amp; 240.7 &amp; 256.9 &amp; 271.9 &amp; 285.8 &amp; 299.1 &amp; 311.4 &amp; 322.6 &amp; 332.8 &amp; 341.9 &amp; 350.0 &amp; 356.6 &amp; 362.2 \\
+4 &amp; 27.1 &amp; 34.0 &amp; 41.0 &amp; 47.5 &amp; 53.3 &amp; 58.5 &amp; 62.5 &amp; 64.6 &amp; 65.7 &amp; 66.1 &amp; 66.3 &amp; 66.4 &amp; 66.4 &amp; 66.4 &amp; 66.4 &amp; 66.4 &amp; 66.4 &amp; 66.3 &amp; 66.0 &amp; 65.2 &amp; 64.2 \\
 \hline
-5 &amp; 78.3 &amp; 99.1 &amp; 119.6 &amp; 141.9 &amp; 163.0 &amp; 184.8 &amp; 205.0 &amp; 224.9 &amp; 242.7 &amp; 258.9 &amp; 273.9 &amp; 287.8 &amp; 301.0 &amp; 313.4 &amp; 324.6 &amp; 334.8 &amp; 343.8 &amp; 352.0 &amp; 358.6 &amp; 364.2 &amp; 368.3 \\
+5 &amp; 32.7 &amp; 39.6 &amp; 45.9 &amp; 51.6 &amp; 56.7 &amp; 60.6 &amp; 64.4 &amp; 66.6 &amp; 67.7 &amp; 68.2 &amp; 68.3 &amp; 68.4 &amp; 68.4 &amp; 68.4 &amp; 68.4 &amp; 68.3 &amp; 68.2 &amp; 67.9 &amp; 67.1 &amp; 66.1 &amp; 64.5 \\
 \hline
-6 &amp; 97.7 &amp; 118.0 &amp; 140.2 &amp; 161.2 &amp; 182.9 &amp; 203.1 &amp; 223.0 &amp; 241.6 &amp; 259.2 &amp; 275.1 &amp; 289.7 &amp; 303.0 &amp; 315.3 &amp; 326.6 &amp; 336.8 &amp; 345.8 &amp; 354.0 &amp; 360.6 &amp; 366.2 &amp; 370.3 &amp; 373.3 \\
+6 &amp; 38.1 &amp; 44.4 &amp; 49.9 &amp; 54.9 &amp; 58.7 &amp; 62.5 &amp; 65.3 &amp; 67.5 &amp; 68.6 &amp; 69.1 &amp; 69.2 &amp; 69.3 &amp; 69.3 &amp; 69.3 &amp; 69.3 &amp; 69.2 &amp; 69.2 &amp; 68.9 &amp; 68.0 &amp; 66.5 &amp; 64.7 \\
 \hline
-7 &amp; 116.4 &amp; 138.5 &amp; 159.4 &amp; 181.0 &amp; 201.2 &amp; 221.0 &amp; 239.6 &amp; 257.2 &amp; 274.0 &amp; 289.3 &amp; 303.3 &amp; 316.0 &amp; 327.6 &amp; 338.2 &amp; 347.7 &amp; 356.0 &amp; 362.6 &amp; 368.2 &amp; 372.3 &amp; 375.3 &amp; 377.0 \\
+7 &amp; 42.8 &amp; 48.2 &amp; 53.2 &amp; 56.9 &amp; 60.6 &amp; 63.3 &amp; 65.6 &amp; 67.9 &amp; 69.0 &amp; 69.5 &amp; 69.6 &amp; 69.7 &amp; 69.7 &amp; 69.7 &amp; 69.6 &amp; 69.6 &amp; 69.5 &amp; 69.2 &amp; 68.4 &amp; 66.6 &amp; 64.7 \\
 \hline
-8 &amp; 136.8 &amp; 157.7 &amp; 179.2 &amp; 199.3 &amp; 219.1 &amp; 237.6 &amp; 255.3 &amp; 272.0 &amp; 287.4 &amp; 302.1 &amp; 315.3 &amp; 327.3 &amp; 338.2 &amp; 348.0 &amp; 356.8 &amp; 364.3 &amp; 370.2 &amp; 374.3 &amp; 377.3 &amp; 379.0 &amp; 379.5 \\
+8 &amp; 46.5 &amp; 51.4 &amp; 55.0 &amp; 58.7 &amp; 61.4 &amp; 63.7 &amp; 65.9 &amp; 68.0 &amp; 69.1 &amp; 69.6 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.4 &amp; 68.5 &amp; 66.6 &amp; 64.7 \\
 \hline
-9 &amp; 155.9 &amp; 177.3 &amp; 197.4 &amp; 217.1 &amp; 235.7 &amp; 253.3 &amp; 270.0 &amp; 285.4 &amp; 300.1 &amp; 313.7 &amp; 326.1 &amp; 337.3 &amp; 347.5 &amp; 356.5 &amp; 364.5 &amp; 371.3 &amp; 376.3 &amp; 379.3 &amp; 381.0 &amp; 381.5 &amp; 381.0 \\
+9 &amp; 49.6 &amp; 53.1 &amp; 56.8 &amp; 59.5 &amp; 61.8 &amp; 63.9 &amp; 66.0 &amp; 68.0 &amp; 69.2 &amp; 69.6 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.4 &amp; 68.6 &amp; 66.6 &amp; 64.8 \\
 \hline
-10 &amp; 173.0 &amp; 195.5 &amp; 215.2 &amp; 233.7 &amp; 251.3 &amp; 268.0 &amp; 283.4 &amp; 298.1 &amp; 311.7 &amp; 324.2 &amp; 335.8 &amp; 346.2 &amp; 355.6 &amp; 363.8 &amp; 371.0 &amp; 377.0 &amp; 381.3 &amp; 383.0 &amp; 383.5 &amp; 382.9 &amp; 380.8 \\
+10 &amp; 51.2 &amp; 54.9 &amp; 57.6 &amp; 59.8 &amp; 62.0 &amp; 64.1 &amp; 66.1 &amp; 68.1 &amp; 69.2 &amp; 69.6 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.4 &amp; 68.6 &amp; 66.6 &amp; 64.7 \\
 \hline
-11 &amp; 188.8 &amp; 211.9 &amp; 231.8 &amp; 249.3 &amp; 266.0 &amp; 281.4 &amp; 296.1 &amp; 309.7 &amp; 322.2 &amp; 333.8 &amp; 344.5 &amp; 354.1 &amp; 362.6 &amp; 370.0 &amp; 376.4 &amp; 381.6 &amp; 385.0 &amp; 385.4 &amp; 384.9 &amp; 382.8 &amp; 378.4 \\
+11 &amp; 52.0 &amp; 55.7 &amp; 57.9 &amp; 60.0 &amp; 62.1 &amp; 64.1 &amp; 66.1 &amp; 68.1 &amp; 69.2 &amp; 69.6 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.4 &amp; 68.6 &amp; 66.6 &amp; 64.7 \\
 \hline
-12 &amp; 203.6 &amp; 227.1 &amp; 246.9 &amp; 264.0 &amp; 279.5 &amp; 294.1 &amp; 307.7 &amp; 320.2 &amp; 331.8 &amp; 342.5 &amp; 352.1 &amp; 360.8 &amp; 368.5 &amp; 375.1 &amp; 380.7 &amp; 384.9 &amp; 387.4 &amp; 386.9 &amp; 384.7 &amp; 380.3 &amp; 372.6 \\
+12 &amp; 52.3 &amp; 56.0 &amp; 58.0 &amp; 60.1 &amp; 62.1 &amp; 64.1 &amp; 66.1 &amp; 68.0 &amp; 69.1 &amp; 69.6 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.4 &amp; 68.6 &amp; 66.6 &amp; 64.7 \\
 \hline
-13 &amp; 217.7 &amp; 241.3 &amp; 260.8 &amp; 277.5 &amp; 292.1 &amp; 305.7 &amp; 318.2 &amp; 329.8 &amp; 340.5 &amp; 350.1 &amp; 358.8 &amp; 366.5 &amp; 373.2 &amp; 378.9 &amp; 383.6 &amp; 386.9 &amp; 388.3 &amp; 386.7 &amp; 382.3 &amp; 374.6 &amp; 365.0 \\
+13 &amp; 52.4 &amp; 56.1 &amp; 58.2 &amp; 60.2 &amp; 62.2 &amp; 64.1 &amp; 66.1 &amp; 68.0 &amp; 69.1 &amp; 69.6 &amp; 69.7 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.8 &amp; 69.7 &amp; 69.6 &amp; 69.3 &amp; 68.5 &amp; 66.5 &amp; 64.5 \\
 \hline
-14 &amp; 231.0 &amp; 254.6 &amp; 273.8 &amp; 289.8 &amp; 303.7 &amp; 316.2 &amp; 327.8 &amp; 338.5 &amp; 348.1 &amp; 356.8 &amp; 364.5 &amp; 371.2 &amp; 376.9 &amp; 381.6 &amp; 384.9 &amp; 386.8 &amp; 387.1 &amp; 384.3 &amp; 376.5 &amp; 366.9 &amp; 352.6 \\
+14 &amp; 52.4 &amp; 56.1 &amp; 58.2 &amp; 60.2 &amp; 62.1 &amp; 64.1 &amp; 66.0 &amp; 67.8 &amp; 68.9 &amp; 69.4 &amp; 69.6 &amp; 69.6 &amp; 69.6 &amp; 69.6 &amp; 69.6 &amp; 69.6 &amp; 69.5 &amp; 69.2 &amp; 68.4 &amp; 66.4 &amp; 64.2 \\
 \hline
-15 &amp; 243.4 &amp; 267.0 &amp; 285.7 &amp; 301.1 &amp; 314.2 &amp; 325.8 &amp; 336.5 &amp; 346.1 &amp; 354.8 &amp; 362.5 &amp; 369.2 &amp; 374.9 &amp; 379.6 &amp; 382.9 &amp; 384.9 &amp; 385.2 &amp; 382.7 &amp; 378.5 &amp; 368.8 &amp; 354.4 &amp; 334.9 \\
+15 &amp; 52.4 &amp; 56.2 &amp; 58.2 &amp; 60.2 &amp; 62.1 &amp; 64.1 &amp; 65.9 &amp; 67.4 &amp; 68.5 &amp; 69.0 &amp; 69.2 &amp; 69.2 &amp; 69.2 &amp; 69.2 &amp; 69.2 &amp; 69.2 &amp; 69.1 &amp; 68.8 &amp; 67.9 &amp; 66.0 &amp; 63.2 \\
 \hline
-16 &amp; 255.0 &amp; 278.5 &amp; 296.7 &amp; 311.4 &amp; 323.7 &amp; 334.5 &amp; 344.1 &amp; 352.8 &amp; 360.5 &amp; 367.2 &amp; 372.9 &amp; 377.6 &amp; 380.9 &amp; 382.9 &amp; 383.2 &amp; 380.8 &amp; 376.5 &amp; 367.3 &amp; 356.3 &amp; 336.7 &amp; 314.0 \\
+16 &amp; 52.4 &amp; 56.2 &amp; 58.2 &amp; 60.2 &amp; 62.1 &amp; 63.9 &amp; 65.5 &amp; 66.6 &amp; 67.5 &amp; 68.0 &amp; 68.1 &amp; 68.2 &amp; 68.2 &amp; 68.2 &amp; 68.1 &amp; 68.1 &amp; 68.0 &amp; 67.7 &amp; 66.9 &amp; 65.0 &amp; 61.1 \\
 \hline
-17 &amp; 265.6 &amp; 289.0 &amp; 306.7 &amp; 320.7 &amp; 332.2 &amp; 342.1 &amp; 350.8 &amp; 358.5 &amp; 365.2 &amp; 370.9 &amp; 375.6 &amp; 378.9 &amp; 380.9 &amp; 381.2 &amp; 378.8 &amp; 374.6 &amp; 365.4 &amp; 354.4 &amp; 335.7 &amp; 315.7 &amp; 284.5 \\
+17 &amp; 52.4 &amp; 56.1 &amp; 58.2 &amp; 60.1 &amp; 62.0 &amp; 63.5 &amp; 64.6 &amp; 65.6 &amp; 66.0 &amp; 66.2 &amp; 66.2 &amp; 66.2 &amp; 66.2 &amp; 66.2 &amp; 66.2 &amp; 66.1 &amp; 65.8 &amp; 65.5 &amp; 64.7 &amp; 62.8 &amp; 59.0 \\
 \hline
-18 &amp; 275.0 &amp; 298.3 &amp; 315.5 &amp; 328.8 &amp; 339.5 &amp; 348.6 &amp; 356.4 &amp; 363.2 &amp; 368.9 &amp; 373.6 &amp; 376.9 &amp; 378.9 &amp; 379.2 &amp; 376.8 &amp; 372.6 &amp; 363.5 &amp; 352.6 &amp; 333.9 &amp; 314.0 &amp; 284.4 &amp; 255.2 \\
+18 &amp; 52.4 &amp; 56.1 &amp; 58.2 &amp; 60.0 &amp; 61.6 &amp; 62.6 &amp; 63.7 &amp; 64.1 &amp; 64.3 &amp; 64.3 &amp; 64.3 &amp; 64.3 &amp; 64.3 &amp; 64.3 &amp; 64.2 &amp; 64.0 &amp; 63.7 &amp; 62.9 &amp; 61.1 &amp; 58.8 &amp; 55.2 \\
 \hline
-19 &amp; 283.0 &amp; 306.0 &amp; 322.7 &amp; 335.2 &amp; 345.1 &amp; 353.3 &amp; 360.3 &amp; 366.2 &amp; 371.0 &amp; 374.6 &amp; 376.9 &amp; 377.2 &amp; 374.8 &amp; 370.7 &amp; 361.6 &amp; 350.7 &amp; 332.1 &amp; 312.3 &amp; 282.9 &amp; 253.8 &amp; 216.0 \\
+19 &amp; 52.3 &amp; 56.0 &amp; 58.0 &amp; 59.7 &amp; 60.7 &amp; 61.7 &amp; 62.2 &amp; 62.3 &amp; 62.4 &amp; 62.4 &amp; 62.4 &amp; 62.4 &amp; 62.3 &amp; 62.3 &amp; 62.1 &amp; 61.8 &amp; 61.1 &amp; 59.4 &amp; 57.2 &amp; 53.8 &amp; 49.0 \\
 \hline
-20 &amp; 288.4 &amp; 311.1 &amp; 327.1 &amp; 338.9 &amp; 348.0 &amp; 355.3 &amp; 361.4 &amp; 366.3 &amp; 370.2 &amp; 372.8 &amp; 373.8 &amp; 372.9 &amp; 368.7 &amp; 359.7 &amp; 348.8 &amp; 330.3 &amp; 310.5 &amp; 281.3 &amp; 252.3 &amp; 214.7 &amp; 180.6 \\
+20 &amp; 52.0 &amp; 55.7 &amp; 57.7 &amp; 58.8 &amp; 59.8 &amp; 60.2 &amp; 60.4 &amp; 60.4 &amp; 60.4 &amp; 60.4 &amp; 60.4 &amp; 60.4 &amp; 60.3 &amp; 60.3 &amp; 60.0 &amp; 59.3 &amp; 57.7 &amp; 55.6 &amp; 52.3 &amp; 47.8 &amp; 42.5 \\
 \hline
 \text{cars at loc. 2:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 &amp; 11 &amp; 12 &amp; 13 &amp; 14 &amp; 15 &amp; 16 &amp; 17 &amp; 18 &amp; 19 &amp; 20
 \end{array}\]</span>
