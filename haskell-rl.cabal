@@ -190,8 +190,9 @@ executable rentalcars
   default-language:
     Haskell2010
   ghc-options:
+    -O2
     -funbox-strict-fields
-    -fforce-recomp
+    -- -fforce-recomp
     -threaded
     -rtsopts
     -with-rtsopts=-N

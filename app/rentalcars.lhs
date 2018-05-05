@@ -135,9 +135,10 @@ optPol :: (Data.MemoTrie.HasTrie s, HasTrie a, Num a)  -- "Num a" is TEMPORARY; 
 optPol gamma n as s's rs g = bestA
  where
   bestA     = maximumBy (compare `on` snd) . aVals v'
-  aVals v s = [ (a, actVal' v (s, a))
-              | a <- as s
-              ]
+  aVals v = \s -> let actVal'' = actVal' v
+                   in [ (a, actVal'' (s, a))
+                      | a <- as s
+                      ]
   actVal'   = memo . uncurry . actVal
   actVal v s a =
     sum [ pt * gamma * u + rt
@@ -150,7 +151,8 @@ optPol gamma n as s's rs g = bestA
         ]
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
-  evalPol p v = \s -> actVal' v (s, p s)
+  evalPol p v = let actVal'' = actVal' v
+                 in \s -> actVal'' (s, p s)
 
 {----------------------------------------------------------------------
   Problem specific definitions
@@ -180,7 +182,13 @@ actions (Finite n1, Finite n2) = map fromIntegral [-(min 5 n2) .. min 5 n1]
 
 -- | S'(s, a)
 nextStates :: RCState -> RCAction -> [RCState]
-nextStates _ _ = allStates
+-- nextStates _ _ = allStates
+nextStates (Finite n1, Finite n2) a =
+  [ (finite m1, finite m2)
+  | m1 <- [max 0 (n1 - a' - 11) .. min 20 (n1 - a' + 11)]
+  , m2 <- [max 0 (n2 + a' - 11) .. min 20 (n2 + a' + 11)]
+  ]
+ where a' = fromIntegral a
 
 -- | R(s, a, s')
 --
@@ -198,16 +206,17 @@ rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
                     , (finite . fromIntegral) nRet2
                     ]
     )
-  | nRet1 <- [max 0 (n1'+a'-n1) .. 20 + n1' + a' - n1]
-  , nRet2 <- [max 0 (n2'-a'-n2) .. 20 + n2' - a' - n2]
+  -- n1 + nRet1 - a <= 20  ==>  nRet1 <= 20 + a - n1
+  -- n2 + nRet2 + a <= 20  ==>  nRet2 <= 20 - a - n2
+  | nRet1 <- [max 0 (n1' + a' - n1) .. min 11 (20 + a' - n1)]
+  , nRet2 <- [max 0 (n2' - a' - n2) .. min 11 (20 - a' - n2)]
   , let nReq1 = fromIntegral (n1 + nRet1 - a' - n1')  -- >= 0 => nRet1 >= n1' + a - n1
-                                                      -- < 21 => nRet1 < 21 + n1' + a - n1
+                                                      -- <= 11 => nRet1 <= 11 + a + n1' - n1
         nReq2 = fromIntegral (n2 + nRet2 + a' - n2')  -- >= 0 => nRet2 >= n2' - a - n2
-                                                      -- < 21 => nRet2 < 21 + n2' - a - n2
-  , nRet1 < 21 && nRet2 < 21 && nReq1 < 21 && nReq2 < 21
+  -- , nRet1 < 21 && nRet2 < 21 && nReq1 < 21 && nReq2 < 21
+  , nReq1 <= 11 && nReq2 <= 11
   ]
  where a' = fromIntegral a
-
 {----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
