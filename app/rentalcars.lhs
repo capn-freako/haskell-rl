@@ -158,14 +158,14 @@ optPol gamma eps n ss as s's rs g = bestA
                                ]
         ]
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
-  -- v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
-  v' = fromMaybe (const 0)
-                 $ withinOn
-                     eps
-                     (VS.maximum . vsFor ss)
-                     $ take n
-                       $ iterate (evalPol (fst . g))
-                       $ snd . g
+  v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
+  -- v' = fromMaybe (const 0)
+  --                $ withinOn
+  --                    eps
+  --                    (VS.maximum . vsFor ss)
+  --                    $ take n
+  --                      $ iterate (evalPol (fst . g))
+  --                      $ snd . g
   evalPol p v = let actVal'' = actVal' v
                  in \s -> actVal'' (s, p s)
 
@@ -215,26 +215,25 @@ rewards :: RCState -> RCAction -> RCState -> [(Float, Float)]
 rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
   [ ( fromIntegral (10 * (nReq1' + nReq2') - 2 * abs a')
     , product $
-        zipWith ($) [ pRet1, pRet2, pReq1, pReq2 ]
-                    [ (finite . fromIntegral) nRet1
-                    , (finite . fromIntegral) nRet2
-                    , (finite . fromIntegral) nReq1
+        zipWith ($) [ pReq1, pReq2, pRet1, pRet2 ]
+                    [ (finite . fromIntegral) nReq1
                     , (finite . fromIntegral) nReq2
+                    , (finite . fromIntegral) nRet1
+                    , (finite . fromIntegral) nRet2
                     ]
     )
-  | nRet1 <- [0..11]
-  , nRet2 <- [0..11]
-  , nReq1 <- [0..11]
+  | nReq1 <- [0..11]
   , nReq2 <- [0..11]
-  -- , let nReq1 = fromIntegral (min 20 (n1 + nRet1 - a') - n1')
-  --       nReq2 = fromIntegral (min 20 (n2 + nRet2 + a') - n2')
-  -- , nReq1 >= 0 && nReq2 >= 0 && nReq1 <= 11 && nReq2 <= 11
-  , let n1''   = min 20 (min 20 (n1 + nRet1) - a')  -- # on lot in the morning
-  , let n2''   = min 20 (min 20 (n2 + nRet2) + a')
-  , let nReq1' = min nReq1 n1''                     -- # actually rented
-  , let nReq2' = min nReq2 n2''
-  , n1' == n1'' - nReq1'
-  , n2' == n2'' - nReq2'
+  , let m1     = min 20 (n1 - a')   -- # on lot in the morning
+        m2     = min 20 (n2 + a')
+        nReq1' = min nReq1 m1       -- # actually rented
+        nReq2' = min nReq2 m2
+  , nRet1 <- if n1' == 20 then [n1' + nReq1' - m1 .. 11]
+                          else [n1' + nReq1' - m1]
+  , nRet2 <- if n2' == 20 then [n2' + nReq2' - m2 .. 11]
+                          else [n2' + nReq2' - m2]
+  , nRet1 >= 0,  nRet2 >= 0
+  , nRet1 <= 11, nRet2 <= 11
   ]
  where a' = fromIntegral a
 
