@@ -69,9 +69,12 @@ import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for)
 import Options.Generic
 
+import GHC.TypeNats
+
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
 import Data.Finite.Internal
+import Data.List                            ((!!))
 import Data.MemoTrie
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
@@ -124,15 +127,20 @@ instance (KnownNat n) => HasTrie (Finite n) where
 --
 -- TODO: Make second argument to optPol' general, perhaps by choosing
 --       randomly from among the legal actions for a given state.
-optPol :: (Data.MemoTrie.HasTrie s, HasTrie a, Num a)  -- "Num a" is TEMPORARY; See TODO above.
+optPol :: ( HasTrie s
+          , HasTrie a, Num a  -- "Num a" is TEMPORARY; See TODO above.
+          , KnownNat n
+          )
        => Float                              -- ^ discount rate
+       -> Float                              -- ^ evaluation convergence tolerance
        -> Int                                -- ^ max. # of evaluation iterations per improvement iteration
+       -> VS.Vector (n + 1) s                -- ^ vector of all possible system states
        -> (s -> [a])                         -- ^ A(s)
        -> (s -> a -> [s])                    -- ^ S'(s, a)
        -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
        -> (s -> (a, Float))                  -- ^ initial (combined) policy & value function
        -> s -> (a, Float)
-optPol gamma n as s's rs g = bestA
+optPol gamma eps n ss as s's rs g = bestA
  where
   bestA     = maximumBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
@@ -150,7 +158,14 @@ optPol gamma n as s's rs g = bestA
                                ]
         ]
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
-  v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
+  -- v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
+  v' = fromMaybe (const 0)
+                 $ withinOn
+                     eps
+                     (VS.maximum . vsFor ss)
+                     $ take n
+                       $ iterate (evalPol (fst . g))
+                       $ snd . g
   evalPol p v = let actVal'' = actVal' v
                  in \s -> actVal'' (s, p s)
 
@@ -160,9 +175,9 @@ optPol gamma n as s's rs g = bestA
 
 eps'   = 0.1  -- my choice
 gamma' = 0.9  -- dictated by Exercise 4.7.
-pReq1  = poisson' 3
+pReq1  = pRet1
 pReq2  = poisson' 4
-pRet1  = pReq1
+pRet1  = poisson' 3
 pRet2  = poisson' 2
 
 type RCState  = (Finite 21, Finite 21)  -- ^ # of cars at locations 1 and 2.
@@ -182,11 +197,12 @@ actions (Finite n1, Finite n2) = map fromIntegral [-(min 5 n2) .. min 5 n1]
 
 -- | S'(s, a)
 nextStates :: RCState -> RCAction -> [RCState]
--- nextStates _ _ = allStates
 nextStates (Finite n1, Finite n2) a =
   [ (finite m1, finite m2)
-  | m1 <- [max 0 (n1 - a' - 11) .. min 20 (n1 - a' + 11)]
-  , m2 <- [max 0 (n2 + a' - 11) .. min 20 (n2 + a' + 11)]
+  -- | m1 <- [max 0 (n1 - a' - 11) .. min 20 (n1 - a' + 11)]
+  -- , m2 <- [max 0 (n2 + a' - 11) .. min 20 (n2 + a' + 11)]
+  | m1 <- [max 0 (min 20 (n1 - a') - 11) .. min 20 (min 20 (n1 - a') + 11)]
+  , m2 <- [max 0 (min 20 (n2 + a') - 11) .. min 20 (min 20 (n2 + a') + 11)]
   ]
  where a' = fromIntegral a
 
@@ -197,26 +213,31 @@ nextStates (Finite n1, Finite n2) a =
 -- - the probability of occurence for that value.
 rewards :: RCState -> RCAction -> RCState -> [(Float, Float)]
 rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
-  [ ( fromIntegral (10 * (nReq1 + nReq2) - 2 * abs a)
+  [ ( fromIntegral (10 * (nReq1' + nReq2') - 2 * abs a')
     , product $
-        zipWith ($) [ pReq1, pRet1, pReq2, pRet2]
-                    [ (finite . fromIntegral) nReq1
-                    , (finite . fromIntegral) nRet1
-                    , (finite . fromIntegral) nReq2
+        zipWith ($) [ pRet1, pRet2, pReq1, pReq2 ]
+                    [ (finite . fromIntegral) nRet1
                     , (finite . fromIntegral) nRet2
+                    , (finite . fromIntegral) nReq1
+                    , (finite . fromIntegral) nReq2
                     ]
     )
-  -- n1 + nRet1 - a <= 20  ==>  nRet1 <= 20 + a - n1
-  -- n2 + nRet2 + a <= 20  ==>  nRet2 <= 20 - a - n2
-  | nRet1 <- [max 0 (n1' + a' - n1) .. min 11 (20 + a' - n1)]
-  , nRet2 <- [max 0 (n2' - a' - n2) .. min 11 (20 - a' - n2)]
-  , let nReq1 = fromIntegral (n1 + nRet1 - a' - n1')  -- >= 0 => nRet1 >= n1' + a - n1
-                                                      -- <= 11 => nRet1 <= 11 + a + n1' - n1
-        nReq2 = fromIntegral (n2 + nRet2 + a' - n2')  -- >= 0 => nRet2 >= n2' - a - n2
-  -- , nRet1 < 21 && nRet2 < 21 && nReq1 < 21 && nReq2 < 21
-  , nReq1 <= 11 && nReq2 <= 11
+  | nRet1 <- [0..11]
+  , nRet2 <- [0..11]
+  , nReq1 <- [0..11]
+  , nReq2 <- [0..11]
+  -- , let nReq1 = fromIntegral (min 20 (n1 + nRet1 - a') - n1')
+  --       nReq2 = fromIntegral (min 20 (n2 + nRet2 + a') - n2')
+  -- , nReq1 >= 0 && nReq2 >= 0 && nReq1 <= 11 && nReq2 <= 11
+  , let n1''   = min 20 (min 20 (n1 + nRet1) - a')  -- # on lot in the morning
+  , let n2''   = min 20 (min 20 (n2 + nRet2) + a')
+  , let nReq1' = min nReq1 n1''                     -- # actually rented
+  , let nReq2' = min nReq2 n2''
+  , n1' == n1'' - nReq1'
+  , n2' == n2'' - nReq2'
   ]
  where a' = fromIntegral a
+
 {----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
@@ -252,9 +273,8 @@ main = do
   appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
   -- Calculate and display optimum policy.
-  -- let g = P.last $ take nIters $ iterate (optPol gamma' nEvals actions nextStates rewards) (const (0,0))
   let g     = take nIters
-                   $ iterate (optPol gamma' nEvals actions nextStates rewards)
+                   $ iterate (optPol gamma' eps' nEvals allStatesV actions nextStates rewards)
                              (const (0,0))
       acts  = map (\f -> VS.map (fst . f) allStatesV) g
       diffs = map (VS.maximum . VS.map (fromIntegral . abs) . uncurry (-))
@@ -266,6 +286,8 @@ main = do
   appendFile "other/rentalcars.md" $ pack $ showFofState pol
   appendFile "other/rentalcars.md" "\n### Final value function\n\n"
   appendFile "other/rentalcars.md" $ pack $ showFofState (Pfloat . val)
+  -- appendFile "other/rentalcars.md" "\n### E[reward]\n\n"
+  -- appendFile "other/rentalcars.md" $ pack $ showFofState (Pfloat . testRewards)
 
 {----------------------------------------------------------------------
   Misc.
@@ -316,14 +338,43 @@ poisson' n x@(Finite x') =
     then 0   -- for an "apples-to-apples" performance comparison.
     else poissonVals `VS.index` n `VS.index` (finite x')
 
--- TODO: Eliminate the double work going on here.
+-- | First list element that differs from its predeccesor by less than
+-- some threshold under the given function, or the index of the last
+-- element if the threshold was never met.
+--
+-- A return value of 'Nothing' indicates an empty list was given.
 withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
-withinOn _   _ []              = Nothing
-withinOn _   _ (x : [])        = Just x
-withinOn eps f (x : xs@(y:_)) =
-  if abs (f x - f y) < eps
-    then Just y
-    else withinOn eps f xs
+withinOn eps f xs = do
+  n <- withinIx eps $ map f xs
+  return $ xs !! n
+
+-- | Index of first list element that differs from its predeccesor by
+-- less than some threshold, or the index of the last element if the
+-- threshold was never met.
+--
+-- A return value of 'Nothing' indicates an empty list was given.
+withinIx :: Float -> [Float] -> Maybe Int
+withinIx _   [] = Nothing
+withinIx eps xs = Just $ res + 1
+
+ where res = withinIx' 0
+              $ map (abs . uncurry (-)) $ zip xs (P.tail xs)
+       withinIx' n []     = n - 1
+       withinIx' n (y:ys) = if y <= eps
+                              then n
+                              else withinIx' (n+1) ys
+
+-- | Expected reward for a given state, assuming equiprobable actions.
+testRewards :: RCState -> Float
+testRewards s =
+  sum [ uncurry (*) r
+      | a  <- acts
+      , s' <- nextStates s a
+      , r  <- rewards s a s'
+      ] / (fromIntegral . length) acts
+ where acts = actions s
+
+vsFor = flip VS.map
 
 \end{code}
 
