@@ -293,7 +293,7 @@ instance Show Pfloat where
 showFofState :: (Show a) => (RCState -> a) -> String
 showFofState g = unlines
   ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}" :
-    ( ("\\text{cars at loc. 1} &" ++ (intersperse '&' (replicate 21 ' ')) ++ " \\\\") :
+    ( ("\\text{cars at loc. 1} &" ++ intersperse '&' (replicate 21 ' ') ++ " \\\\") :
       ["\\hline"] ++
       intersperse "\\hline"
         ( map ((++ " \\\\") . intercalate " & ")
@@ -305,7 +305,7 @@ showFofState g = unlines
               ]
         )
       ++ ["\\hline"]
-      ++ [(intercalate " & " $ "\\text{cars at loc. 2:} " : [show n | n <- [0..20]])]
+      ++ [intercalate " & " $ "\\text{cars at loc. 2:} " : [show n | n <- [0..20]]]
       ++ ["\\end{array}"]
     )
   )
@@ -326,7 +326,7 @@ poisson' :: Finite 5 -> Finite 21 -> Float
 poisson' n x@(Finite x') =
   if x > 11  -- The Python code enforces this limit. And we're trying
     then 0   -- for an "apples-to-apples" performance comparison.
-    else poissonVals `VS.index` n `VS.index` (finite x')
+    else poissonVals `VS.index` n `VS.index` finite x'
 
 -- | First list element that differs from its predeccesor by less than
 -- some threshold under the given function, or the index of the last
