@@ -103,30 +103,15 @@ instance (KnownNat n) => HasTrie (Finite n) where
 
 -- | Yields a single policy improvment iteration, given:
 --   - gamma           - discount rate
+--   - eps             - convergence tolerance
 --   - n               - max. policy evaluation iterations
+--   - S               - set of all possible system states
 --   - A(s)            - all possible actions in state s,
 --   - S'(s, a)        - all possible next states, for a given state/action pair, and
 --   - R(s, a, s')     - all possible rewards for a given state/action/next-state triple,
 --                       along with their probabilities of occurence.
 --
 -- Returns a combined policy & value function.
---
--- Note: The following note doesn't make sense, now, but will soon.
---       (See TODO item below.)
--- Note: I use the pure random number generator, instead of its IO
---       counterpart, for two reasons:
---       - It allows me to keep this function pure, as opposed to
---         running it inside the IO monad.
---       - Initialized with a constant '1', the way it is here, it
---         provides the same stream of pseudo-random numbers each time
---         the program is run. This repeatability is a nice feature,
---         during program development/debug.
---       (Note, however, that it should be replaced by its IO
---       counterpart, once the code is stable, so as to provide better
---       corner case exposure.)
---
--- TODO: Make second argument to optPol' general, perhaps by choosing
---       randomly from among the legal actions for a given state.
 optPol :: ( HasTrie s
           , HasTrie a, Num a  -- "Num a" is TEMPORARY; See TODO above.
           , KnownNat n
@@ -142,30 +127,30 @@ optPol :: ( HasTrie s
        -> s -> (a, Float)
 optPol gamma eps n ss as s's rs g = bestA
  where
-  bestA     = maximumBy (compare `on` snd) . aVals v'
+  bestA   = maximumBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
                    in [ (a, actVal'' (s, a))
                       | a <- as s
                       ]
-  actVal'   = memo . uncurry . actVal
+  actVal' = memo . uncurry . actVal
   actVal v s a =
     sum [ pt * gamma * u + rt
         | s' <- s's s a
         , let u = v s'
         , let (pt, rt) = foldl prSum (0,0)
                                [ (p, p * r)
-                               | (r, p) <- rs s a s'
+                               | (r, p) <- rs' s a s'
                                ]
         ]
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
-  v' = P.last $ take n $ iterate (evalPol (fst . g)) $ snd . g
-  -- v' = fromMaybe (const 0)
-  --                $ withinOn
-  --                    eps
-  --                    (VS.maximum . vsFor ss)
-  --                    $ take n
-  --                      $ iterate (evalPol (fst . g))
-  --                      $ snd . g
+  rs' = memo3 rs
+  v' = fromMaybe (const 0)
+                 $ withinOn
+                     eps
+                     (VS.maximum . vsFor ss)
+                     $ take n
+                       $ iterate (evalPol (fst . g))
+                       $ snd . g
   evalPol p v = let actVal'' = actVal' v
                  in \s -> actVal'' (s, p s)
 
@@ -175,10 +160,17 @@ optPol gamma eps n ss as s's rs g = bestA
 
 eps'   = 0.1  -- my choice
 gamma' = 0.9  -- dictated by Exercise 4.7.
-pReq1  = pRet1
-pReq2  = poisson' 4
-pRet1  = poisson' 3
-pRet2  = poisson' 2
+
+-- expectations for Poisson distributions
+gEXPREQ1 = 3
+gEXPREQ2 = 4
+gEXPRET1 = 3
+gEXPRET2 = 2
+
+pReq1  = poisson' $ finite gEXPREQ1
+pReq2  = poisson' $ finite gEXPREQ2
+-- pRet1  = poisson' $ finite gEXPRET1
+-- pRet2  = poisson' $ finite gEXPRET2
 
 type RCState  = (Finite 21, Finite 21)  -- ^ # of cars at locations 1 and 2.
 type RCAction = Int                     -- ^ # of cars to move from 1 to 2
@@ -187,6 +179,7 @@ type RCAction = Int                     -- ^ # of cars to move from 1 to 2
 allStates :: [RCState]
 allStates = [(finite m, finite n) | m <- [0..20], n <- [0..20]]
 
+-- Just a sized vector alternative to the list above.
 allStatesV :: VS.Vector 441 (Finite 21, Finite 21)
 allStatesV = fromMaybe (VS.replicate (finite 0, finite 0))
                        $ VS.fromList allStates
@@ -199,8 +192,6 @@ actions (Finite n1, Finite n2) = map fromIntegral [-(min 5 n2) .. min 5 n1]
 nextStates :: RCState -> RCAction -> [RCState]
 nextStates (Finite n1, Finite n2) a =
   [ (finite m1, finite m2)
-  -- | m1 <- [max 0 (n1 - a' - 11) .. min 20 (n1 - a' + 11)]
-  -- , m2 <- [max 0 (n2 + a' - 11) .. min 20 (n2 + a' + 11)]
   | m1 <- [max 0 (min 20 (n1 - a') - 11) .. min 20 (min 20 (n1 - a') + 11)]
   , m2 <- [max 0 (min 20 (n2 + a') - 11) .. min 20 (min 20 (n2 + a') + 11)]
   ]
@@ -215,11 +206,9 @@ rewards :: RCState -> RCAction -> RCState -> [(Float, Float)]
 rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
   [ ( fromIntegral (10 * (nReq1' + nReq2') - 2 * abs a')
     , product $
-        zipWith ($) [ pReq1, pReq2, pRet1, pRet2 ]
+        zipWith ($) [ pReq1, pReq2 ]
                     [ (finite . fromIntegral) nReq1
                     , (finite . fromIntegral) nReq2
-                    , (finite . fromIntegral) nRet1
-                    , (finite . fromIntegral) nRet2
                     ]
     )
   | nReq1 <- [0..11]
@@ -228,12 +217,14 @@ rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
         m2     = min 20 (n2 + a')
         nReq1' = min nReq1 m1       -- # actually rented
         nReq2' = min nReq2 m2
-  , nRet1 <- if n1' == 20 then [n1' + nReq1' - m1 .. 11]
-                          else [n1' + nReq1' - m1]
-  , nRet2 <- if n2' == 20 then [n2' + nReq2' - m2 .. 11]
-                          else [n2' + nReq2' - m2]
-  , nRet1 >= 0,  nRet2 >= 0
-  , nRet1 <= 11, nRet2 <= 11
+  -- Copying the same "cheat" used in the Python code.
+  -- (i.e. - # of cars returned assumed to equal expectaion.)
+  , if n1' == 20 then gEXPRET1 >= (n1' + nReq1' - m1)
+                   && gEXPRET1 <= 11
+                 else gEXPRET1 == n1' + nReq1' - m1
+  , if n2' == 20 then gEXPRET2 >= (n2' + nReq2' - m2)
+                   && gEXPRET2 <= 11
+                 else gEXPRET2 == n2' + nReq2' - m2
   ]
  where a' = fromIntegral a
 
@@ -364,14 +355,14 @@ withinIx eps xs = Just $ res + 1
                               else withinIx' (n+1) ys
 
 -- | Expected reward for a given state, assuming equiprobable actions.
-testRewards :: RCState -> Float
-testRewards s =
-  sum [ uncurry (*) r
-      | a  <- acts
-      , s' <- nextStates s a
-      , r  <- rewards s a s'
-      ] / (fromIntegral . length) acts
- where acts = actions s
+-- testRewards :: RCState -> Float
+-- testRewards s =
+--   sum [ uncurry (*) r
+--       | a  <- acts
+--       , s' <- nextStates s a
+--       , r  <- rewards s a s'
+--       ] / (fromIntegral . length) acts
+--  where acts = actions s
 
 vsFor = flip VS.map
 
