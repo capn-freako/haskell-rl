@@ -203,6 +203,7 @@ executable rentalcars
   build-depends:
     base >= 4.7 && < 5,
     protolude,
+    mtl,
     optparse-generic,
     vector-sized,
     vector,

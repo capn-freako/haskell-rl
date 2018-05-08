@@ -71,6 +71,7 @@ import Options.Generic
 
 import GHC.TypeNats
 
+import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
 import Data.Finite.Internal
@@ -263,14 +264,21 @@ main = do
   appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
   -- Calculate and display optimum policy.
-  let g     = take nIters
+  appendFile "other/rentalcars.md" "\n### Policy optimization\n\n"
+  let g     = take (nIters + 1)
                    $ iterate (optPol gamma' eps' nEvals allStatesV actions nextStates rewards)
                              (const (0,0))
       acts  = map (\f -> VS.map (fst . f) allStatesV) g
-      diffs = map (VS.maximum . VS.map (fromIntegral . abs) . uncurry (-))
+      diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
-      g'    = snd . fromMaybe (0, const (0,0)) $ withinOn eps' fst $ zip diffs (P.tail g)
-      pol   = fst . g'
+  let ((_, g'), msg) = first (fromMaybe (VS.replicate 0, const (0,0))) $
+        runWriter $ withinOnM eps'
+                              ( maxAndNonZero "Found %3d policy changes.  \n"
+                              . fst
+                              ) $ zip diffs (P.tail g)
+  appendFile "other/rentalcars.md" $ pack msg
+
+  let pol   = fst . g'
       val   = snd . g'
   appendFile "other/rentalcars.md" "\n### Final policy\n\n"
   appendFile "other/rentalcars.md" $ pack $ showFofState pol
@@ -282,6 +290,34 @@ main = do
 {----------------------------------------------------------------------
   Misc.
 ----------------------------------------------------------------------}
+
+-- | Return the maximum value of a set, as well as a scripted log
+-- message, regarding the number of non-zero elements in the set.
+--
+-- (See documentation for `chooseAndCount` function.)
+maxAndNonZero :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
+maxAndNonZero = chooseAndCount max (/= 0)
+
+-- | Choose a value from the set using the given comparison function,
+-- and provide a scripted log message, regarding the number of elements
+-- in the set meeting the given criteria.
+chooseAndCount :: (Foldable t, Num a)
+               => (a -> a -> a)  -- ^ choice function
+               -> (a -> Bool)    -- ^ counting predicate
+               -> String         -- ^ message script (Should contain precisely 1 "%d".)
+               -> t a            -- ^ foldable set of elements to count/compare
+               -> Writer String a
+chooseAndCount f p s xs = do
+  let (val, cnt::Int) =
+        foldl' ( \ (v, c) x ->
+                   ( f v x
+                   , if p x
+                       then c + 1
+                       else c
+                   )
+               ) (0,0) xs
+  tell $ printf s cnt
+  return val
 
 --- | To control the formatting of printed floats in output matrices.
 newtype Pfloat = Pfloat { unPfloat :: Float}
@@ -328,9 +364,8 @@ poisson' n x@(Finite x') =
     then 0   -- for an "apples-to-apples" performance comparison.
     else poissonVals `VS.index` n `VS.index` finite x'
 
--- | First list element that differs from its predeccesor by less than
--- some threshold under the given function, or the index of the last
--- element if the threshold was never met.
+-- | First list element less than or equal to given threshold under the
+-- given function, or the last element if the threshold was never met.
 --
 -- A return value of 'Nothing' indicates an empty list was given.
 withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
@@ -338,21 +373,50 @@ withinOn eps f xs = do
   n <- withinIx eps $ map f xs
   return $ xs !! n
 
--- | Index of first list element that differs from its predeccesor by
--- less than some threshold, or the index of the last element if the
--- threshold was never met.
+-- | Index of first list element less than or equal to given threshold,
+-- or the index of the last element if the threshold was never met.
 --
 -- A return value of 'Nothing' indicates an empty list was given.
 withinIx :: Float -> [Float] -> Maybe Int
 withinIx _   [] = Nothing
-withinIx eps xs = Just $ res + 1
-
- where res = withinIx' 0
-              $ map (abs . uncurry (-)) $ zip xs (P.tail xs)
-       withinIx' n []     = n - 1
+withinIx eps xs = Just $ withinIx' 0 xs
+ where withinIx' n []     = n - 1
        withinIx' n (y:ys) = if y <= eps
                               then n
                               else withinIx' (n+1) ys
+
+-- | Monadically search list for first element less than or equal to
+-- given threshold under the given function, and return the last element
+-- if the threshold was never met.
+-- Return 'Nothing' if the input list was empty.
+withinOnM :: Monad m
+          => Float
+          -> (a -> m Float)
+          -> [a]
+          -> m (Maybe a)
+withinOnM _   _ [] = return Nothing
+withinOnM eps f xs = do
+  n <- withinIxM eps $ map f xs
+  case n of
+    Nothing -> return Nothing
+    Just n' -> return $ Just (xs !! n')
+
+-- | Monadically find index of first list element less than or equal to
+-- given threshold, or the index of the last element if the threshold
+-- was never met.
+--
+-- A return value of 'Nothing' indicates an empty list was given.
+withinIxM :: Monad m
+          => Float
+          -> [m Float]
+          -> m (Maybe Int)
+withinIxM _   [] = return Nothing
+withinIxM eps xs = withinIxM' 0 xs
+ where withinIxM' n []     = return $ Just (n - 1)
+       withinIxM' n (y:ys) = do
+         y' <- y
+         if y' <= eps then return (Just n)
+                      else withinIxM' (n+1) ys
 
 -- | Expected reward for a given state, assuming equiprobable actions.
 -- testRewards :: RCState -> Float
