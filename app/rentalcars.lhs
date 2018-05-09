@@ -115,7 +115,7 @@ instance (KnownNat n) => HasTrie (Finite n) where
 -- Returns a combined policy & value function.
 optPol :: ( HasTrie s
           , HasTrie a, Num a  -- "Num a" is TEMPORARY; See TODO above.
-          , KnownNat n
+          , KnownNat (n + 1)
           )
        => Float                              -- ^ discount rate
        -> Float                              -- ^ evaluation convergence tolerance
@@ -124,9 +124,9 @@ optPol :: ( HasTrie s
        -> (s -> [a])                         -- ^ A(s)
        -> (s -> a -> [s])                    -- ^ S'(s, a)
        -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
-       -> (s -> (a, Float))                  -- ^ initial (combined) policy & value function
-       -> s -> (a, Float)
-optPol gamma eps n ss as s's rs g = bestA
+       -> ((s -> (a, Float)), String)        -- ^ initial (combined) policy & value function
+       -> ((s -> (a, Float)), String)
+optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
  where
   bestA   = maximumBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
@@ -145,13 +145,15 @@ optPol gamma eps n ss as s's rs g = bestA
         ]
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rs
-  v' = fromMaybe (const 0)
-                 $ withinOn
-                     eps
-                     (VS.maximum . vsFor ss)
-                     $ take n
-                       $ iterate (evalPol (fst . g))
-                       $ snd . g
+  ((_, v'), msg) =
+    first (fromMaybe (P.error "Major blow-up!"))
+      $ runWriter
+        $ withinOnM
+            eps
+            (chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n" . fst)
+            $ zip (map abs $ zipWith (-) vs (P.tail vs)) (P.tail evalIters)
+  vs = map (vsFor ss) evalIters
+  evalIters = take (n + 1) $ iterate (evalPol (fst . g)) $ snd . g
   evalPol p v = let actVal'' = actVal' v
                  in \s -> actVal'' (s, p s)
 
@@ -265,17 +267,18 @@ main = do
 
   -- Calculate and display optimum policy.
   appendFile "other/rentalcars.md" "\n### Policy optimization\n\n"
-  let g     = take (nIters + 1)
+  let iters = take (nIters + 1)
                    $ iterate (optPol gamma' eps' nEvals allStatesV actions nextStates rewards)
-                             (const (0,0))
-      acts  = map (\f -> VS.map (fst . f) allStatesV) g
+                             (const (0,0), "")
+      acts  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
-  let ((_, g'), msg) = first (fromMaybe (VS.replicate 0, const (0,0))) $
+  let ((_, (g', _)), msg) = first (fromMaybe (P.error "main: Major failure!")) $
         runWriter $ withinOnM eps'
-                              ( maxAndNonZero "Found %3d policy changes.  \n"
-                              . fst
-                              ) $ zip diffs (P.tail g)
+                              ( \ (dv, (_, msg')) ->
+                                  do tell msg'
+                                     maxAndNonZero "\n**Found %3d policy changes.**\n\n" dv
+                              ) $ zip diffs (P.tail iters)
   appendFile "other/rentalcars.md" $ pack msg
 
   let pol   = fst . g'
@@ -368,22 +371,22 @@ poisson' n x@(Finite x') =
 -- given function, or the last element if the threshold was never met.
 --
 -- A return value of 'Nothing' indicates an empty list was given.
-withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
-withinOn eps f xs = do
-  n <- withinIx eps $ map f xs
-  return $ xs !! n
+-- withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
+-- withinOn eps f xs = do
+--   n <- withinIx eps $ map f xs
+--   return $ xs !! n
 
 -- | Index of first list element less than or equal to given threshold,
 -- or the index of the last element if the threshold was never met.
 --
 -- A return value of 'Nothing' indicates an empty list was given.
-withinIx :: Float -> [Float] -> Maybe Int
-withinIx _   [] = Nothing
-withinIx eps xs = Just $ withinIx' 0 xs
- where withinIx' n []     = n - 1
-       withinIx' n (y:ys) = if y <= eps
-                              then n
-                              else withinIx' (n+1) ys
+-- withinIx :: Float -> [Float] -> Maybe Int
+-- withinIx _   [] = Nothing
+-- withinIx eps xs = Just $ withinIx' 0 xs
+--  where withinIx' n []     = n - 1
+--        withinIx' n (y:ys) = if y <= eps
+--                               then n
+--                               else withinIx' (n+1) ys
 
 -- | Monadically search list for first element less than or equal to
 -- given threshold under the given function, and return the last element
