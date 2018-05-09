@@ -24,4 +24,5 @@ cabal.project.local
 other/*.md
 prof/
 *.ps
+*.out
 

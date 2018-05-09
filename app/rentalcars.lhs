@@ -40,8 +40,10 @@ code
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 -- {-# LANGUAGE BangPatterns #-}
 \end{code}
@@ -151,7 +153,8 @@ optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
         $ withinOnM
             eps
             (chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n" . fst)
-            $ zip (map abs $ zipWith (-) vs (P.tail vs)) (P.tail evalIters)
+            $ zip (map abs $ zipWith (-) vs (P.tail vs))
+                  (P.tail evalIters)
   vs = map (vsFor ss) evalIters
   evalIters = take (n + 1) $ iterate (evalPol (fst . g)) $ snd . g
   evalPol p v = let actVal'' = actVal' v
