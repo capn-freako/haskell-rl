@@ -271,7 +271,13 @@ main = do
        setColors $ map opaque [red, blue, green, yellow]
        forM_ ( zip ["Req1", "Req2", "Ret1", "Ret2"]
                    [3,      4,      3,      2]
-             ) $ \ (lbl, n) -> plot (line lbl [[(x, poisson' (finite n) (finite x)) | x <- [0..20]]])
+             ) $ \ (lbl, n) ->
+                   plot ( line lbl
+                               [ [ (x, poisson' (finite n) (finite x))
+                                 | x <- [0..20]
+                                 ]
+                               ]
+                        )
   appendFile "other/rentalcars.md" "![](img/pdfs.png)\n"
 
   -- Calculate and display optimum policy.
