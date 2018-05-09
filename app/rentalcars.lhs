@@ -212,7 +212,8 @@ nextStates (Finite n1, Finite n2) a =
 -- - the probability of occurence for that value.
 rewards :: RCState -> RCAction -> RCState -> [(Float, Float)]
 rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
-  [ ( fromIntegral (10 * (nReq1' + nReq2') - 2 * abs a')
+  -- [ ( fromIntegral (10 * (nReq1' + nReq2') - 2 * abs a')
+  [ ( fromIntegral (10 * (nReq1' + nReq2') - fromIntegral pnlty)
     , product $
         zipWith ($) [ pReq1, pReq2 ]
                     [ (finite . fromIntegral) nReq1
@@ -225,6 +226,18 @@ rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
         m2     = min 20 (n2 + a')
         nReq1' = min nReq1 m1       -- # actually rented
         nReq2' = min nReq2 m2
+        pnlty  = ( if a > 0
+                     then  2 * (a - 1)
+                     else -2 * a
+                 )
+               + ( if m1 > 10
+                     then 4
+                     else 0
+                 )
+               + ( if m2 > 10
+                     then 4
+                     else 0
+                 )
   -- Copying the same "cheat" used in the Python code.
   -- (i.e. - # of cars returned assumed to equal expectaion.)
   , if n1' == 20 then gEXPRET1 >= (n1' + nReq1' - m1)
