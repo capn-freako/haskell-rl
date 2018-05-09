@@ -116,17 +116,17 @@ instance (KnownNat n) => HasTrie (Finite n) where
 --
 -- Returns a combined policy & value function.
 optPol :: ( HasTrie s
-          , HasTrie a, Num a  -- "Num a" is TEMPORARY; See TODO above.
+          , HasTrie a
           , KnownNat (n + 1)
           )
        => Float                              -- ^ discount rate
        -> Float                              -- ^ evaluation convergence tolerance
-       -> Int                                -- ^ max. # of evaluation iterations per improvement iteration
+       -> Int                                -- ^ max. # of evaluation iterations
        -> VS.Vector (n + 1) s                -- ^ vector of all possible system states
        -> (s -> [a])                         -- ^ A(s)
        -> (s -> a -> [s])                    -- ^ S'(s, a)
        -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
-       -> ((s -> (a, Float)), String)        -- ^ initial (combined) policy & value function
+       -> ((s -> (a, Float)), String)        -- ^ initial policy & value functions
        -> ((s -> (a, Float)), String)
 optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
  where
@@ -148,11 +148,13 @@ optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rs
   ((_, v'), msg) =
-    first (fromMaybe (P.error "Major blow-up!"))
+    first (fromMaybe (P.error "optPol: Major blow-up!"))
       $ runWriter
         $ withinOnM
             eps
-            (chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n" . fst)
+            ( chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n"
+            . fst
+            )
             $ zip (map abs $ zipWith (-) vs (P.tail vs))
                   (P.tail evalIters)
   vs = map (vsFor ss) evalIters
@@ -239,8 +241,10 @@ rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
 ----------------------------------------------------------------------}
 
 data Opts w = Opts
-    { nIter :: w ::: Maybe Int <?> "The number of policy improvement iterations"
-    , nEval :: w ::: Maybe Int <?> "The number of policy evaluation iterations per policy improvement iteration"
+    { nIter :: w ::: Maybe Int <?>
+        "The number of policy improvement iterations"
+    , nEval :: w ::: Maybe Int <?>
+        "The number of policy evaluation iterations per policy improvement iteration"
     }
     deriving (Generic)
 
@@ -254,12 +258,14 @@ instance ParseRecord (Opts Wrapped)
 main :: IO ()
 main = do
   -- Process command line options.
-  o :: Opts Unwrapped <- unwrapRecord "A solution to the 'Jack's Rental Cars' problem (Ex. 4.7)."
+  o :: Opts Unwrapped <-
+    unwrapRecord "A solution to the 'Jack's Rental Cars' problem (Ex. 4.7)."
   let nIters = fromMaybe 2 (nIter o)
       nEvals = fromMaybe 1 (nEval o)
 
   -- Plot the pdfs.
-  writeFile  "other/rentalcars.md" "### Return/Request Probability Distribution Functions\n\n"
+  writeFile  "other/rentalcars.md"
+             "### Return/Request Probability Distribution Functions\n\n"
   toFile def "img/pdfs.png" $
     do layout_title .= "Return/Request Probability Distribution Functions"
        setColors $ map opaque [red, blue, green, yellow]
@@ -271,8 +277,9 @@ main = do
   -- Calculate and display optimum policy.
   appendFile "other/rentalcars.md" "\n### Policy optimization\n\n"
   let iters = take (nIters + 1)
-                   $ iterate (optPol gamma' eps' nEvals allStatesV actions nextStates rewards)
-                             (const (0,0), "")
+                   $ iterate ( optPol gamma'  eps'       nEvals allStatesV
+                                      actions nextStates rewards
+                             ) (const (0,0), "")
       acts  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
@@ -280,7 +287,8 @@ main = do
         runWriter $ withinOnM eps'
                               ( \ (dv, (_, msg')) ->
                                   do tell msg'
-                                     maxAndNonZero "\n**Found %3d policy changes.**\n\n" dv
+                                     maxAndNonZero "\n**Found %3d policy changes.**\n\n"
+                                                   dv
                               ) $ zip diffs (P.tail iters)
   appendFile "other/rentalcars.md" $ pack msg
 
