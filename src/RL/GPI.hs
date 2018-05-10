@@ -43,7 +43,7 @@ import qualified Data.Vector.Sized   as VS
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List                            ((!!))
+import Data.List             ((!!), lookup)
 import Data.MemoTrie
 import Text.Printf
 
@@ -91,7 +91,7 @@ rltDef = RLType
 --                       along with their probabilities of occurence.
 --
 -- Returns a combined policy & value function.
-optPol :: ( HasTrie s
+optPol :: ( Eq s, HasTrie s
           , HasTrie a
           , KnownNat (n + 1)
           )
@@ -107,14 +107,16 @@ optPol RLType{..} (g, _) = (bestA, msg)
                       ]
   actVal' = memo . uncurry . actVal
   actVal v s a =
-    sum [ pt * gamma * u + rt
-        | s' <- nextStates s a
-        , let u = v s'
-        , let (pt, rt) = foldl prSum (0,0)
-                               [ (p, p * r)
-                               | (r, p) <- rs' s a s'
-                               ]
-        ]
+    fromMaybe
+      (sum [ pt * gamma * u + rt
+           | s' <- nextStates s a
+           , let u = v s'
+           , let (pt, rt) = foldl' prSum (0,0)
+                                  [ (p, p * r)
+                                  | (r, p) <- rs' s a s'
+                                  ]
+           ])
+      $ lookup s stateVals
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
   ((_, v'), msg) =

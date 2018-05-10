@@ -96,18 +96,19 @@ type GAction = Int
 
 allStatesV = VS.generate P.id :: VS.Vector 101 Int
 
-actions :: GState -> [GAction]
-actions s = [0 .. min s (100 - s)]
+actions' :: GState -> [GAction]
+actions' s = [0 .. min s (100 - s)]
 
-nextStates :: GState -> GAction -> [GState]
-nextStates s a = if a == 0
+nextStates' :: GState -> GAction -> [GState]
+nextStates' s a = if a == 0
                    then [s]
                    else [s - a, s + a]
 
-rewards :: GState -> GAction -> GState -> [(Float, Float)]
-rewards s a s' = if s' == 100 && s /= 100
-                   then [(1, ph)]
-                   else [(0, p)]
+rewards' :: GState -> GAction -> GState -> [(Float, Float)]
+rewards' s a s' = [(0, p)]
+-- rewards' s a s' = if s' == 100 && s /= 100
+--                    then [(1, ph)]
+--                    else [(0, p)]
  where p = if s' == s + a
              then ph
              else 1 - ph
@@ -142,9 +143,22 @@ main = do
   -- Calculate and display optimum policy.
   writeFile "other/gambler.md" "\n### Policy optimization\n\n"
   let iters = take (nIters + 1)
-                   $ iterate ( optPol gamma'  eps'       nEvals allStatesV
-                                      actions nextStates rewards
-                             ) (const (0,0), "")
+                   $ iterate
+                       ( optPol
+                           rltDef
+                             { gamma      = gamma'
+                             , epsilon    = eps'
+                             , maxIter    = nEvals
+                             , states     = allStatesV
+                             , actions    = actions'
+                             , nextStates = nextStates'
+                             , rewards    = rewards'
+                             , stateVals  =
+                                 [ (  0, 0)
+                                 , (100, 1)
+                                 ]
+                             }
+                       ) (\s -> if s == 100 then (0,1) else (0,0), "")
       acts  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
@@ -158,7 +172,7 @@ main = do
   appendFile "other/gambler.md" $ pack msg
 
   let pol   = fst . g'
-      val   = snd . g'
+      -- val   = snd . g'
       vs    = map (\(g, _) -> snd . g) iters
 
   -- Plot the state value functions.
@@ -166,23 +180,30 @@ main = do
              "### State Value Functions\n\n"
   toFile def "img/gam_val.png" $
     do layout_title .= "State Value Functions"
-       setColors $ map opaque [red, blue, green, black]
-       forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
-                   [1,      2,      3]
-             ) $ \ (lbl, n) ->
-                   plot ( line lbl
-                               [ [ (x, (vs P.!! n) x)
+       -- setColors $ map opaque [red, blue, green, black]
+       forM_ (zip vs [0..]) $ \ (v,n) ->
+                   plot ( line (P.show n)
+                               [ [ (x, v x)
                                  | x <- [(0::GState)..100]
                                  ]
                                ]
                         )
-       plot ( line (printf "%d Iters." nIters)
-                   -- [ [ (x, val x)
-                   [ [ (x, (P.last vs) x)
-                     | x <- [0..100]
-                     ]
-                   ]
-            )
+       -- forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
+       --             [1,      2,      3]
+       --       ) $ \ (lbl, n) ->
+       --             plot ( line lbl
+       --                         [ [ (x, (vs P.!! n) x)
+       --                           | x <- [(0::GState)..100]
+       --                           ]
+       --                         ]
+       --                  )
+       -- plot ( line (printf "%d Iters." nIters)
+       --             -- [ [ (x, val x)
+       --             [ [ (x, (P.last vs) x)
+       --               | x <- [0..100]
+       --               ]
+       --             ]
+       --      )
   appendFile "other/gambler.md" "![](img/gam_val.png)\n"
 
   -- Plot the final policy.
