@@ -17,8 +17,14 @@
 --       Cambridge, Massachusetts; London, England
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-missing-fields #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+
 module RL.GPI
   ( Pfloat (..)
+  , RLType (..)
+  , rltDef
   , optPol
   , maxAndNonZero
   , chooseAndCount
@@ -27,7 +33,8 @@ module RL.GPI
   ) where
 
 import qualified Prelude as P
-import Prelude (unlines, Show(..), String)
+-- import Prelude (unlines, Show(..), String)
+import Prelude (Show(..), String)
 import Protolude  hiding (show, for)
 
 import GHC.TypeNats
@@ -54,6 +61,26 @@ instance (KnownNat n) => HasTrie (Finite n) where
   General policy iterator
 ----------------------------------------------------------------------}
 
+-- | Abstract data type, to future proof API.
+data RLType s a n = RLType
+  { gamma      :: Float  -- discount rate
+  , epsilon    :: Float  -- convergence tolerance
+  , maxIter    :: Int    -- max. eval. iterations (0 = Value Iteration)
+  , states     :: VS.Vector (n + 1) s
+  , actions    :: s -> [a]
+  , nextStates :: s -> a -> [s]
+  , rewards    :: s -> a -> s -> [(Float,Float)]
+  , stateVals  :: [(s, Float)]
+  }
+
+rltDef :: RLType s a n
+rltDef = RLType
+  { gamma     = 1
+  , epsilon   = 0.1
+  , maxIter   = 10
+  , stateVals = []
+  }
+
 -- | Yields a single policy improvment iteration, given:
 --   - gamma           - discount rate
 --   - eps             - convergence tolerance
@@ -69,17 +96,19 @@ optPol :: ( HasTrie s
           , HasTrie a
           , KnownNat (n + 1)
           )
-       => Float                              -- ^ discount rate
-       -> Float                              -- ^ evaluation convergence tolerance
-       -> Int                                -- ^ max. # of evaluation iterations
-       -> VS.Vector (n + 1) s                -- ^ vector of all possible system states
-       -> (s -> [a])                         -- ^ A(s)
-       -> (s -> a -> [s])                    -- ^ S'(s, a)
-       -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
+       => RLType s a n
        -> ((s -> (a, Float)), String)        -- ^ initial policy & value functions
        -> ((s -> (a, Float)), String)
-optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
+-- optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
+optPol rlt (g, _) = (bestA, msg)
  where
+  gam     = gamma      rlt
+  eps     = epsilon    rlt
+  n       = maxIter    rlt
+  ss      = states     rlt
+  as      = actions    rlt
+  s's     = nextStates rlt
+  rs      = rewards    rlt
   bestA   = maximumBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
                    in [ (a, actVal'' (s, a))
@@ -87,7 +116,7 @@ optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
                       ]
   actVal' = memo . uncurry . actVal
   actVal v s a =
-    sum [ pt * gamma * u + rt
+    sum [ pt * gam * u + rt
         | s' <- s's s a
         , let u = v s'
         , let (pt, rt) = foldl prSum (0,0)
@@ -98,15 +127,18 @@ optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rs
   ((_, v'), msg) =
-    first (fromMaybe (P.error "optPol: Major blow-up!"))
-      $ runWriter
-        $ withinOnM
-            eps
-            ( chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n"
-            . fst
-            )
-            $ zip (map abs $ zipWith (-) vs (P.tail vs))
-                  (P.tail evalIters)
+    if length evalIters == 1
+      then ((VS.replicate 0, P.head evalIters), "Value Iteration")
+      else
+        first (fromMaybe (P.error "optPol: Major blow-up!"))
+          $ runWriter
+            $ withinOnM
+                eps
+                ( chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n"
+                . fst
+                )
+                $ zip (map abs $ zipWith (-) vs (P.tail vs))
+                      (P.tail evalIters)
   vs = map (vsFor ss) evalIters
   evalIters = take (n + 1) $ iterate (evalPol (fst . g)) $ snd . g
   evalPol p v = let actVal'' = actVal' v
@@ -152,9 +184,10 @@ instance Show Pfloat where
   show x = printf "%4.1f" (unPfloat x)
 
 poisson :: Int -> Int -> Float
-poisson lambda n = lambda' ^ n' * exp (-lambda') / fromIntegral (fact n)
+-- poisson lambda n = lambda' ^ n' * exp (-lambda') / fromIntegral (fact n)
+poisson lambda n = lambda' ^ n * exp (-lambda') / fromIntegral (fact n)
  where lambda' = fromIntegral lambda
-       n'      = fromIntegral n
+       -- n'      = fromIntegral n
 
 fact :: Int -> Int
 fact 0 = 1

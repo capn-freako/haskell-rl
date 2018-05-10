@@ -28,7 +28,6 @@ code
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -119,12 +118,12 @@ allStatesV = fromMaybe (VS.replicate (finite 0, finite 0))
                        $ VS.fromList allStates
 
 -- | A(s)
-actions :: RCState -> [RCAction]
-actions (Finite n1, Finite n2) = map fromIntegral [-(min 5 n2) .. min 5 n1]
+actions' :: RCState -> [RCAction]
+actions' (Finite n1, Finite n2) = map fromIntegral [-(min 5 n2) .. min 5 n1]
 
 -- | S'(s, a)
-nextStates :: RCState -> RCAction -> [RCState]
-nextStates (Finite n1, Finite n2) a =
+nextStates' :: RCState -> RCAction -> [RCState]
+nextStates' (Finite n1, Finite n2) a =
   [ (finite m1, finite m2)
   | m1 <- [max 0 (min 20 (n1 - a') - 11) .. min 20 (min 20 (n1 - a') + 11)]
   , m2 <- [max 0 (min 20 (n2 + a') - 11) .. min 20 (min 20 (n2 + a') + 11)]
@@ -136,8 +135,8 @@ nextStates (Finite n1, Finite n2) a =
 -- Returns a list of pairs, each containing:
 -- - a unique reward value, and
 -- - the probability of occurence for that value.
-rewards :: RCState -> RCAction -> RCState -> [(Float, Float)]
-rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
+rewards' :: RCState -> RCAction -> RCState -> [(Float, Float)]
+rewards' (Finite n1, Finite n2) a (Finite n1', Finite n2') =
   -- [ ( fromIntegral (10 * (nReq1' + nReq2') - 2 * abs a')
   [ ( fromIntegral (10 * (nReq1' + nReq2') - fromIntegral pnlty)
     , product $
@@ -242,9 +241,20 @@ main = do
   -- Calculate and display optimum policy.
   appendFile "other/rentalcars.md" "\n### Policy optimization\n\n"
   let iters = take (nIters + 1)
-                   $ iterate ( optPol gamma'  eps'       nEvals allStatesV
-                                      actions nextStates rewards
-                             ) (const (0,0), "")
+                   -- $ iterate ( optPol gamma'  eps'       nEvals allStatesV
+                   --                    actions nextStates rewards
+                   $ iterate
+                       ( optPol
+                           rltDef
+                             { gamma      = gamma'
+                             , epsilon    = eps'
+                             , maxIter    = nEvals
+                             , states     = allStatesV
+                             , actions    = actions'
+                             , nextStates = nextStates'
+                             , rewards    = rewards'
+                             }
+                       ) (const (0,0), "")
       acts  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)

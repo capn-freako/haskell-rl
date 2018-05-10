@@ -60,18 +60,19 @@ code
 
 \begin{code}
 import qualified Prelude as P
-import Prelude (unlines, Show(..), String)
+-- import Prelude (unlines, Show(..), String)
 
 import Protolude  hiding (show, for)
 import Options.Generic
 
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
-import Data.Finite
-import Data.Finite.Internal
+-- import Data.Finite
+-- import Data.Finite.Internal
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
+import Text.Printf
 
 import RL.GPI
 \end{code}
@@ -87,22 +88,25 @@ code
 ----------------------------------------------------------------------}
 eps'   = 0.1   -- My choice.
 gamma' = 1     -- Dictated by problem.
-ph     = 0.25
+-- ph     = 0.25
+ph     = 0.4
 
-type GState  = Finite 101
-type GAction = Finite 51
+type GState  = Int
+type GAction = Int
 
-allStatesV = VS.generate id :: VS.Vector 101 Int
+allStatesV = VS.generate P.id :: VS.Vector 101 Int
 
 actions :: GState -> [GAction]
-actions s = [0..min s (100 - s)]
+actions s = [0 .. min s (100 - s)]
 
 nextStates :: GState -> GAction -> [GState]
-nextStates s a = [s - a, s + a]
+nextStates s a = if a == 0
+                   then [s]
+                   else [s - a, s + a]
 
 rewards :: GState -> GAction -> GState -> [(Float, Float)]
-rewards s a s' = if s' == 100
-                   then [(1, p)]
+rewards s a s' = if s' == 100 && s /= 100
+                   then [(1, ph)]
                    else [(0, p)]
  where p = if s' == s + a
              then ph
@@ -136,7 +140,7 @@ main = do
       nEvals = fromMaybe  1 (nEval o)
 
   -- Calculate and display optimum policy.
-  appendFile "other/gambler.md" "\n### Policy optimization\n\n"
+  writeFile "other/gambler.md" "\n### Policy optimization\n\n"
   let iters = take (nIters + 1)
                    $ iterate ( optPol gamma'  eps'       nEvals allStatesV
                                       actions nextStates rewards
@@ -158,22 +162,23 @@ main = do
       vs    = map (\(g, _) -> snd . g) iters
 
   -- Plot the state value functions.
-  writeFile  "other/gambler.md"
+  appendFile  "other/gambler.md"
              "### State Value Functions\n\n"
   toFile def "img/gam_val.png" $
     do layout_title .= "State Value Functions"
        setColors $ map opaque [red, blue, green, black]
-       forM_ ( zip ["1 Iter.", "2 Iters.", "5 Iters."]
-                   [0,      1,      4]
+       forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
+                   [1,      2,      3]
              ) $ \ (lbl, n) ->
                    plot ( line lbl
-                               [ [ (x, vs !! n x)
-                                 | x <- [0..100]
+                               [ [ (x, (vs P.!! n) x)
+                                 | x <- [(0::GState)..100]
                                  ]
                                ]
                         )
        plot ( line (printf "%d Iters." nIters)
-                   [ [ (x, last vs x)
+                   -- [ [ (x, val x)
+                   [ [ (x, (P.last vs) x)
                      | x <- [0..100]
                      ]
                    ]
@@ -181,8 +186,8 @@ main = do
   appendFile "other/gambler.md" "![](img/gam_val.png)\n"
 
   -- Plot the final policy.
-  writeFile  "other/gambler.md"
-             "### Final Policy Function\n\n"
+  appendFile  "other/gambler.md"
+             "\n### Final Policy Function\n\n"
   toFile def "img/gam_pol.png" $
     do layout_title .= "Final Policy Function"
        setColors $ map opaque [blue, green, black]
