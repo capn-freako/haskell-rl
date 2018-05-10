@@ -1,0 +1,200 @@
+<meta charset="utf-8"> <link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+<h1 id="haskell-rl-gamblers-problem-ex.-4.9">haskell-rl : Gambler’s Problem (Ex. 4.9)</h1>
+<p>This <a href="https://wiki.haskell.org/Literate_programming">literate Haskell</a> document provides a solution to Exercise 4.9 in <em>Reinforcement Learning</em> by Sutton &amp; Barto.</p>
+<p>Original author: <a href="mailto:David.Banas@target.com">David Banas</a><br />
+Original date: May 10, 2018</p>
+<p>Copyright © 2018 Target Corp.; all rights reserved World wide.</p>
+<h2 id="contents">Contents</h2>
+<ul class="incremental">
+<li><a href="#code">Code</a></li>
+<li><a href="#output">Output</a></li>
+</ul>
+<h2 id="code">code</h2>
+<h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" data-line-number="1"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span></a>
+<a class="sourceLine" id="cb1-2" data-line-number="2"><span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></a>
+<a class="sourceLine" id="cb1-3" data-line-number="3"><span class="ot">{-# OPTIONS_GHC -Wno-missing-signatures #-}</span></a>
+<a class="sourceLine" id="cb1-4" data-line-number="4"><span class="ot">{-# OPTIONS_GHC -Wno-orphans #-}</span></a></code></pre></div>
+<h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></a>
+<a class="sourceLine" id="cb2-2" data-line-number="2"><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></a>
+<a class="sourceLine" id="cb2-3" data-line-number="3"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></a>
+<a class="sourceLine" id="cb2-4" data-line-number="4"><span class="ot">{-# LANGUAGE DataKinds #-}</span></a>
+<a class="sourceLine" id="cb2-5" data-line-number="5"><span class="ot">{-# LANGUAGE DeriveGeneric #-}</span></a>
+<a class="sourceLine" id="cb2-6" data-line-number="6"><span class="ot">{-# LANGUAGE FlexibleContexts #-}</span></a>
+<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></a>
+<a class="sourceLine" id="cb2-8" data-line-number="8"><span class="ot">{-# LANGUAGE TypeOperators #-}</span></a>
+<a class="sourceLine" id="cb2-9" data-line-number="9"><span class="ot">{-# LANGUAGE TypeFamilies #-}</span></a>
+<a class="sourceLine" id="cb2-10" data-line-number="10"><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></a>
+<a class="sourceLine" id="cb2-11" data-line-number="11"><span class="co">-- {-# LANGUAGE BangPatterns #-}</span></a></code></pre></div>
+<h2 id="libraries"><a href="https://www.stackage.org/">libraries</a></h2>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/protolude">protolude</a></li>
+<li><a href="https://www.stackage.org/package/optparse-generic">optparse-generic</a></li>
+<li><a href="https://www.stackage.org/package/vector-sized">vector-sized</a></li>
+<li><a href="https://www.stackage.org/package/finite-typelits">finite-typelits</a></li>
+<li><a href="https://www.stackage.org/package/Chart">Chart</a></li>
+<li><a href="https://www.stackage.org/package/Chart-cairo">Chart-cairo</a></li>
+</ul>
+<div class="sourceCode" id="cb3"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" data-line-number="1"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Prelude</span> <span class="kw">as</span> <span class="dt">P</span></a>
+<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="co">-- import Prelude (unlines, Show(..), String)</span></a>
+<a class="sourceLine" id="cb3-3" data-line-number="3"></a>
+<a class="sourceLine" id="cb3-4" data-line-number="4"><span class="kw">import</span> <span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for)</a>
+<a class="sourceLine" id="cb3-5" data-line-number="5"><span class="kw">import</span> <span class="dt">Options.Generic</span></a>
+<a class="sourceLine" id="cb3-6" data-line-number="6"></a>
+<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></a>
+<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
+<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="co">-- import Data.Finite</span></a>
+<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="co">-- import Data.Finite.Internal</span></a>
+<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.Text</span>                            (pack)</a>
+<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span> (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
+<a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
+<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
+<a class="sourceLine" id="cb3-15" data-line-number="15"></a>
+<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
+<h2 id="code-1">code</h2>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="co">  Problem specific definitions</span></a>
+<a class="sourceLine" id="cb4-3" data-line-number="3"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-4" data-line-number="4">eps&#39;   <span class="fu">=</span> <span class="fl">0.1</span>   <span class="co">-- My choice.</span></a>
+<a class="sourceLine" id="cb4-5" data-line-number="5">gamma&#39; <span class="fu">=</span> <span class="dv">1</span>     <span class="co">-- Dictated by problem.</span></a>
+<a class="sourceLine" id="cb4-6" data-line-number="6"><span class="co">-- ph     = 0.25</span></a>
+<a class="sourceLine" id="cb4-7" data-line-number="7">ph     <span class="fu">=</span> <span class="fl">0.4</span></a>
+<a class="sourceLine" id="cb4-8" data-line-number="8"></a>
+<a class="sourceLine" id="cb4-9" data-line-number="9"><span class="kw">type</span> <span class="dt">GState</span>  <span class="fu">=</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-10" data-line-number="10"><span class="kw">type</span> <span class="dt">GAction</span> <span class="fu">=</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-11" data-line-number="11"></a>
+<a class="sourceLine" id="cb4-12" data-line-number="12">allStatesV <span class="fu">=</span> VS.generate P.id<span class="ot"> ::</span> <span class="dt">VS.Vector</span> <span class="dv">101</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-13" data-line-number="13"></a>
+<a class="sourceLine" id="cb4-14" data-line-number="14"><span class="ot">actions ::</span> <span class="dt">GState</span> <span class="ot">-&gt;</span> [<span class="dt">GAction</span>]</a>
+<a class="sourceLine" id="cb4-15" data-line-number="15">actions s <span class="fu">=</span> [<span class="dv">0</span> <span class="fu">..</span> min s (<span class="dv">100</span> <span class="fu">-</span> s)]</a>
+<a class="sourceLine" id="cb4-16" data-line-number="16"></a>
+<a class="sourceLine" id="cb4-17" data-line-number="17"><span class="ot">nextStates ::</span> <span class="dt">GState</span> <span class="ot">-&gt;</span> <span class="dt">GAction</span> <span class="ot">-&gt;</span> [<span class="dt">GState</span>]</a>
+<a class="sourceLine" id="cb4-18" data-line-number="18">nextStates s a <span class="fu">=</span> <span class="kw">if</span> a <span class="fu">==</span> <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-19" data-line-number="19">                   <span class="kw">then</span> [s]</a>
+<a class="sourceLine" id="cb4-20" data-line-number="20">                   <span class="kw">else</span> [s <span class="fu">-</span> a, s <span class="fu">+</span> a]</a>
+<a class="sourceLine" id="cb4-21" data-line-number="21"></a>
+<a class="sourceLine" id="cb4-22" data-line-number="22"><span class="ot">rewards ::</span> <span class="dt">GState</span> <span class="ot">-&gt;</span> <span class="dt">GAction</span> <span class="ot">-&gt;</span> <span class="dt">GState</span> <span class="ot">-&gt;</span> [(<span class="dt">Float</span>, <span class="dt">Float</span>)]</a>
+<a class="sourceLine" id="cb4-23" data-line-number="23">rewards s a s&#39; <span class="fu">=</span> <span class="kw">if</span> s&#39; <span class="fu">==</span> <span class="dv">100</span> <span class="fu">&amp;&amp;</span> s <span class="fu">/=</span> <span class="dv">100</span></a>
+<a class="sourceLine" id="cb4-24" data-line-number="24">                   <span class="kw">then</span> [(<span class="dv">1</span>, ph)]</a>
+<a class="sourceLine" id="cb4-25" data-line-number="25">                   <span class="kw">else</span> [(<span class="dv">0</span>, p)]</a>
+<a class="sourceLine" id="cb4-26" data-line-number="26"> <span class="kw">where</span> p <span class="fu">=</span> <span class="kw">if</span> s&#39; <span class="fu">==</span> s <span class="fu">+</span> a</a>
+<a class="sourceLine" id="cb4-27" data-line-number="27">             <span class="kw">then</span> ph</a>
+<a class="sourceLine" id="cb4-28" data-line-number="28">             <span class="kw">else</span> <span class="dv">1</span> <span class="fu">-</span> ph</a>
+<a class="sourceLine" id="cb4-29" data-line-number="29"></a>
+<a class="sourceLine" id="cb4-30" data-line-number="30"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-31" data-line-number="31"><span class="co">  Command line options defintions.</span></a>
+<a class="sourceLine" id="cb4-32" data-line-number="32"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-33" data-line-number="33"></a>
+<a class="sourceLine" id="cb4-34" data-line-number="34"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
+<a class="sourceLine" id="cb4-35" data-line-number="35">    {<span class="ot"> nIter ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-36" data-line-number="36">        <span class="st">&quot;The number of policy improvement iterations&quot;</span></a>
+<a class="sourceLine" id="cb4-37" data-line-number="37">    ,<span class="ot"> nEval ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-38" data-line-number="38">        <span class="st">&quot;The number of policy evaluation iterations per policy improvement iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-39" data-line-number="39">    }</a>
+<a class="sourceLine" id="cb4-40" data-line-number="40">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb4-41" data-line-number="41"></a>
+<a class="sourceLine" id="cb4-42" data-line-number="42"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb4-43" data-line-number="43"></a>
+<a class="sourceLine" id="cb4-44" data-line-number="44"></a>
+<a class="sourceLine" id="cb4-45" data-line-number="45"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-46" data-line-number="46"><span class="co">  main()</span></a>
+<a class="sourceLine" id="cb4-47" data-line-number="47"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-48" data-line-number="48"></a>
+<a class="sourceLine" id="cb4-49" data-line-number="49"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-50" data-line-number="50">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-51" data-line-number="51">  <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-52" data-line-number="52"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
+<a class="sourceLine" id="cb4-53" data-line-number="53">    unwrapRecord <span class="st">&quot;A solution to the &#39;Gambler&#39;s Problem&#39; (Ex. 4.9).&quot;</span></a>
+<a class="sourceLine" id="cb4-54" data-line-number="54">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe <span class="dv">10</span> (nIter o)</a>
+<a class="sourceLine" id="cb4-55" data-line-number="55">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span> (nEval o)</a>
+<a class="sourceLine" id="cb4-56" data-line-number="56"></a>
+<a class="sourceLine" id="cb4-57" data-line-number="57">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-58" data-line-number="58">  writeFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-59" data-line-number="59">  <span class="kw">let</span> iters <span class="fu">=</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-60" data-line-number="60">                   <span class="fu">$</span> iterate ( optPol gamma&#39;  eps&#39;       nEvals allStatesV</a>
+<a class="sourceLine" id="cb4-61" data-line-number="61">                                      actions nextStates rewards</a>
+<a class="sourceLine" id="cb4-62" data-line-number="62">                             ) (const (<span class="dv">0</span>,<span class="dv">0</span>), <span class="st">&quot;&quot;</span>)</a>
+<a class="sourceLine" id="cb4-63" data-line-number="63">      acts  <span class="fu">=</span> map ((\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) <span class="fu">.</span> fst) iters</a>
+<a class="sourceLine" id="cb4-64" data-line-number="64">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
+<a class="sourceLine" id="cb4-65" data-line-number="65">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
+<a class="sourceLine" id="cb4-66" data-line-number="66">  <span class="kw">let</span> ((_, (g&#39;, _)), msg) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-67" data-line-number="67">        runWriter <span class="fu">$</span> withinOnM eps&#39;</a>
+<a class="sourceLine" id="cb4-68" data-line-number="68">                              ( \ (dv, (_, msg&#39;)) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-69" data-line-number="69">                                  <span class="kw">do</span> tell msg&#39;</a>
+<a class="sourceLine" id="cb4-70" data-line-number="70">                                     maxAndNonZero <span class="st">&quot;\n**Found %3d policy changes.**\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-71" data-line-number="71">                                                   dv</a>
+<a class="sourceLine" id="cb4-72" data-line-number="72">                              ) <span class="fu">$</span> zip diffs (P.tail iters)</a>
+<a class="sourceLine" id="cb4-73" data-line-number="73">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="fu">$</span> pack msg</a>
+<a class="sourceLine" id="cb4-74" data-line-number="74"></a>
+<a class="sourceLine" id="cb4-75" data-line-number="75">  <span class="kw">let</span> pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-76" data-line-number="76">      val   <span class="fu">=</span> snd <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-77" data-line-number="77">      vs    <span class="fu">=</span> map (\(g, _) <span class="ot">-&gt;</span> snd <span class="fu">.</span> g) iters</a>
+<a class="sourceLine" id="cb4-78" data-line-number="78"></a>
+<a class="sourceLine" id="cb4-79" data-line-number="79">  <span class="co">-- Plot the state value functions.</span></a>
+<a class="sourceLine" id="cb4-80" data-line-number="80">  appendFile  <span class="st">&quot;other/gambler.md&quot;</span></a>
+<a class="sourceLine" id="cb4-81" data-line-number="81">             <span class="st">&quot;### State Value Functions\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-82" data-line-number="82">  toFile def <span class="st">&quot;img/gam_val.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-83" data-line-number="83">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;State Value Functions&quot;</span></a>
+<a class="sourceLine" id="cb4-84" data-line-number="84">       setColors <span class="fu">$</span> map opaque [red, blue, green, black]</a>
+<a class="sourceLine" id="cb4-85" data-line-number="85">       forM_ ( zip [<span class="st">&quot;1 Iter.&quot;</span>, <span class="st">&quot;2 Iters.&quot;</span>, <span class="st">&quot;3 Iters.&quot;</span>]</a>
+<a class="sourceLine" id="cb4-86" data-line-number="86">                   [<span class="dv">1</span>,      <span class="dv">2</span>,      <span class="dv">3</span>]</a>
+<a class="sourceLine" id="cb4-87" data-line-number="87">             ) <span class="fu">$</span> \ (lbl, n) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-88" data-line-number="88">                   plot ( line lbl</a>
+<a class="sourceLine" id="cb4-89" data-line-number="89">                               [ [ (x, (vs <span class="fu">P.!!</span> n) x)</a>
+<a class="sourceLine" id="cb4-90" data-line-number="90">                                 <span class="fu">|</span> x <span class="ot">&lt;-</span> [(<span class="dv">0</span><span class="ot">::</span><span class="dt">GState</span>)<span class="fu">..</span><span class="dv">100</span>]</a>
+<a class="sourceLine" id="cb4-91" data-line-number="91">                                 ]</a>
+<a class="sourceLine" id="cb4-92" data-line-number="92">                               ]</a>
+<a class="sourceLine" id="cb4-93" data-line-number="93">                        )</a>
+<a class="sourceLine" id="cb4-94" data-line-number="94">       plot ( line (printf <span class="st">&quot;%d Iters.&quot;</span> nIters)</a>
+<a class="sourceLine" id="cb4-95" data-line-number="95">                   <span class="co">-- [ [ (x, val x)</span></a>
+<a class="sourceLine" id="cb4-96" data-line-number="96">                   [ [ (x, (P.last vs) x)</a>
+<a class="sourceLine" id="cb4-97" data-line-number="97">                     <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]</a>
+<a class="sourceLine" id="cb4-98" data-line-number="98">                     ]</a>
+<a class="sourceLine" id="cb4-99" data-line-number="99">                   ]</a>
+<a class="sourceLine" id="cb4-100" data-line-number="100">            )</a>
+<a class="sourceLine" id="cb4-101" data-line-number="101">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;![](img/gam_val.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-102" data-line-number="102"></a>
+<a class="sourceLine" id="cb4-103" data-line-number="103">  <span class="co">-- Plot the final policy.</span></a>
+<a class="sourceLine" id="cb4-104" data-line-number="104">  appendFile  <span class="st">&quot;other/gambler.md&quot;</span></a>
+<a class="sourceLine" id="cb4-105" data-line-number="105">             <span class="st">&quot;\n### Final Policy Function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-106" data-line-number="106">  toFile def <span class="st">&quot;img/gam_pol.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-107" data-line-number="107">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Final Policy Function&quot;</span></a>
+<a class="sourceLine" id="cb4-108" data-line-number="108">       setColors <span class="fu">$</span> map opaque [blue, green, black]</a>
+<a class="sourceLine" id="cb4-109" data-line-number="109">       plot ( line <span class="st">&quot;pi(s)&quot;</span></a>
+<a class="sourceLine" id="cb4-110" data-line-number="110">                   [ [ (x, pol x)</a>
+<a class="sourceLine" id="cb4-111" data-line-number="111">                     <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]</a>
+<a class="sourceLine" id="cb4-112" data-line-number="112">                     ]</a>
+<a class="sourceLine" id="cb4-113" data-line-number="113">                   ]</a>
+<a class="sourceLine" id="cb4-114" data-line-number="114">            )</a>
+<a class="sourceLine" id="cb4-115" data-line-number="115">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;![](img/gam_pol.png)\n&quot;</span></a></code></pre></div>
+<h2 id="output">output</h2>
+<h3 id="policy-optimization">Policy optimization</h3>
+<p>Value Iteration <strong>Found 99 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 24 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 12 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 12 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 19 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 18 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 23 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 24 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 19 policy changes.</strong></p>
+<p>Value Iteration <strong>Found 14 policy changes.</strong></p>
+<h3 id="state-value-functions">State Value Functions</h3>
+<figure>
+<img src="img/gam_val.png" />
+</figure>
+<h3 id="final-policy-function">Final Policy Function</h3>
+<figure>
+<img src="img/gam_pol.png" />
+</figure>
+<hr />
+<div class="footer">
+<p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
+</div>
