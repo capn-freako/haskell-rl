@@ -71,18 +71,15 @@ import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for)
 import Options.Generic
 
-import GHC.TypeNats
-
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
 import Data.Finite.Internal
-import Data.List                            ((!!))
-import Data.MemoTrie
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
-import Text.Printf
+
+import RL.GPI
 \end{code}
 
 code
@@ -91,77 +88,6 @@ code
 - [hoogle](https://www.stackage.org/package/hoogle)
 
 \begin{code}
-{----------------------------------------------------------------------
-  Orphans
-----------------------------------------------------------------------}
-instance (KnownNat n) => HasTrie (Finite n) where
-  data Finite n :->: x     = FiniteTrie (VS.Vector n x)
-  trie f                   = FiniteTrie (VS.generate (f . finite . fromIntegral))
-  untrie (FiniteTrie v)    = VS.index v
-  enumerate (FiniteTrie v) = map (first (finite . fromIntegral)) $ (VS.toList . VS.indexed) v
-
-{----------------------------------------------------------------------
-  General policy iterator
-----------------------------------------------------------------------}
-
--- | Yields a single policy improvment iteration, given:
---   - gamma           - discount rate
---   - eps             - convergence tolerance
---   - n               - max. policy evaluation iterations
---   - S               - set of all possible system states
---   - A(s)            - all possible actions in state s,
---   - S'(s, a)        - all possible next states, for a given state/action pair, and
---   - R(s, a, s')     - all possible rewards for a given state/action/next-state triple,
---                       along with their probabilities of occurence.
---
--- Returns a combined policy & value function.
-optPol :: ( HasTrie s
-          , HasTrie a
-          , KnownNat (n + 1)
-          )
-       => Float                              -- ^ discount rate
-       -> Float                              -- ^ evaluation convergence tolerance
-       -> Int                                -- ^ max. # of evaluation iterations
-       -> VS.Vector (n + 1) s                -- ^ vector of all possible system states
-       -> (s -> [a])                         -- ^ A(s)
-       -> (s -> a -> [s])                    -- ^ S'(s, a)
-       -> (s -> a -> s -> [(Float, Float)])  -- ^ R(s, a, s')
-       -> ((s -> (a, Float)), String)        -- ^ initial policy & value functions
-       -> ((s -> (a, Float)), String)
-optPol gamma eps n ss as s's rs (g, _) = (bestA, msg)
- where
-  bestA   = maximumBy (compare `on` snd) . aVals v'
-  aVals v = \s -> let actVal'' = actVal' v
-                   in [ (a, actVal'' (s, a))
-                      | a <- as s
-                      ]
-  actVal' = memo . uncurry . actVal
-  actVal v s a =
-    sum [ pt * gamma * u + rt
-        | s' <- s's s a
-        , let u = v s'
-        , let (pt, rt) = foldl prSum (0,0)
-                               [ (p, p * r)
-                               | (r, p) <- rs' s a s'
-                               ]
-        ]
-  prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
-  rs' = memo3 rs
-  ((_, v'), msg) =
-    first (fromMaybe (P.error "optPol: Major blow-up!"))
-      $ runWriter
-        $ withinOnM
-            eps
-            ( chooseAndCount max (> eps) "- Found %3d state value diffs > eps.  \n"
-            . fst
-            )
-            $ zip (map abs $ zipWith (-) vs (P.tail vs))
-                  (P.tail evalIters)
-  vs = map (vsFor ss) evalIters
-  evalIters = take (n + 1) $ iterate (evalPol (fst . g)) $ snd . g
-  evalPol p v = let actVal'' = actVal' v
-                 in \s -> actVal'' (s, p s)
-
 {----------------------------------------------------------------------
   Problem specific definitions
 ----------------------------------------------------------------------}
@@ -249,6 +175,26 @@ rewards (Finite n1, Finite n2) a (Finite n1', Finite n2') =
   ]
  where a' = fromIntegral a
 
+showFofState :: (Show a) => (RCState -> a) -> String
+showFofState g = unlines
+  ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}" :
+    ( ("\\text{cars at loc. 1} &" ++ intersperse '&' (replicate 21 ' ') ++ " \\\\") :
+      ["\\hline"] ++
+      intersperse "\\hline"
+        ( map ((++ " \\\\") . intercalate " & ")
+              [ (show m :) $ map show
+                [ g (finite m, finite n)
+                | n <- [0..20]
+                ]
+              | m <- [0..20]
+              ]
+        )
+      ++ ["\\hline"]
+      ++ [intercalate " & " $ "\\text{cars at loc. 2:} " : [show n | n <- [0..20]]]
+      ++ ["\\end{array}"]
+    )
+  )
+
 {----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
@@ -319,149 +265,6 @@ main = do
   appendFile "other/rentalcars.md" $ pack $ showFofState (Pfloat . val)
   -- appendFile "other/rentalcars.md" "\n### E[reward]\n\n"
   -- appendFile "other/rentalcars.md" $ pack $ showFofState (Pfloat . testRewards)
-
-{----------------------------------------------------------------------
-  Misc.
-----------------------------------------------------------------------}
-
--- | Return the maximum value of a set, as well as a scripted log
--- message, regarding the number of non-zero elements in the set.
---
--- (See documentation for `chooseAndCount` function.)
-maxAndNonZero :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
-maxAndNonZero = chooseAndCount max (/= 0)
-
--- | Choose a value from the set using the given comparison function,
--- and provide a scripted log message, regarding the number of elements
--- in the set meeting the given criteria.
-chooseAndCount :: (Foldable t, Num a)
-               => (a -> a -> a)  -- ^ choice function
-               -> (a -> Bool)    -- ^ counting predicate
-               -> String         -- ^ message script (Should contain precisely 1 "%d".)
-               -> t a            -- ^ foldable set of elements to count/compare
-               -> Writer String a
-chooseAndCount f p s xs = do
-  let (val, cnt::Int) =
-        foldl' ( \ (v, c) x ->
-                   ( f v x
-                   , if p x
-                       then c + 1
-                       else c
-                   )
-               ) (0,0) xs
-  tell $ printf s cnt
-  return val
-
---- | To control the formatting of printed floats in output matrices.
-newtype Pfloat = Pfloat { unPfloat :: Float}
-  deriving (Eq)
-
-instance Show Pfloat where
-  show x = printf "%4.1f" (unPfloat x)
-
-showFofState :: (Show a) => (RCState -> a) -> String
-showFofState g = unlines
-  ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}" :
-    ( ("\\text{cars at loc. 1} &" ++ intersperse '&' (replicate 21 ' ') ++ " \\\\") :
-      ["\\hline"] ++
-      intersperse "\\hline"
-        ( map ((++ " \\\\") . intercalate " & ")
-              [ (show m :) $ map show
-                [ g (finite m, finite n)
-                | n <- [0..20]
-                ]
-              | m <- [0..20]
-              ]
-        )
-      ++ ["\\hline"]
-      ++ [intercalate " & " $ "\\text{cars at loc. 2:} " : [show n | n <- [0..20]]]
-      ++ ["\\end{array}"]
-    )
-  )
-
-poisson :: Int -> Int -> Float
-poisson lambda n = lambda' ^ n' * exp (-lambda') / fromIntegral (fact n)
- where lambda' = fromIntegral lambda
-       n'      = fromIntegral n
-
-fact :: Int -> Int
-fact 0 = 1
-fact n = product [1..n]
-
-poissonVals :: VS.Vector 5 (VS.Vector 12 Float)
-poissonVals = VS.generate (VS.generate . poisson)
-
-poisson' :: Finite 5 -> Finite 21 -> Float
-poisson' n x@(Finite x') =
-  if x > 11  -- The Python code enforces this limit. And we're trying
-    then 0   -- for an "apples-to-apples" performance comparison.
-    else poissonVals `VS.index` n `VS.index` finite x'
-
--- | First list element less than or equal to given threshold under the
--- given function, or the last element if the threshold was never met.
---
--- A return value of 'Nothing' indicates an empty list was given.
--- withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
--- withinOn eps f xs = do
---   n <- withinIx eps $ map f xs
---   return $ xs !! n
-
--- | Index of first list element less than or equal to given threshold,
--- or the index of the last element if the threshold was never met.
---
--- A return value of 'Nothing' indicates an empty list was given.
--- withinIx :: Float -> [Float] -> Maybe Int
--- withinIx _   [] = Nothing
--- withinIx eps xs = Just $ withinIx' 0 xs
---  where withinIx' n []     = n - 1
---        withinIx' n (y:ys) = if y <= eps
---                               then n
---                               else withinIx' (n+1) ys
-
--- | Monadically search list for first element less than or equal to
--- given threshold under the given function, and return the last element
--- if the threshold was never met.
--- Return 'Nothing' if the input list was empty.
-withinOnM :: Monad m
-          => Float
-          -> (a -> m Float)
-          -> [a]
-          -> m (Maybe a)
-withinOnM _   _ [] = return Nothing
-withinOnM eps f xs = do
-  n <- withinIxM eps $ map f xs
-  case n of
-    Nothing -> return Nothing
-    Just n' -> return $ Just (xs !! n')
-
--- | Monadically find index of first list element less than or equal to
--- given threshold, or the index of the last element if the threshold
--- was never met.
---
--- A return value of 'Nothing' indicates an empty list was given.
-withinIxM :: Monad m
-          => Float
-          -> [m Float]
-          -> m (Maybe Int)
-withinIxM _   [] = return Nothing
-withinIxM eps xs = withinIxM' 0 xs
- where withinIxM' n []     = return $ Just (n - 1)
-       withinIxM' n (y:ys) = do
-         y' <- y
-         if y' <= eps then return (Just n)
-                      else withinIxM' (n+1) ys
-
--- | Expected reward for a given state, assuming equiprobable actions.
--- testRewards :: RCState -> Float
--- testRewards s =
---   sum [ uncurry (*) r
---       | a  <- acts
---       , s' <- nextStates s a
---       , r  <- rewards s a s'
---       ] / (fromIntegral . length) acts
---  where acts = actions s
-
-vsFor = flip VS.map
 
 \end{code}
 

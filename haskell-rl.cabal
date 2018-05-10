@@ -1,50 +1,49 @@
-name:
-  haskell-rl
-version:
-  0.0.1
-synopsis:
-  See readme.md
-description:
-  See readme.md for description.
-category:
-  project
-homepage:
-  https://github.com/capn-freako/haskell-rl
-license:
-  BSD3
-license-file:
-  LICENSE
-author:
-  David Banas
-maintainer:
-  capn.freako@gmail.com
-copyright:
-  Copyright (c) 2018 David Banas; all rights reserved World wide.
-build-type:
-  Simple
-cabal-version:
-  >=1.14
+name:          haskell-rl
+version:       0.0.1
+synopsis:      See readme.md
+description:   See readme.md for description.
+category:      project
+homepage:      https://git.target.com/RedOptHaskell/haskell-rl/wiki
+license:       BSD3
+license-file:  LICENSE
+author:        David Banas
+maintainer:    David.Banas@target.com
+copyright:     Copyright (c) 2018 Target Corp.; all rights reserved World wide.
+build-type:    Simple
+cabal-version: >=1.14
+
 extra-source-files:
   readme.md
   index.html
+  rentalcars.html
+  rentalcars2.html
   stack.yaml
   other/lhs.css
   other/header.md
+
 library
   default-language:
     Haskell2010
   ghc-options:
-  hs-source-dirs:      
-
+    -O2
+    -funbox-strict-fields
+    -Wall
+  hs-source-dirs: src
   exposed-modules:
-
+    RL.GPI
   build-depends:
     base >= 4.7 && < 5
+    , protolude
+    , finite-typelits
+    , mtl
+    , vector-sized
+    , MemoTrie
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,
     BangPatterns,
     BinaryLiterals,
+    DataKinds,
     DeriveFoldable,
     DeriveFunctor,
     DeriveGeneric,
@@ -215,7 +214,7 @@ executable rentalcars
     random,
     Chart,
     Chart-cairo,
-    MemoTrie
+    haskell-rl
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,
@@ -249,6 +248,36 @@ executable rentalcars
     TupleSections,
     TypeFamilies,
     TypeOperators
+
+executable gambler
+  default-language:
+    Haskell2010
+  ghc-options:
+    -O2
+    -funbox-strict-fields
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+  hs-source-dirs:
+    app
+  main-is:
+    gambler.lhs
+  build-depends:
+    base >= 4.7 && < 5
+    , protolude
+    , mtl
+    , optparse-generic
+    , vector-sized
+    -- , vector
+    , finite-typelits
+    , text
+    -- , QuickCheck
+    -- , monad-extras
+    -- , random-shuffle
+    -- , random
+    , Chart
+    , Chart-cairo
+    , haskell-rl
 
 test-suite test
   default-language:
@@ -306,4 +335,4 @@ source-repository head
   type:
     git
   location:
-    https://github.com/capn-freako/haskell-rl
+    https://git.target.com/RedOptHaskell/haskell-rl
