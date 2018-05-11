@@ -72,7 +72,7 @@ import qualified Data.Vector.Sized   as VS
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
-import Text.Printf
+-- import Text.Printf
 
 import RL.GPI
 \end{code}
@@ -86,7 +86,7 @@ code
 {----------------------------------------------------------------------
   Problem specific definitions
 ----------------------------------------------------------------------}
-eps'   = 0.1   -- My choice.
+-- eps'   = 0.1   -- My choice.
 gamma' = 1     -- Dictated by problem.
 -- ph     = 0.25
 ph     = 0.4
@@ -122,6 +122,8 @@ data Opts w = Opts
         "The number of policy improvement iterations"
     , nEval :: w ::: Maybe Int <?>
         "The number of policy evaluation iterations per policy improvement iteration"
+    , eps :: w ::: Maybe Float <?>
+        "Convergence tolerance"
     }
     deriving (Generic)
 
@@ -137,8 +139,9 @@ main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A solution to the 'Gambler's Problem' (Ex. 4.9)."
-  let nIters = fromMaybe 10 (nIter o)
-      nEvals = fromMaybe  1 (nEval o)
+  let nIters = fromMaybe 10   (nIter o)
+      nEvals = fromMaybe  1   (nEval o)
+      eps'   = fromMaybe  0.1 (eps   o)
 
   -- Calculate and display optimum policy.
   writeFile "other/gambler.md" "\n### Policy optimization\n\n"
@@ -172,7 +175,7 @@ main = do
   appendFile "other/gambler.md" $ pack msg
 
   let pol   = fst . g'
-      -- val   = snd . g'
+      val   = snd . g'
       vs    = map (\(g, _) -> snd . g) iters
 
   -- Plot the state value functions.
@@ -180,30 +183,30 @@ main = do
              "### State Value Functions\n\n"
   toFile def "img/gam_val.png" $
     do layout_title .= "State Value Functions"
-       -- setColors $ map opaque [red, blue, green, black]
-       forM_ (zip vs [0..]) $ \ (v,n) ->
-                   plot ( line (P.show n)
-                               [ [ (x, v x)
-                                 | x <- [(0::GState)..100]
-                                 ]
-                               ]
-                        )
-       -- forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
-       --             [1,      2,      3]
-       --       ) $ \ (lbl, n) ->
-       --             plot ( line lbl
-       --                         [ [ (x, (vs P.!! n) x)
+       setColors $ map opaque [red, green, blue, black]
+       -- forM_ (zip vs [0..]) $ \ (v,n) ->
+       --             plot ( line (P.show n)
+       --                         [ [ (x, v x)
        --                           | x <- [(0::GState)..100]
        --                           ]
        --                         ]
        --                  )
-       -- plot ( line (printf "%d Iters." nIters)
-       --             -- [ [ (x, val x)
-       --             [ [ (x, (P.last vs) x)
-       --               | x <- [0..100]
-       --               ]
-       --             ]
-       --      )
+       forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
+                   [1,      2,      3]
+             ) $ \ (lbl, n) ->
+                   plot ( line lbl
+                               [ [ (x, (vs P.!! n) x)
+                                 | x <- [(0::GState)..100]
+                                 ]
+                               ]
+                        )
+       plot ( line "Final"
+                   [ [ (x, val x)
+                   -- [ [ (x, (P.last vs) x)
+                     | x <- [0..100]
+                     ]
+                   ]
+            )
   appendFile "other/gambler.md" "![](img/gam_val.png)\n"
 
   -- Plot the final policy.

@@ -3,8 +3,12 @@ haskell-rl
 
 See [repository *index.html* file](https://pages.git.target.com/RedOptHaskell/haskell-rl/) for project description.
 
+Instant Gratification Instructions:
+
 ~~~
-stack build :tic-tac-toe
-stack exec tic-tac-toe
-pandoc -f markdown+lhs -i app/tictactoe.lhs -t html -o index.html --filter pandoc-include --mathjax
+stack build
+stack exec <app>  (<app>: "example", "tictactoe", "rentalcars", "gambler")
+pandoc -f markdown+lhs -i app/<app>.lhs -t html -o <app>.html --filter pandoc-include --mathjax
+(View file "<app>.html" in your browser.)
 ~~~
+

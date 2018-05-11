@@ -43,7 +43,7 @@ import qualified Data.Vector.Sized   as VS
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List             ((!!), lookup)
+import Data.List             ((!!), lookup, groupBy)
 import Data.MemoTrie
 import Text.Printf
 
@@ -69,7 +69,7 @@ data RLType s a n = RLType
   , actions    :: s -> [a]
   , nextStates :: s -> a -> [s]
   , rewards    :: s -> a -> s -> [(Float,Float)]
-  , stateVals  :: [(s, Float)]
+  , stateVals  :: [(s, Float)]  -- overides for terminal states
   }
 
 rltDef :: RLType s a n
@@ -92,7 +92,7 @@ rltDef = RLType
 --
 -- Returns a combined policy & value function.
 optPol :: ( Eq s, HasTrie s
-          , HasTrie a
+          , Ord a, HasTrie a
           , KnownNat (n + 1)
           )
        => RLType s a n               -- ^ abstract type, to protect API
@@ -100,7 +100,11 @@ optPol :: ( Eq s, HasTrie s
        -> (s -> (a, Float), String)
 optPol RLType{..} (g, _) = (bestA, msg)
  where
-  bestA   = maximumBy (compare `on` snd) . aVals v'
+  -- bestA   = maximumBy (compare `on` snd) . aVals v'
+  bestA   = minimumBy (compare `on` fst)
+            . P.head . reverse
+            . groupBy ((==) `on` snd)
+            . sortBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
                    in [ (a, actVal'' (s, a))
                       | a <- actions s
@@ -108,14 +112,15 @@ optPol RLType{..} (g, _) = (bestA, msg)
   actVal' = memo . uncurry . actVal
   actVal v s a =
     fromMaybe
-      (sum [ pt * gamma * u + rt
-           | s' <- nextStates s a
-           , let u = v s'
-           , let (pt, rt) = foldl' prSum (0,0)
-                                  [ (p, p * r)
-                                  | (r, p) <- rs' s a s'
-                                  ]
-           ])
+      ( sum [ pt * gamma * u + rt
+            | s' <- nextStates s a
+            , let u = v s'
+            , let (pt, rt) = foldl' prSum (0,0)
+                                    [ (p, p * r)
+                                    | (r, p) <- rs' s a s'
+                                    ]
+            ]
+      )
       $ lookup s stateVals
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards

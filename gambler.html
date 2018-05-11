@@ -52,7 +52,7 @@ Original date: May 10, 2018</p>
 <a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.Text</span>                            (pack)</a>
 <a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span> (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
 <a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
-<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
+<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="co">-- import Text.Printf</span></a>
 <a class="sourceLine" id="cb3-15" data-line-number="15"></a>
 <a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
 <h2 id="code-1">code</h2>
@@ -62,7 +62,7 @@ Original date: May 10, 2018</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="co">{----------------------------------------------------------------------</span></a>
 <a class="sourceLine" id="cb4-2" data-line-number="2"><span class="co">  Problem specific definitions</span></a>
 <a class="sourceLine" id="cb4-3" data-line-number="3"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-4" data-line-number="4">eps&#39;   <span class="fu">=</span> <span class="fl">0.1</span>   <span class="co">-- My choice.</span></a>
+<a class="sourceLine" id="cb4-4" data-line-number="4"><span class="co">-- eps&#39;   = 0.1   -- My choice.</span></a>
 <a class="sourceLine" id="cb4-5" data-line-number="5">gamma&#39; <span class="fu">=</span> <span class="dv">1</span>     <span class="co">-- Dictated by problem.</span></a>
 <a class="sourceLine" id="cb4-6" data-line-number="6"><span class="co">-- ph     = 0.25</span></a>
 <a class="sourceLine" id="cb4-7" data-line-number="7">ph     <span class="fu">=</span> <span class="fl">0.4</span></a>
@@ -98,115 +98,460 @@ Original date: May 10, 2018</p>
 <a class="sourceLine" id="cb4-37" data-line-number="37">        <span class="st">&quot;The number of policy improvement iterations&quot;</span></a>
 <a class="sourceLine" id="cb4-38" data-line-number="38">    ,<span class="ot"> nEval ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
 <a class="sourceLine" id="cb4-39" data-line-number="39">        <span class="st">&quot;The number of policy evaluation iterations per policy improvement iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-40" data-line-number="40">    }</a>
-<a class="sourceLine" id="cb4-41" data-line-number="41">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
-<a class="sourceLine" id="cb4-42" data-line-number="42"></a>
-<a class="sourceLine" id="cb4-43" data-line-number="43"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb4-40" data-line-number="40">    ,<span class="ot"> eps ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Float</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-41" data-line-number="41">        <span class="st">&quot;Convergence tolerance&quot;</span></a>
+<a class="sourceLine" id="cb4-42" data-line-number="42">    }</a>
+<a class="sourceLine" id="cb4-43" data-line-number="43">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
 <a class="sourceLine" id="cb4-44" data-line-number="44"></a>
-<a class="sourceLine" id="cb4-45" data-line-number="45"></a>
-<a class="sourceLine" id="cb4-46" data-line-number="46"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-47" data-line-number="47"><span class="co">  main()</span></a>
-<a class="sourceLine" id="cb4-48" data-line-number="48"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-49" data-line-number="49"></a>
-<a class="sourceLine" id="cb4-50" data-line-number="50"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb4-51" data-line-number="51">main <span class="fu">=</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-52" data-line-number="52">  <span class="co">-- Process command line options.</span></a>
-<a class="sourceLine" id="cb4-53" data-line-number="53"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
-<a class="sourceLine" id="cb4-54" data-line-number="54">    unwrapRecord <span class="st">&quot;A solution to the &#39;Gambler&#39;s Problem&#39; (Ex. 4.9).&quot;</span></a>
-<a class="sourceLine" id="cb4-55" data-line-number="55">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe <span class="dv">10</span> (nIter o)</a>
-<a class="sourceLine" id="cb4-56" data-line-number="56">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span> (nEval o)</a>
-<a class="sourceLine" id="cb4-57" data-line-number="57"></a>
-<a class="sourceLine" id="cb4-58" data-line-number="58">  <span class="co">-- Calculate and display optimum policy.</span></a>
-<a class="sourceLine" id="cb4-59" data-line-number="59">  writeFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-60" data-line-number="60">  <span class="kw">let</span> iters <span class="fu">=</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-61" data-line-number="61">                   <span class="fu">$</span> iterate</a>
-<a class="sourceLine" id="cb4-62" data-line-number="62">                       ( optPol</a>
-<a class="sourceLine" id="cb4-63" data-line-number="63">                           rltDef</a>
-<a class="sourceLine" id="cb4-64" data-line-number="64">                             { gamma      <span class="fu">=</span> gamma&#39;</a>
-<a class="sourceLine" id="cb4-65" data-line-number="65">                             , epsilon    <span class="fu">=</span> eps&#39;</a>
-<a class="sourceLine" id="cb4-66" data-line-number="66">                             , maxIter    <span class="fu">=</span> nEvals</a>
-<a class="sourceLine" id="cb4-67" data-line-number="67">                             , states     <span class="fu">=</span> allStatesV</a>
-<a class="sourceLine" id="cb4-68" data-line-number="68">                             , actions    <span class="fu">=</span> actions&#39;</a>
-<a class="sourceLine" id="cb4-69" data-line-number="69">                             , nextStates <span class="fu">=</span> nextStates&#39;</a>
-<a class="sourceLine" id="cb4-70" data-line-number="70">                             , rewards    <span class="fu">=</span> rewards&#39;</a>
-<a class="sourceLine" id="cb4-71" data-line-number="71">                             , stateVals  <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-72" data-line-number="72">                                 [ (  <span class="dv">0</span>, <span class="dv">0</span>)</a>
-<a class="sourceLine" id="cb4-73" data-line-number="73">                                 , (<span class="dv">100</span>, <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-74" data-line-number="74">                                 ]</a>
-<a class="sourceLine" id="cb4-75" data-line-number="75">                             }</a>
-<a class="sourceLine" id="cb4-76" data-line-number="76">                       ) (\s <span class="ot">-&gt;</span> <span class="kw">if</span> s <span class="fu">==</span> <span class="dv">100</span> <span class="kw">then</span> (<span class="dv">0</span>,<span class="dv">1</span>) <span class="kw">else</span> (<span class="dv">0</span>,<span class="dv">0</span>), <span class="st">&quot;&quot;</span>)</a>
-<a class="sourceLine" id="cb4-77" data-line-number="77">      acts  <span class="fu">=</span> map ((\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) <span class="fu">.</span> fst) iters</a>
-<a class="sourceLine" id="cb4-78" data-line-number="78">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
-<a class="sourceLine" id="cb4-79" data-line-number="79">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
-<a class="sourceLine" id="cb4-80" data-line-number="80">  <span class="kw">let</span> ((_, (g&#39;, _)), msg) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-81" data-line-number="81">        runWriter <span class="fu">$</span> withinOnM eps&#39;</a>
-<a class="sourceLine" id="cb4-82" data-line-number="82">                              ( \ (dv, (_, msg&#39;)) <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-83" data-line-number="83">                                  <span class="kw">do</span> tell msg&#39;</a>
-<a class="sourceLine" id="cb4-84" data-line-number="84">                                     maxAndNonZero <span class="st">&quot;\n**Found %3d policy changes.**\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-85" data-line-number="85">                                                   dv</a>
-<a class="sourceLine" id="cb4-86" data-line-number="86">                              ) <span class="fu">$</span> zip diffs (P.tail iters)</a>
-<a class="sourceLine" id="cb4-87" data-line-number="87">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="fu">$</span> pack msg</a>
-<a class="sourceLine" id="cb4-88" data-line-number="88"></a>
-<a class="sourceLine" id="cb4-89" data-line-number="89">  <span class="kw">let</span> pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
-<a class="sourceLine" id="cb4-90" data-line-number="90">      <span class="co">-- val   = snd . g&#39;</span></a>
-<a class="sourceLine" id="cb4-91" data-line-number="91">      vs    <span class="fu">=</span> map (\(g, _) <span class="ot">-&gt;</span> snd <span class="fu">.</span> g) iters</a>
-<a class="sourceLine" id="cb4-92" data-line-number="92"></a>
-<a class="sourceLine" id="cb4-93" data-line-number="93">  <span class="co">-- Plot the state value functions.</span></a>
-<a class="sourceLine" id="cb4-94" data-line-number="94">  appendFile  <span class="st">&quot;other/gambler.md&quot;</span></a>
-<a class="sourceLine" id="cb4-95" data-line-number="95">             <span class="st">&quot;### State Value Functions\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-96" data-line-number="96">  toFile def <span class="st">&quot;img/gam_val.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-97" data-line-number="97">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;State Value Functions&quot;</span></a>
-<a class="sourceLine" id="cb4-98" data-line-number="98">       <span class="co">-- setColors $ map opaque [red, blue, green, black]</span></a>
-<a class="sourceLine" id="cb4-99" data-line-number="99">       forM_ (zip vs [<span class="dv">0</span><span class="fu">..</span>]) <span class="fu">$</span> \ (v,n) <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-100" data-line-number="100">                   plot ( line (P.show n)</a>
-<a class="sourceLine" id="cb4-101" data-line-number="101">                               [ [ (x, v x)</a>
-<a class="sourceLine" id="cb4-102" data-line-number="102">                                 <span class="fu">|</span> x <span class="ot">&lt;-</span> [(<span class="dv">0</span><span class="ot">::</span><span class="dt">GState</span>)<span class="fu">..</span><span class="dv">100</span>]</a>
-<a class="sourceLine" id="cb4-103" data-line-number="103">                                 ]</a>
-<a class="sourceLine" id="cb4-104" data-line-number="104">                               ]</a>
-<a class="sourceLine" id="cb4-105" data-line-number="105">                        )</a>
-<a class="sourceLine" id="cb4-106" data-line-number="106">       <span class="co">-- forM_ ( zip [&quot;1 Iter.&quot;, &quot;2 Iters.&quot;, &quot;3 Iters.&quot;]</span></a>
-<a class="sourceLine" id="cb4-107" data-line-number="107">       <span class="co">--             [1,      2,      3]</span></a>
-<a class="sourceLine" id="cb4-108" data-line-number="108">       <span class="co">--       ) $ \ (lbl, n) -&gt;</span></a>
-<a class="sourceLine" id="cb4-109" data-line-number="109">       <span class="co">--             plot ( line lbl</span></a>
-<a class="sourceLine" id="cb4-110" data-line-number="110">       <span class="co">--                         [ [ (x, (vs P.!! n) x)</span></a>
-<a class="sourceLine" id="cb4-111" data-line-number="111">       <span class="co">--                           | x &lt;- [(0::GState)..100]</span></a>
-<a class="sourceLine" id="cb4-112" data-line-number="112">       <span class="co">--                           ]</span></a>
-<a class="sourceLine" id="cb4-113" data-line-number="113">       <span class="co">--                         ]</span></a>
-<a class="sourceLine" id="cb4-114" data-line-number="114">       <span class="co">--                  )</span></a>
-<a class="sourceLine" id="cb4-115" data-line-number="115">       <span class="co">-- plot ( line (printf &quot;%d Iters.&quot; nIters)</span></a>
-<a class="sourceLine" id="cb4-116" data-line-number="116">       <span class="co">--             -- [ [ (x, val x)</span></a>
-<a class="sourceLine" id="cb4-117" data-line-number="117">       <span class="co">--             [ [ (x, (P.last vs) x)</span></a>
-<a class="sourceLine" id="cb4-118" data-line-number="118">       <span class="co">--               | x &lt;- [0..100]</span></a>
-<a class="sourceLine" id="cb4-119" data-line-number="119">       <span class="co">--               ]</span></a>
-<a class="sourceLine" id="cb4-120" data-line-number="120">       <span class="co">--             ]</span></a>
-<a class="sourceLine" id="cb4-121" data-line-number="121">       <span class="co">--      )</span></a>
-<a class="sourceLine" id="cb4-122" data-line-number="122">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;![](img/gam_val.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-123" data-line-number="123"></a>
-<a class="sourceLine" id="cb4-124" data-line-number="124">  <span class="co">-- Plot the final policy.</span></a>
-<a class="sourceLine" id="cb4-125" data-line-number="125">  appendFile  <span class="st">&quot;other/gambler.md&quot;</span></a>
-<a class="sourceLine" id="cb4-126" data-line-number="126">             <span class="st">&quot;\n### Final Policy Function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-127" data-line-number="127">  toFile def <span class="st">&quot;img/gam_pol.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-128" data-line-number="128">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Final Policy Function&quot;</span></a>
-<a class="sourceLine" id="cb4-129" data-line-number="129">       setColors <span class="fu">$</span> map opaque [blue, green, black]</a>
-<a class="sourceLine" id="cb4-130" data-line-number="130">       plot ( line <span class="st">&quot;pi(s)&quot;</span></a>
-<a class="sourceLine" id="cb4-131" data-line-number="131">                   [ [ (x, pol x)</a>
-<a class="sourceLine" id="cb4-132" data-line-number="132">                     <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]</a>
-<a class="sourceLine" id="cb4-133" data-line-number="133">                     ]</a>
-<a class="sourceLine" id="cb4-134" data-line-number="134">                   ]</a>
-<a class="sourceLine" id="cb4-135" data-line-number="135">            )</a>
-<a class="sourceLine" id="cb4-136" data-line-number="136">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;![](img/gam_pol.png)\n&quot;</span></a></code></pre></div>
+<a class="sourceLine" id="cb4-45" data-line-number="45"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb4-46" data-line-number="46"></a>
+<a class="sourceLine" id="cb4-47" data-line-number="47"></a>
+<a class="sourceLine" id="cb4-48" data-line-number="48"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-49" data-line-number="49"><span class="co">  main()</span></a>
+<a class="sourceLine" id="cb4-50" data-line-number="50"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-51" data-line-number="51"></a>
+<a class="sourceLine" id="cb4-52" data-line-number="52"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-53" data-line-number="53">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-54" data-line-number="54">  <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-55" data-line-number="55"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
+<a class="sourceLine" id="cb4-56" data-line-number="56">    unwrapRecord <span class="st">&quot;A solution to the &#39;Gambler&#39;s Problem&#39; (Ex. 4.9).&quot;</span></a>
+<a class="sourceLine" id="cb4-57" data-line-number="57">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe <span class="dv">10</span>   (nIter o)</a>
+<a class="sourceLine" id="cb4-58" data-line-number="58">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span>   (nEval o)</a>
+<a class="sourceLine" id="cb4-59" data-line-number="59">      eps&#39;   <span class="fu">=</span> fromMaybe  <span class="fl">0.1</span> (eps   o)</a>
+<a class="sourceLine" id="cb4-60" data-line-number="60"></a>
+<a class="sourceLine" id="cb4-61" data-line-number="61">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-62" data-line-number="62">  writeFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-63" data-line-number="63">  <span class="kw">let</span> iters <span class="fu">=</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-64" data-line-number="64">                   <span class="fu">$</span> iterate</a>
+<a class="sourceLine" id="cb4-65" data-line-number="65">                       ( optPol</a>
+<a class="sourceLine" id="cb4-66" data-line-number="66">                           rltDef</a>
+<a class="sourceLine" id="cb4-67" data-line-number="67">                             { gamma      <span class="fu">=</span> gamma&#39;</a>
+<a class="sourceLine" id="cb4-68" data-line-number="68">                             , epsilon    <span class="fu">=</span> eps&#39;</a>
+<a class="sourceLine" id="cb4-69" data-line-number="69">                             , maxIter    <span class="fu">=</span> nEvals</a>
+<a class="sourceLine" id="cb4-70" data-line-number="70">                             , states     <span class="fu">=</span> allStatesV</a>
+<a class="sourceLine" id="cb4-71" data-line-number="71">                             , actions    <span class="fu">=</span> actions&#39;</a>
+<a class="sourceLine" id="cb4-72" data-line-number="72">                             , nextStates <span class="fu">=</span> nextStates&#39;</a>
+<a class="sourceLine" id="cb4-73" data-line-number="73">                             , rewards    <span class="fu">=</span> rewards&#39;</a>
+<a class="sourceLine" id="cb4-74" data-line-number="74">                             , stateVals  <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-75" data-line-number="75">                                 [ (  <span class="dv">0</span>, <span class="dv">0</span>)</a>
+<a class="sourceLine" id="cb4-76" data-line-number="76">                                 , (<span class="dv">100</span>, <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-77" data-line-number="77">                                 ]</a>
+<a class="sourceLine" id="cb4-78" data-line-number="78">                             }</a>
+<a class="sourceLine" id="cb4-79" data-line-number="79">                       ) (\s <span class="ot">-&gt;</span> <span class="kw">if</span> s <span class="fu">==</span> <span class="dv">100</span> <span class="kw">then</span> (<span class="dv">0</span>,<span class="dv">1</span>) <span class="kw">else</span> (<span class="dv">0</span>,<span class="dv">0</span>), <span class="st">&quot;&quot;</span>)</a>
+<a class="sourceLine" id="cb4-80" data-line-number="80">      acts  <span class="fu">=</span> map ((\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) <span class="fu">.</span> fst) iters</a>
+<a class="sourceLine" id="cb4-81" data-line-number="81">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
+<a class="sourceLine" id="cb4-82" data-line-number="82">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
+<a class="sourceLine" id="cb4-83" data-line-number="83">  <span class="kw">let</span> ((_, (g&#39;, _)), msg) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-84" data-line-number="84">        runWriter <span class="fu">$</span> withinOnM eps&#39;</a>
+<a class="sourceLine" id="cb4-85" data-line-number="85">                              ( \ (dv, (_, msg&#39;)) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-86" data-line-number="86">                                  <span class="kw">do</span> tell msg&#39;</a>
+<a class="sourceLine" id="cb4-87" data-line-number="87">                                     maxAndNonZero <span class="st">&quot;\n**Found %3d policy changes.**\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-88" data-line-number="88">                                                   dv</a>
+<a class="sourceLine" id="cb4-89" data-line-number="89">                              ) <span class="fu">$</span> zip diffs (P.tail iters)</a>
+<a class="sourceLine" id="cb4-90" data-line-number="90">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="fu">$</span> pack msg</a>
+<a class="sourceLine" id="cb4-91" data-line-number="91"></a>
+<a class="sourceLine" id="cb4-92" data-line-number="92">  <span class="kw">let</span> pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-93" data-line-number="93">      val   <span class="fu">=</span> snd <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-94" data-line-number="94">      vs    <span class="fu">=</span> map (\(g, _) <span class="ot">-&gt;</span> snd <span class="fu">.</span> g) iters</a>
+<a class="sourceLine" id="cb4-95" data-line-number="95"></a>
+<a class="sourceLine" id="cb4-96" data-line-number="96">  <span class="co">-- Plot the state value functions.</span></a>
+<a class="sourceLine" id="cb4-97" data-line-number="97">  appendFile  <span class="st">&quot;other/gambler.md&quot;</span></a>
+<a class="sourceLine" id="cb4-98" data-line-number="98">             <span class="st">&quot;### State Value Functions\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-99" data-line-number="99">  toFile def <span class="st">&quot;img/gam_val.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-100" data-line-number="100">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;State Value Functions&quot;</span></a>
+<a class="sourceLine" id="cb4-101" data-line-number="101">       setColors <span class="fu">$</span> map opaque [red, green, blue, black]</a>
+<a class="sourceLine" id="cb4-102" data-line-number="102">       <span class="co">-- forM_ (zip vs [0..]) $ \ (v,n) -&gt;</span></a>
+<a class="sourceLine" id="cb4-103" data-line-number="103">       <span class="co">--             plot ( line (P.show n)</span></a>
+<a class="sourceLine" id="cb4-104" data-line-number="104">       <span class="co">--                         [ [ (x, v x)</span></a>
+<a class="sourceLine" id="cb4-105" data-line-number="105">       <span class="co">--                           | x &lt;- [(0::GState)..100]</span></a>
+<a class="sourceLine" id="cb4-106" data-line-number="106">       <span class="co">--                           ]</span></a>
+<a class="sourceLine" id="cb4-107" data-line-number="107">       <span class="co">--                         ]</span></a>
+<a class="sourceLine" id="cb4-108" data-line-number="108">       <span class="co">--                  )</span></a>
+<a class="sourceLine" id="cb4-109" data-line-number="109">       forM_ ( zip [<span class="st">&quot;1 Iter.&quot;</span>, <span class="st">&quot;2 Iters.&quot;</span>, <span class="st">&quot;3 Iters.&quot;</span>]</a>
+<a class="sourceLine" id="cb4-110" data-line-number="110">                   [<span class="dv">1</span>,      <span class="dv">2</span>,      <span class="dv">3</span>]</a>
+<a class="sourceLine" id="cb4-111" data-line-number="111">             ) <span class="fu">$</span> \ (lbl, n) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-112" data-line-number="112">                   plot ( line lbl</a>
+<a class="sourceLine" id="cb4-113" data-line-number="113">                               [ [ (x, (vs <span class="fu">P.!!</span> n) x)</a>
+<a class="sourceLine" id="cb4-114" data-line-number="114">                                 <span class="fu">|</span> x <span class="ot">&lt;-</span> [(<span class="dv">0</span><span class="ot">::</span><span class="dt">GState</span>)<span class="fu">..</span><span class="dv">100</span>]</a>
+<a class="sourceLine" id="cb4-115" data-line-number="115">                                 ]</a>
+<a class="sourceLine" id="cb4-116" data-line-number="116">                               ]</a>
+<a class="sourceLine" id="cb4-117" data-line-number="117">                        )</a>
+<a class="sourceLine" id="cb4-118" data-line-number="118">       plot ( line <span class="st">&quot;Final&quot;</span></a>
+<a class="sourceLine" id="cb4-119" data-line-number="119">                   [ [ (x, val x)</a>
+<a class="sourceLine" id="cb4-120" data-line-number="120">                   <span class="co">-- [ [ (x, (P.last vs) x)</span></a>
+<a class="sourceLine" id="cb4-121" data-line-number="121">                     <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]</a>
+<a class="sourceLine" id="cb4-122" data-line-number="122">                     ]</a>
+<a class="sourceLine" id="cb4-123" data-line-number="123">                   ]</a>
+<a class="sourceLine" id="cb4-124" data-line-number="124">            )</a>
+<a class="sourceLine" id="cb4-125" data-line-number="125">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;![](img/gam_val.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-126" data-line-number="126"></a>
+<a class="sourceLine" id="cb4-127" data-line-number="127">  <span class="co">-- Plot the final policy.</span></a>
+<a class="sourceLine" id="cb4-128" data-line-number="128">  appendFile  <span class="st">&quot;other/gambler.md&quot;</span></a>
+<a class="sourceLine" id="cb4-129" data-line-number="129">             <span class="st">&quot;\n### Final Policy Function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-130" data-line-number="130">  toFile def <span class="st">&quot;img/gam_pol.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-131" data-line-number="131">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Final Policy Function&quot;</span></a>
+<a class="sourceLine" id="cb4-132" data-line-number="132">       setColors <span class="fu">$</span> map opaque [blue, green, black]</a>
+<a class="sourceLine" id="cb4-133" data-line-number="133">       plot ( line <span class="st">&quot;pi(s)&quot;</span></a>
+<a class="sourceLine" id="cb4-134" data-line-number="134">                   [ [ (x, pol x)</a>
+<a class="sourceLine" id="cb4-135" data-line-number="135">                     <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]</a>
+<a class="sourceLine" id="cb4-136" data-line-number="136">                     ]</a>
+<a class="sourceLine" id="cb4-137" data-line-number="137">                   ]</a>
+<a class="sourceLine" id="cb4-138" data-line-number="138">            )</a>
+<a class="sourceLine" id="cb4-139" data-line-number="139">  appendFile <span class="st">&quot;other/gambler.md&quot;</span> <span class="st">&quot;![](img/gam_pol.png)\n&quot;</span></a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="policy-optimization">Policy optimization</h3>
-<p>Value Iteration <strong>Found 99 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 24 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 12 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 12 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 19 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 18 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 23 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 24 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 19 policy changes.</strong></p>
-<p>Value Iteration <strong>Found 14 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 50 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 25 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 12 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 6 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 3 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 1 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 69 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 11 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 10 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 9 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 14 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 11 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 19 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 24 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 29 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 31 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 33 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 34 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 36 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 37 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 44 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 44 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 48 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 44 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 47 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 47 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 47 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 52 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 51 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 48 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 47 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 47 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 47 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 50 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 40 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 41 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 43 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 40 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 38 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 43 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 46 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 38 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 38 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 31 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 32 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 33 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 37 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 43 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 40 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 30 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 26 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 25 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 29 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 28 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 24 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 22 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 21 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 22 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 23 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 23 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 26 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 24 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 26 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 19 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 19 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 18 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 68 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 40 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 26 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 25 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 27 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 35 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 42 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 46 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 49 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 57 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 62 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 68 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 69 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 66 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 62 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 60 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 61 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 60 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 53 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 39 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 26 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 12 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 9 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 4 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 60 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 24 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 11 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 11 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 13 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 15 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 15 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 11 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 10 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 10 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 15 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 16 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 20 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 17 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 10 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 6 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 3 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 1 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 27 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 11 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 9 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 6 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 8 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 8 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 7 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 4 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 2 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 2 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 20 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 6 state value diffs &gt; epsilon.<br />
+</li>
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 8 policy changes.</strong></p>
+<ul class="incremental">
+<li>Found 0 state value diffs &gt; epsilon.</li>
+</ul>
+<p><strong>Found 0 policy changes.</strong></p>
 <h3 id="state-value-functions">State Value Functions</h3>
 <figure>
 <img src="img/gam_val.png" />
