@@ -86,10 +86,7 @@ code
 {----------------------------------------------------------------------
   Problem specific definitions
 ----------------------------------------------------------------------}
--- eps'   = 0.1   -- My choice.
 gamma' = 1     -- Dictated by problem.
--- ph     = 0.25
-ph     = 0.4
 
 type GState  = Int
 type GAction = Int
@@ -104,14 +101,11 @@ nextStates' s a = if a == 0
                    then [s]
                    else [s - a, s + a]
 
-rewards' :: GState -> GAction -> GState -> [(Float, Float)]
-rewards' s a s' = [(0, p)]
--- rewards' s a s' = if s' == 100 && s /= 100
---                    then [(1, ph)]
---                    else [(0, p)]
+rewards' :: Float -> GState -> GAction -> GState -> [(Float, Float)]
+rewards' ph' s a s' = [(0, p)]
  where p = if s' == s + a
-             then ph
-             else 1 - ph
+             then ph'
+             else 1 - ph'
 
 {----------------------------------------------------------------------
   Command line options defintions.
@@ -124,6 +118,8 @@ data Opts w = Opts
         "The number of policy evaluation iterations per policy improvement iteration"
     , eps :: w ::: Maybe Float <?>
         "Convergence tolerance"
+    , ph :: w ::: Maybe Float <?>
+        "Probability of heads"
     }
     deriving (Generic)
 
@@ -142,6 +138,7 @@ main = do
   let nIters = fromMaybe 10   (nIter o)
       nEvals = fromMaybe  1   (nEval o)
       eps'   = fromMaybe  0.1 (eps   o)
+      ph'    = fromMaybe  0.4 (ph    o)
 
   -- Calculate and display optimum policy.
   writeFile "other/gambler.md" "\n### Policy optimization\n\n"
@@ -155,7 +152,7 @@ main = do
                              , states     = allStatesV
                              , actions    = actions'
                              , nextStates = nextStates'
-                             , rewards    = rewards'
+                             , rewards    = rewards' ph'
                              , stateVals  =
                                  [ (  0, 0)
                                  , (100, 1)
@@ -184,13 +181,6 @@ main = do
   toFile def "img/gam_val.png" $
     do layout_title .= "State Value Functions"
        setColors $ map opaque [red, green, blue, black]
-       -- forM_ (zip vs [0..]) $ \ (v,n) ->
-       --             plot ( line (P.show n)
-       --                         [ [ (x, v x)
-       --                           | x <- [(0::GState)..100]
-       --                           ]
-       --                         ]
-       --                  )
        forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
                    [1,      2,      3]
              ) $ \ (lbl, n) ->
