@@ -69,10 +69,11 @@ import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 -- import Data.Finite
 -- import Data.Finite.Internal
+import Data.List                            (findIndices)
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
--- import Text.Printf
+import Text.Printf
 
 import RL.GPI
 \end{code}
@@ -140,78 +141,126 @@ main = do
       eps'   = fromMaybe  0.1 (eps   o)
       ph'    = fromMaybe  0.4 (ph    o)
 
-  -- Calculate and display optimum policy.
-  writeFile "other/gambler.md" "\n### Policy optimization\n\n"
-  let iters = take (nIters + 1)
-                   $ iterate
-                       ( optPol
-                           rltDef
-                             { gamma      = gamma'
-                             , epsilon    = eps'
-                             , maxIter    = nEvals
-                             , states     = allStatesV
-                             , actions    = actions'
-                             , nextStates = nextStates'
-                             , rewards    = rewards' ph'
-                             , stateVals  =
-                                 [ (  0, 0)
-                                 , (100, 1)
+  -- Show policy/value convergence for different values of `nEval`.
+  forM_ (zip [(1::Int)..4] [(0::Int),1,2,5]) $ \(n, nEvals') -> do
+    let iters = take (nIters + 1)
+                     $ iterate
+                         ( optPol
+                             rltDef
+                               { gamma      = gamma'
+                               , epsilon    = eps'
+                               , maxIter    = nEvals'
+                               , states     = allStatesV
+                               , actions    = actions'
+                               , nextStates = nextStates'
+                               , rewards    = rewards' ph'
+                               , stateVals  =
+                                   [ (  0, 0)
+                                   , (100, 1)
+                                   ]
+                               }
+                         ) (\s -> if s == 100 then (0,1) else (0,0), [])
+        acts  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters
+        diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
+                    $ zip acts (P.tail acts)
+        ((_, (_, _)), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
+          runWriter $ withinOnM eps'
+                                ( \ (dv, (_, cnts')) ->
+                                    do tell $ map negate cnts'  -- to distinguish them
+                                       maxAndNonZero dv
+                                ) $ zip diffs (P.tail iters)
+    toFile def (printf "img/gam_cnv%d.png" n) $
+      do layout_title .= (printf "Value Function & Policy Convergence (nEval = %d)" nEvals')
+         layout_x_axis . laxis_title .= "Iteration (mixed)"
+         layout_y_axis . laxis_title .= "# of diffs >eps."
+         plot (line "Value"  [zip (findIndices (<= 0) cnts) (map negate $ filter (<= 0) cnts)])
+         plot (line "Policy" [zip (findIndices (> 0) cnts)  (filter (> 0) cnts)])
+
+  writeFile  "other/gambler.md" (pack $ printf "\n$eps = %04.2g$\n" eps')
+  appendFile "other/gambler.md" "\n### Value/Policy convergence vs. `nEval`\n\n"
+  appendFile "other/gambler.md" (pack $ printf "$ph = %04.2f$\n\n" ph')
+  appendFile "other/gambler.md" "Note: `nEval` of zero is _Value Iteration_.\n\n"
+  appendFile "other/gambler.md" "|     |     |\n"
+  appendFile "other/gambler.md" "| --- | --- |\n"
+  appendFile "other/gambler.md" "| ![](img/gam_cnv1.png) | ![](img/gam_cnv2.png) |\n"
+  appendFile "other/gambler.md" "| ![](img/gam_cnv3.png) | ![](img/gam_cnv4.png) |\n"
+
+  -- Plot the state value functions and final policies for different `ph` values.
+  forM_ (zip [(1::Int)..4] [(0.25::Float),0.4,0.5,0.55]) $ \(n, ph'') -> do
+    let iters' = take (nIters + 1)
+                     $ iterate
+                         ( optPol
+                             rltDef
+                               { gamma      = gamma'
+                               , epsilon    = eps'
+                               , maxIter    = nEvals
+                               , states     = allStatesV
+                               , actions    = actions'
+                               , nextStates = nextStates'
+                               , rewards    = rewards' ph''
+                               , stateVals  =
+                                   [ (  0, 0)
+                                   , (100, 1)
+                                   ]
+                               }
+                         ) (\s -> if s == 100 then (0,1) else (0,0), [])
+        acts'  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters'
+        diffs' = map (VS.map (fromIntegral . abs) . uncurry (-))
+                    $ zip acts' (P.tail acts')
+        ((_, (g'', _)), _) = first (fromMaybe (P.error "main: Major failure!")) $
+          runWriter $ withinOnM eps'
+                                ( \ (dv, (_, cnts')) ->
+                                    do tell $ map negate cnts'  -- to distinguish them
+                                       maxAndNonZero dv
+                                ) $ zip diffs' (P.tail iters')
+        pol'   = fst . g''
+        val'   = snd . g''
+        vs'    = map (\(g, _) -> snd . g) iters'
+    toFile def (printf "img/gam_val%d.png" n) $
+      do layout_title .= (printf "State Value Functions (ph = %04.2f)" ph'')
+         layout_x_axis . laxis_title .= "Iteration (mixed)"
+         layout_y_axis . laxis_title .= "# of diffs' >eps."
+         setColors $ map opaque [red, green, blue, black]
+         forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
+                     [1,      2,      3]
+               ) $ \ (lbl, n') ->
+                     plot ( line lbl
+                                 [ [ (x, (vs' P.!! n') x)
+                                   | x <- [(0::GState)..100]
+                                   ]
                                  ]
-                             }
-                       ) (\s -> if s == 100 then (0,1) else (0,0), "")
-      acts  = map ((\f -> VS.map (fst . f) allStatesV) . fst) iters
-      diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
-                  $ zip acts (P.tail acts)
-  let ((_, (g', _)), msg) = first (fromMaybe (P.error "main: Major failure!")) $
-        runWriter $ withinOnM eps'
-                              ( \ (dv, (_, msg')) ->
-                                  do tell msg'
-                                     maxAndNonZero "\n**Found %3d policy changes.**\n\n"
-                                                   dv
-                              ) $ zip diffs (P.tail iters)
-  appendFile "other/gambler.md" $ pack msg
-
-  let pol   = fst . g'
-      val   = snd . g'
-      vs    = map (\(g, _) -> snd . g) iters
-
-  -- Plot the state value functions.
-  appendFile  "other/gambler.md"
-             "### State Value Functions\n\n"
-  toFile def "img/gam_val.png" $
-    do layout_title .= "State Value Functions"
-       setColors $ map opaque [red, green, blue, black]
-       forM_ ( zip ["1 Iter.", "2 Iters.", "3 Iters."]
-                   [1,      2,      3]
-             ) $ \ (lbl, n) ->
-                   plot ( line lbl
-                               [ [ (x, (vs P.!! n) x)
-                                 | x <- [(0::GState)..100]
-                                 ]
-                               ]
-                        )
-       plot ( line "Final"
-                   [ [ (x, val x)
-                   -- [ [ (x, (P.last vs) x)
-                     | x <- [0..100]
+                          )
+         plot ( line "Final"
+                     [ [ (x, val' x)
+                       | x <- [0..100]
+                       ]
                      ]
-                   ]
-            )
-  appendFile "other/gambler.md" "![](img/gam_val.png)\n"
-
-  -- Plot the final policy.
-  appendFile  "other/gambler.md"
-             "\n### Final Policy Function\n\n"
-  toFile def "img/gam_pol.png" $
-    do layout_title .= "Final Policy Function"
-       setColors $ map opaque [blue, green, black]
-       plot ( line "pi(s)"
-                   [ [ (x, pol x)
-                     | x <- [0..100]
+              )
+    toFile def (printf "img/gam_pol%d.png" n) $
+      do layout_title .= (printf "Final Policy Function (ph = %04.2f)" ph'')
+         layout_x_axis . laxis_title .= "State"
+         layout_y_axis . laxis_title .= "Action"
+         setColors $ map opaque [blue, green, black]
+         plot ( line "pi(s)"
+                     [ [ (x, pol' x)
+                       | x <- [0..100]
+                       ]
                      ]
-                   ]
-            )
-  appendFile "other/gambler.md" "![](img/gam_pol.png)\n"
+              )
+
+  appendFile "other/gambler.md" "\n### State Value Functions vs. `ph`\n\n"
+  appendFile "other/gambler.md" (pack $ printf "$nEval = %d$\n\n" nEvals)
+  appendFile "other/gambler.md" "|     |     |\n"
+  appendFile "other/gambler.md" "| --- | --- |\n"
+  appendFile "other/gambler.md" "| ![](img/gam_val1.png) | ![](img/gam_val2.png) |\n"
+  appendFile "other/gambler.md" "| ![](img/gam_val3.png) | ![](img/gam_val4.png) |\n"
+
+  appendFile "other/gambler.md" "\n### Final Policy Function vs. `ph`\n\n"
+  appendFile "other/gambler.md" (pack $ printf "$nEval = %d$\n\n" nEvals)
+  appendFile "other/gambler.md" "|     |     |\n"
+  appendFile "other/gambler.md" "| --- | --- |\n"
+  appendFile "other/gambler.md" "| ![](img/gam_pol1.png) | ![](img/gam_pol2.png) |\n"
+  appendFile "other/gambler.md" "| ![](img/gam_pol3.png) | ![](img/gam_pol4.png) |\n"
 
 \end{code}
 

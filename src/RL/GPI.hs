@@ -96,9 +96,9 @@ optPol :: ( Eq s, HasTrie s
           , KnownNat (n + 1)
           )
        => RLType s a n               -- ^ abstract type, to protect API
-       -> (s -> (a, Float), String)  -- ^ initial policy & value functions
-       -> (s -> (a, Float), String)
-optPol RLType{..} (g, _) = (bestA, msg)
+       -> (s -> (a, Float), [Int])  -- ^ initial policy & value functions
+       -> (s -> (a, Float), [Int])
+optPol RLType{..} (g, _) = (bestA, cnts)
  where
   -- bestA   = maximumBy (compare `on` snd) . aVals v'
   bestA   = minimumBy (compare `on` fst)
@@ -124,9 +124,9 @@ optPol RLType{..} (g, _) = (bestA, msg)
       $ lookup s stateVals
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
-  ((_, v'), msg) =
+  ((_, v'), cnts) =
     if length evalIters == 1
-      then ((VS.replicate 0, P.head evalIters), "Value Iteration")
+      then ((VS.replicate 0, P.head evalIters), [])
       else
         first (fromMaybe (P.error "optPol: Major blow-up!"))
           $ runWriter
@@ -135,7 +135,6 @@ optPol RLType{..} (g, _) = (bestA, msg)
                 ( chooseAndCount
                     max
                     (> epsilon)
-                    "- Found %3d state value diffs > epsilon.  \n"
                 . fst
                 )
                 $ zip (map abs $ zipWith (-) vs (P.tail vs))
@@ -148,34 +147,6 @@ optPol RLType{..} (g, _) = (bestA, msg)
 {----------------------------------------------------------------------
   Misc.
 ----------------------------------------------------------------------}
-
--- | Return the maximum value of a set, as well as a scripted log
--- message, regarding the number of non-zero elements in the set.
---
--- (See documentation for `chooseAndCount` function.)
-maxAndNonZero :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
-maxAndNonZero = chooseAndCount max (/= 0)
-
--- | Choose a value from the set using the given comparison function,
--- and provide a scripted log message, regarding the number of elements
--- in the set meeting the given criteria.
-chooseAndCount :: (Foldable t, Num a)
-               => (a -> a -> a)  -- ^ choice function
-               -> (a -> Bool)    -- ^ counting predicate
-               -> String         -- ^ message script (Should contain precisely 1 "%d".)
-               -> t a            -- ^ foldable set of elements to count/compare
-               -> Writer String a
-chooseAndCount f p s xs = do
-  let (val, cnt::Int) =
-        foldl' ( \ (v, c) x ->
-                   ( f v x
-                   , if p x
-                       then c + 1
-                       else c
-                   )
-               ) (0,0) xs
-  tell $ printf s cnt
-  return val
 
 --- | To control the formatting of printed floats in output matrices.
 newtype Pfloat = Pfloat { unPfloat :: Float}
@@ -254,6 +225,61 @@ withinIxM eps xs = withinIxM' 0 xs
          y' <- y
          if y' <= eps then return (Just n)
                       else withinIxM' (n+1) ys
+
+-- | Return the maximum value of a set, as well as a scripted log
+-- message, regarding the number of non-zero elements in the set.
+--
+-- (See documentation for `chooseAndCount` function.)
+maxAndNonZeroMsg :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
+maxAndNonZeroMsg = chooseAndCountMsg max (/= 0)
+
+-- | Choose a value from the set using the given comparison function,
+-- and provide a scripted log message, regarding the number of elements
+-- in the set meeting the given criteria.
+chooseAndCountMsg :: (Foldable t, Num a)
+               => (a -> a -> a)  -- ^ choice function
+               -> (a -> Bool)    -- ^ counting predicate
+               -> String         -- ^ message script (Should contain precisely 1 "%d".)
+               -> t a            -- ^ foldable set of elements to count/compare
+               -> Writer String a
+chooseAndCountMsg f p s xs = do
+  let (val, cnt::Int) =
+        foldl' ( \ (v, c) x ->
+                   ( f v x
+                   , if p x
+                       then c + 1
+                       else c
+                   )
+               ) (0,0) xs
+  tell $ printf s cnt
+  return val
+
+-- | Return the maximum value of a set, as well as a count of the number
+-- of non-zero elements in the set.
+--
+-- (See documentation for `chooseAndCount` function.)
+maxAndNonZero :: (Foldable t, Num a, Ord a) => t a -> Writer [Int] a
+maxAndNonZero = chooseAndCount max (/= 0)
+
+-- | Choose a value from the set using the given comparison function,
+-- and provide a count of the number of elements in the set meeting the
+-- given criteria.
+chooseAndCount :: (Foldable t, Num a)
+               => (a -> a -> a)  -- ^ choice function
+               -> (a -> Bool)    -- ^ counting predicate
+               -> t a            -- ^ foldable set of elements to count/compare
+               -> Writer [Int] a
+chooseAndCount f p xs = do
+  let (val, cnt::Int) =
+        foldl' ( \ (v, c) x ->
+                   ( f v x
+                   , if p x
+                       then c + 1
+                       else c
+                   )
+               ) (0,0) xs
+  tell [cnt]
+  return val
 
 -- | Expected reward for a given state, assuming equiprobable actions.
 -- testRewards :: RCState -> Float
