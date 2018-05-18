@@ -155,9 +155,11 @@ newtype Pfloat = Pfloat { unPfloat :: Float}
 instance Show Pfloat where
   show x = printf "%4.1f" (unPfloat x)
 
-poisson :: Int -> Int -> Float
-poisson lambda n = lambda' ^ n * exp (-lambda') / fromIntegral (fact n)
+poisson :: Finite 5 -> Finite 12 -> Float
+poisson (Finite lambda) (Finite n') =
+  lambda' ^ n * exp (-lambda') / fromIntegral (fact n)
  where lambda' = fromIntegral lambda
+       n       = fromIntegral n'
 
 fact :: Int -> Int
 fact 0 = 1

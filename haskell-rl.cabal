@@ -129,7 +129,7 @@ executable tic-tac-toe
     Haskell2010
   ghc-options:
     -funbox-strict-fields
-    -fforce-recomp
+    -- -fforce-recomp
     -threaded
     -rtsopts
     -with-rtsopts=-N
@@ -278,6 +278,36 @@ executable gambler
     , Chart
     , Chart-cairo
     , haskell-rl
+
+executable blackjack
+  default-language:
+    Haskell2010
+  ghc-options:
+    -O2
+    -funbox-strict-fields
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+  hs-source-dirs:
+    app
+  main-is:
+    blackjack.lhs
+  build-depends:
+    base >= 4.7 && < 5
+    , protolude
+    , mtl
+    , optparse-generic
+    , vector-sized
+    -- , vector
+    , finite-typelits
+    , text
+    -- , QuickCheck
+    , monad-extras
+    , random-shuffle
+    -- , random
+    -- , Chart
+    -- , Chart-cairo
+    -- , haskell-rl
 
 test-suite test
   default-language:
