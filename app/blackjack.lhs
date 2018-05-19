@@ -64,11 +64,11 @@ import qualified Prelude as P
 import Prelude (unlines, Show(..), String, error, (!!))
 
 import Protolude  hiding (show, for)
--- import Options.Generic
+import Options.Generic
 
 import qualified Data.Vector.Sized as VS
 
-import Control.Arrow                        ((&&&))
+import Control.Arrow                        ((&&&), (***))
 import Control.Monad.Extra                  (skip)
 import Control.Monad.Writer
 import Data.Vector.Sized (Vector, (//), index)
@@ -80,7 +80,7 @@ import Data.Text                            (pack)
 -- import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 -- import Graphics.Rendering.Chart.Backend.Cairo
 import System.Random.Shuffle
--- import Text.Printf
+import Text.Printf
 
 -- import RL.GPI
 \end{code}
@@ -221,13 +221,31 @@ showVofState' v ace = unlines $
     )
 
 {----------------------------------------------------------------------
+  Command line options defintions.
+----------------------------------------------------------------------}
+
+data Opts w = Opts
+    { nGames :: w ::: Maybe Int <?>
+        "The number of games to play."
+    }
+    deriving (Generic)
+
+instance ParseRecord (Opts Wrapped)
+
+
+{----------------------------------------------------------------------
   main()
 ----------------------------------------------------------------------}
 
 main :: IO ()
 main = do
+  -- Process command line options.
+  o :: Opts Unwrapped <-
+    unwrapRecord "A solution to the 'Blackjack' problem (Example 5.3)."
+  let nG = fromMaybe 10000 (nGames o)
+
   -- Initialize policy and state/action values.
-  let qs  = VS.replicate (0,0)  -- Initialize all state/action values to zero.
+  let qs  = VS.replicate ((0,0), (0,0))  -- Initialize all state/action values to zero.
       pol = VS.replicate (BJAction True)
         // [ (enumState s, BJAction False)
            | s <- [ BJState pTot ace dCard 0 False
@@ -238,30 +256,52 @@ main = do
            ]
 
   -- Play many games, updating policy and state/action values after each.
-  (results, dbgss) <- runWriterT $ iterateM' 1000000 optPol (qs, pol)
+  (results, dbgss) <- runWriterT $ iterateM' nG optPol (qs, pol)
   writeFile  "other/blackjack.md" "\n### Final State Action Values (stand, hit)\n\n"
   appendFile "other/blackjack.md" $ pack
                                   $ showVofState
+                                  $ VS.map ( toBoth
+                                             $ PrettyFloat
+                                             . uncurry safeDiv
+                                             . (fromIntegral *** fromIntegral)
+                                           )
                                   $ fst results
   appendFile "other/blackjack.md" "\n### Final Policy (H = hit)\n\n"
   appendFile "other/blackjack.md" $ pack
                                   $ showVofState
                                   $ snd results
   appendFile "other/blackjack.md" "\n### Debugging Info\n\n"
+  appendFile "other/blackjack.md" "\n### State Action Visits (stand, hit)\n\n"
   appendFile "other/blackjack.md" $ pack
-                                  $ intercalate " " . map show
-                                  $ map length . group . sort
-                                  $ (map upCard . concat) dbgss
-  -- print $ ((reward &&& states) . P.head . concat) dbgss
-  -- mapIO (print . (reward &&& states)) $ (take 5 . concat) dbgss
-  forM_ ((take 5 . concat) dbgss) (print . (reward &&& states))
+                                  $ showVofState
+                                  $ VS.map ( toBoth snd )
+                                  $ fst results
+  -- appendFile "other/blackjack.md" $ pack
+  --                                 $ intercalate " " . map show
+  --                                 $ map length . group . sort
+  --                                 $ (map upCard . concat) dbgss
+  -- -- print $ ((reward &&& states) . P.head . concat) dbgss
+  -- -- mapIO (print . (reward &&& states)) $ (take 5 . concat) dbgss
+  -- forM_ ((take 5 . concat) dbgss) (print . (reward &&& states))
 
 {----------------------------------------------------------------------
   Monte Carlo optimizer
 ----------------------------------------------------------------------}
 
-optPol :: (Vector 200 (Int, Int), Vector 200 BJAction)
-       -> WriterT [[DbgT]] IO (Vector 200 (Int, Int), Vector 200 BJAction)
+-- | Play one game of Blackjack and return improved state-action value
+-- and policy estimates.
+--
+-- Note that the Q vector contains not only the running expectation for
+-- hitting/standing at each state, but also the number of times that
+-- particular state-action pair has been visited. This is needed for
+-- proper normalization across multiple episodes.
+optPol :: ( Vector 200 ((Int, Integer), (Int, Integer))
+          , Vector 200 BJAction
+          )
+       -> WriterT [[DbgT]]
+            IO ( Vector 200 ((Int, Integer), (Int, Integer))
+               , Vector 200 BJAction
+               )
 optPol (qs, pol) = do
   cards <- shuffleM $ concat [replicate  4  n | n <- [1..9]]
                            ++ replicate 16 10
@@ -275,10 +315,15 @@ optPol (qs, pol) = do
                                 q' = ( if (act p)
                                          then second
                                          else first
-                                     ) (+ r) q
-                                p' = if fst q' > snd q'
-                                       then BJAction False
-                                       else BJAction True
+                                     ) ((+ r) *** (+ 1)) q
+                                -- p' = if fst q' > snd q'
+                                p' = case ( uncurry compare
+                                          $ toBoth ( uncurry (/)
+                                                   . (fromIntegral *** fromIntegral)
+                                                   ) q'
+                                          ) of
+                                       GT -> BJAction False
+                                       _  -> BJAction True
                           ]
   tell [dbgs]
   return (qs', pol')
@@ -290,6 +335,20 @@ optPol (qs, pol) = do
 iterateM' :: Monad m => Int -> (a -> m a) -> a -> m a
 iterateM' 0 _ a = return a
 iterateM' n f a = f a >>= iterateM' (n-1) f
+
+toBoth :: (a -> b) -> (a,a) -> (b,b)
+toBoth f (x,y) = (f x, f y)
+
+safeDiv :: (Fractional a, Eq a)
+        => a -> a -> a
+safeDiv x y = if y == 0
+                then 0
+                else x / y
+
+newtype PrettyFloat = PrettyFloat Float
+
+instance Show PrettyFloat where
+  show (PrettyFloat x) = printf "%+5.2f" x
 
 \end{code}
 
