@@ -304,6 +304,7 @@ executable blackjack
     -- , QuickCheck
     , monad-extras
     , random-shuffle
+    , Useful
     -- , random
     -- , Chart
     -- , Chart-cairo

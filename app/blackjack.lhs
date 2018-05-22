@@ -27,8 +27,6 @@ code
 \begin{code}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
--- {-# OPTIONS_GHC -Wno-missing-signatures #-}
--- {-# OPTIONS_GHC -Wno-orphans #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -46,7 +44,6 @@ code
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
--- {-# LANGUAGE BangPatterns #-}
 \end{code}
 
 [libraries](https://www.stackage.org/)
@@ -68,21 +65,14 @@ import Options.Generic
 
 import qualified Data.Vector.Sized as VS
 
-import Control.Arrow                        ((&&&), (***))
-import Control.Monad.Extra                  (skip)
+import Control.Arrow          ((&&&), (***))
 import Control.Monad.Writer
-import Data.Vector.Sized (Vector, (//), index)
+import Data.Vector.Sized      (Vector, (//), index)
 import Data.Finite
-import Data.List                            (nub)
--- import Data.Finite.Internal
--- import Data.List                            (findIndices)
-import Data.Text                            (pack)
--- import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
--- import Graphics.Rendering.Chart.Backend.Cairo
+import Data.Text              (pack)
 import System.Random.Shuffle
 import Text.Printf
-
--- import RL.GPI
+import Useful.IO              (rand)
 \end{code}
 
 code
@@ -91,28 +81,44 @@ code
 - [hoogle](https://www.stackage.org/package/hoogle)
 
 \begin{code}
+
 {----------------------------------------------------------------------
   Problem specific definitions
 ----------------------------------------------------------------------}
+
 data BJState = BJState
   { playerSum  :: Int   -- 12 - 21
   , usableAce  :: Bool
   , dealerCard :: Int   -- 1 - 10
   , dealerSum  :: Int   -- For debugging only; not used for learning.
   , polHit     :: Bool  -- For debugging only; not used for learning.
+  , didHit     :: Bool
   } deriving (Show)
 
--- type BJAction = Bool  -- Hit?
+stateDef :: BJState
+stateDef = BJState
+  { playerSum  = 12
+  , usableAce  = False
+  , dealerCard = 1
+  , dealerSum  = 12
+  , polHit     = False
+  , didHit     = False
+  }
+
 newtype BJAction = BJAction { act :: Bool }  -- Hit?
+
 instance Show BJAction where
   show (BJAction x) =
     if x then "H"
          else " "
 
+allActs :: [BJAction]
+allActs = map BJAction [False, True]
+
 type BJPolicy = BJState -> BJAction
 
 appPolV :: Vector 200 BJAction -> BJPolicy
-appPolV v = \s -> v `index` (enumState s)
+appPolV v = \s -> v `index` enumState s
 
 enumState :: BJState -> Finite 200
 enumState s@BJState{..} =
@@ -136,61 +142,84 @@ data DbgT = DbgT
   , reward :: Int
   }
 
-play :: BJPolicy -> [Int] -> Writer [DbgT] (Int, [BJState])
-play pol cards = do
-  let (r, ss) =
-        if pTot == 21 && dTot == 21  -- Checking for naturals.
-          then (0, [initState])
-          else if pTot == 21
-                 then (1, [initState])
-                 else if dTot == 21
-                        then if pTot > 11
-                               then (-1, [initState])
-                               else (-1, [])
-                        else runWriter $ play' pol (drop 4 cards) dCards pCards
-  tell [ DbgT { upCard = cards !! 2
-              , states = ss
-              , reward = r
-              }
-       ]
-  return (r, ss)
-  where (pTot, ace) = cardSum pCards
-        (dTot, _)   = cardSum dCards
-        dCards      = (take 2 $ drop 2 cards)
-        pCards      = (take 2 cards)
-        initState'  = BJState pTot ace (P.head dCards) dTot False
-        initState   = initState' { polHit = (act . pol) initState' }
+play :: BJPolicy -> [Int] -> BJAction -> Writer [DbgT] (Int, [BJState])
+play pol cards randAct =
+  do let (r, ss) | pTot == 21 = if dTot == 21
+                                  then (0, [])
+                                  else (1, [])
+                 | dTot == 21 = (-1, [])
+                 | otherwise =
+                   runWriter $ play' pol (drop 4 cards) dCards pCards Init randAct
+     tell [ DbgT { upCard = cards !! 2
+                 , states = ss
+                 , reward = r
+                 }
+          ]
+     return (r, ss)
+  where (pTot, _) = cardSum pCards
+        (dTot, _) = cardSum dCards
+        dCards    = take 2 $ drop 2 cards
+        pCards    = take 2 cards
 
-play' :: BJPolicy -> [Int] -> [Int] -> [Int] -> Writer [BJState] Int
-play' pol cards' dCards pCards =
-  do if pTot > 11
-       then tell [s]
-       else skip
-     if pTot > 21                         -- Player go bust yet?
-       then return (-1)
-       else if dTot > 21                  -- Dealer go bust yet?
-              then return 1
-              else if pTot < 12 || polHit -- Does player want a hit?
-                     then play' pol (P.tail cards') dCards $ P.head cards' : pCards
-                     else if dTot < 17  -- Must dealer take a hit?
-                            then play' pol (P.tail cards') (P.head cards' : dCards) pCards
-                            else case (compare pTot dTot) of
-                                   GT -> return   1
-                                   EQ -> return   0
-                                   _  -> return (-1)
+data PlayPhase = Init    -- Bringing player's sum > 11.
+               | Player  -- Player is hitting/standing.
+               | Dealer  -- Dealer is hitting/standing.
+
+play' :: BJPolicy   -- current policy
+      -> [Int]      -- remaining deck of cards
+      -> [Int]      -- dealer's cards
+      -> [Int]      -- player's cards
+      -> PlayPhase  -- phase of the game
+      -> BJAction   -- randomly chosen action to be performed by player at his first free turn
+      -> Writer [BJState] Int
+play' pol cards dCards pCards phs randAct =
+  case phs of
+    Init ->
+      if pTot > 11
+        then do tell [s{didHit = act randAct}]
+                if act randAct  -- Is first (randomly chosen) player action "hit"?
+                  then play' pol (P.tail cards) dCards (P.head cards : pCards) Player randAct
+                  else play' pol cards dCards pCards Dealer randAct
+        else play' pol (P.tail cards) dCards (P.head cards : pCards) Init randAct
+
+    Player ->
+      do tell [s]
+         if pTot > 21        -- Player go bust yet?
+           then return (-1)
+           else if polHit    -- Does policy dictate a hit?
+                  then play' pol (P.tail cards) dCards (P.head cards : pCards) Player randAct
+                  else play' pol cards dCards pCards Dealer randAct
+
+    Dealer ->
+      do tell [s]
+         if dTot > 21        -- Dealer go bust yet?
+           then return 1
+           else if dTot < 17        -- Must dealer take a hit?
+                  then play' pol (P.tail cards) (P.head cards : dCards) pCards Dealer randAct
+                  else case compare pTot dTot of
+                         GT -> return   1
+                         EQ -> return   0
+                         _  -> return (-1)
+
   where (pTot, ace) = cardSum pCards
         (dTot, _)   = cardSum dCards
-        s'          = BJState pTot ace (P.last dCards) dTot False
-        s           = s' { polHit = polHit }
+        s'          = stateDef
+                        { playerSum  = pTot
+                        , usableAce  = ace
+                        , dealerCard = P.last dCards
+                        , dealerSum  = dTot
+                        }
+        s           = s'
+                        { polHit = polHit
+                        , didHit = polHit
+                        }
         polHit      = (act . pol) s'
 
 cardSum :: [Int] -> (Int, Bool)
 cardSum cards =
-  if tot < 12
-    then if 1 `elem` cards
-           then (tot + 10, True)
-           else (tot,      False)
-    else (tot, False)
+  if tot < 12 && 1 `elem` cards
+    then (tot + 10, True)
+    else (tot,      False)
   where tot = sum cards
 
 showVofState :: (Show a) => Vector 200 a -> String
@@ -207,9 +236,12 @@ showVofState' v ace = unlines $
         intersperse "\\hline"
           ( map ((++ " \\\\") . intercalate " & ")
                 [ (show pTot :) $ map show
-                  [ v `index` (enumState s)
+                  [ v `index` enumState s
                   | dCard <- [1..10]
-                  , let s = BJState pTot ace dCard 0 False
+                  , let s = stateDef { playerSum  = pTot
+                                     , usableAce  = ace
+                                     , dealerCard = dCard
+                                     }
                   ]
                 | pTot <- [12..21]
                 ]
@@ -248,7 +280,10 @@ main = do
   let qs  = VS.replicate ((0,0), (0,0))  -- Initialize all state/action values to zero.
       pol = VS.replicate (BJAction True)
         // [ (enumState s, BJAction False)
-           | s <- [ BJState pTot ace dCard 0 False
+           | s <- [ stateDef { playerSum = pTot
+                             , usableAce = ace
+                             , dealerCard = dCard
+                             }
                   | pTot  <- [20, 21]
                   , ace   <- [False, True]
                   , dCard <- [1..10]
@@ -256,7 +291,7 @@ main = do
            ]
 
   -- Play many games, updating policy and state/action values after each.
-  (results, dbgss) <- runWriterT $ iterateM' nG optPol (qs, pol)
+  (results, _) <- runWriterT $ iterateM' nG optPol (qs, pol)
   writeFile  "other/blackjack.md" "\n### Final State Action Values (stand, hit)\n\n"
   appendFile "other/blackjack.md" $ pack
                                   $ showVofState
@@ -276,13 +311,6 @@ main = do
                                   $ showVofState
                                   $ VS.map ( toBoth snd )
                                   $ fst results
-  -- appendFile "other/blackjack.md" $ pack
-  --                                 $ intercalate " " . map show
-  --                                 $ map length . group . sort
-  --                                 $ (map upCard . concat) dbgss
-  -- -- print $ ((reward &&& states) . P.head . concat) dbgss
-  -- -- mapIO (print . (reward &&& states)) $ (take 5 . concat) dbgss
-  -- forM_ ((take 5 . concat) dbgss) (print . (reward &&& states))
 
 {----------------------------------------------------------------------
   Monte Carlo optimizer
@@ -303,25 +331,24 @@ optPol :: ( Vector 200 ((Int, Integer), (Int, Integer))
                , Vector 200 BJAction
                )
 optPol (qs, pol) = do
+  randAct <- lift $ rand allActs
   cards <- shuffleM $ concat [replicate  4  n | n <- [1..9]]
                            ++ replicate 16 10
-  let ((r, ss), dbgs) = runWriter $ play (appPolV pol) cards
-      ixs             = nub . map enumState . validStates $ ss
+  let ((r, ss), dbgs) = runWriter $ play (appPolV pol) cards randAct
+      ixs             = (nubOn fst . map (enumState &&& didHit) . validStates) ss
       (qs', pol')     = VS.unzip $ VS.zip qs pol //
                           [ (i, (q', p'))
-                          | i <- ixs
+                          | (i, hit) <- ixs
                           , let q  = qs  `index` i
-                                p  = pol `index` i
-                                q' = ( if (act p)
+                                q' = ( if hit
                                          then second
                                          else first
                                      ) ((+ r) *** (+ 1)) q
-                                -- p' = if fst q' > snd q'
-                                p' = case ( uncurry compare
+                                p' = case uncurry compare
                                           $ toBoth ( uncurry (/)
                                                    . (fromIntegral *** fromIntegral)
                                                    ) q'
-                                          ) of
+                                     of
                                        GT -> BJAction False
                                        _  -> BJAction True
                           ]
@@ -349,6 +376,10 @@ newtype PrettyFloat = PrettyFloat Float
 
 instance Show PrettyFloat where
   show (PrettyFloat x) = printf "%+5.2f" x
+
+nubOn :: Eq b => (a -> b) -> [a] -> [a]
+nubOn _ []     = []
+nubOn f (x:xs) = x : filter ((/= f x) . f) xs
 
 \end{code}
 
