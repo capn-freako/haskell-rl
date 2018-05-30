@@ -1,2 +1,5 @@
-other/* linguist-documentation
-*.html linguist-documentation
+other/*    linguist-generated
+*.html     linguist-generated
+index.html linguist-documentation
+readme.md  linguist-documentation
+
