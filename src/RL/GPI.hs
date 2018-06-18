@@ -124,7 +124,7 @@ optPol RLType{..} (g, _) = (bestA, cnts)
       $ lookup s stateVals
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
-  ((_, v'), cnts) =
+  ((_, v'), cnts) =  -- `cnts` is # of value changes > epsilon.
     if length evalIters == 1
       then ((VS.replicate 0, P.head evalIters), [])
       else
