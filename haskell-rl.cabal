@@ -36,6 +36,7 @@ library
     , protolude
     , finite-typelits
     , mtl
+    , statistics
     , vector-sized
     , MemoTrie
   default-extensions:

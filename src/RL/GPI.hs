@@ -23,28 +23,33 @@
 
 module RL.GPI
   ( Pfloat (..)
+  , Pdouble (..)
   , RLType (..)
   , rltDef
   , optPol
   , maxAndNonZero
   , chooseAndCount
   , poisson'
+  , gamma'
   , withinOnM
+  , mean
   ) where
 
 import qualified Prelude as P
-import Prelude (Show(..), String)
+import Prelude (Show(..))  -- , String)
 import Protolude  hiding (show, for)
 
-import GHC.TypeNats
+-- import GHC.TypeNats
 
 import qualified Data.Vector.Sized   as VS
 
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List             ((!!), lookup, groupBy)
+import Data.List                     ((!!), lookup, groupBy)
 import Data.MemoTrie
+import Statistics.Distribution       (density)
+import Statistics.Distribution.Gamma (gammaDistr)
 import Text.Printf
 
 {----------------------------------------------------------------------
@@ -62,19 +67,20 @@ instance (KnownNat n) => HasTrie (Finite n) where
 
 -- | Abstract data type, to future proof API.
 data RLType s a n = RLType
-  { gamma      :: Float  -- discount rate
-  , epsilon    :: Float  -- convergence tolerance
+  { disc       :: Double  -- discount rate
+  , epsilon    :: Double  -- convergence tolerance
   , maxIter    :: Int    -- max. eval. iterations (0 = Value Iteration)
-  , states     :: VS.Vector (n + 1) s
+  -- , states     :: VS.Vector (n + 1) s
+  , states     :: VS.Vector n s
   , actions    :: s -> [a]
   , nextStates :: s -> a -> [s]
-  , rewards    :: s -> a -> s -> [(Float,Float)]
-  , stateVals  :: [(s, Float)]  -- overides for terminal states
+  , rewards    :: s -> a -> s -> [(Double,Double)]
+  , stateVals  :: [(s, Double)]  -- overides for terminal states
   }
 
 rltDef :: RLType s a n
 rltDef = RLType
-  { gamma     = 1
+  { disc      = 1
   , epsilon   = 0.1
   , maxIter   = 10
   , stateVals = []
@@ -93,11 +99,12 @@ rltDef = RLType
 -- Returns a combined policy & value function.
 optPol :: ( Eq s, HasTrie s
           , Ord a, HasTrie a
-          , KnownNat (n + 1)
+          -- , KnownNat (n + 1)
+          , KnownNat n
           )
        => RLType s a n               -- ^ abstract type, to protect API
-       -> (s -> (a, Float), [Int])  -- ^ initial policy & value functions
-       -> (s -> (a, Float), [Int])
+       -> (s -> (a, Double), [Int])  -- ^ initial policy & value functions
+       -> (s -> (a, Double), [Int])
 optPol RLType{..} (g, _) = (bestA, cnts)
  where
   -- bestA   = maximumBy (compare `on` snd) . aVals v'
@@ -112,7 +119,7 @@ optPol RLType{..} (g, _) = (bestA, cnts)
   actVal' = memo . uncurry . actVal
   actVal v s a =
     fromMaybe
-      ( sum [ pt * gamma * u + rt
+      ( sum [ pt * disc * u + rt
             | s' <- nextStates s a
             , let u = v s'
             , let (pt, rt) = foldl' prSum (0,0)
@@ -155,6 +162,12 @@ newtype Pfloat = Pfloat { unPfloat :: Float}
 instance Show Pfloat where
   show x = printf "%4.1f" (unPfloat x)
 
+newtype Pdouble = Pdouble { unPdouble :: Double }
+  deriving (Eq)
+
+instance Show Pdouble where
+  show x = printf "%4.1f" (unPdouble x)
+
 poisson :: Finite 5 -> Finite 12 -> Float
 poisson (Finite lambda) (Finite n') =
   lambda' ^ n * exp (-lambda') / fromIntegral (fact n)
@@ -173,6 +186,21 @@ poisson' n x@(Finite x') =
   if x > 11  -- The Python code enforces this limit. And we're trying
     then 0   -- for an "apples-to-apples" performance comparison.
     else poissonVals `VS.index` n `VS.index` finite x'
+
+gamma :: Double -> Finite 5 -> Finite 12 -> Double
+gamma shape (Finite expect') (Finite n') =
+  density (gammaDistr shape (expect / shape)) n
+ where expect = fromIntegral expect'
+       n      = fromIntegral n'
+
+gammaVals :: Double -> VS.Vector 5 (VS.Vector 12 Double)
+gammaVals shape = VS.generate (VS.generate . gamma shape)
+
+gamma' :: Double -> Finite 5 -> Finite 21 -> Double
+gamma' shape n x@(Finite x') =
+  if x > 11
+    then 0
+    else gammaVals shape `VS.index` n `VS.index` finite x'
 
 -- | First list element less than or equal to given threshold under the
 -- given function, or the last element if the threshold was never met.
@@ -195,13 +223,13 @@ poisson' n x@(Finite x') =
 --                               then n
 --                               else withinIx' (n+1) ys
 
--- | Monadically search list for first element less than or equal to
+-- | Monadically search list for first element less than
 -- given threshold under the given function, and return the last element
 -- if the threshold was never met.
 -- Return 'Nothing' if the input list was empty.
 withinOnM :: Monad m
-          => Float
-          -> (a -> m Float)
+          => Double
+          -> (a -> m Double)
           -> [a]
           -> m (Maybe a)
 withinOnM _   _ [] = return Nothing
@@ -217,44 +245,44 @@ withinOnM eps f xs = do
 --
 -- A return value of 'Nothing' indicates an empty list was given.
 withinIxM :: Monad m
-          => Float
-          -> [m Float]
+          => Double
+          -> [m Double]
           -> m (Maybe Int)
 withinIxM _   [] = return Nothing
 withinIxM eps xs = withinIxM' 0 xs
  where withinIxM' n []     = return $ Just (n - 1)
        withinIxM' n (y:ys) = do
          y' <- y
-         if y' <= eps then return (Just n)
-                      else withinIxM' (n+1) ys
+         if y' < eps then return (Just n)
+                     else withinIxM' (n+1) ys
 
 -- | Return the maximum value of a set, as well as a scripted log
 -- message, regarding the number of non-zero elements in the set.
 --
 -- (See documentation for `chooseAndCount` function.)
-maxAndNonZeroMsg :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
-maxAndNonZeroMsg = chooseAndCountMsg max (/= 0)
+-- maxAndNonZeroMsg :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
+-- maxAndNonZeroMsg = chooseAndCountMsg max (/= 0)
 
 -- | Choose a value from the set using the given comparison function,
 -- and provide a scripted log message, regarding the number of elements
 -- in the set meeting the given criteria.
-chooseAndCountMsg :: (Foldable t, Num a)
-               => (a -> a -> a)  -- ^ choice function
-               -> (a -> Bool)    -- ^ counting predicate
-               -> String         -- ^ message script (Should contain precisely 1 "%d".)
-               -> t a            -- ^ foldable set of elements to count/compare
-               -> Writer String a
-chooseAndCountMsg f p s xs = do
-  let (val, cnt::Int) =
-        foldl' ( \ (v, c) x ->
-                   ( f v x
-                   , if p x
-                       then c + 1
-                       else c
-                   )
-               ) (0,0) xs
-  tell $ printf s cnt
-  return val
+-- chooseAndCountMsg :: (Foldable t, Num a)
+--                => (a -> a -> a)  -- ^ choice function
+--                -> (a -> Bool)    -- ^ counting predicate
+--                -> String         -- ^ message script (Should contain precisely 1 "%d".)
+--                -> t a            -- ^ foldable set of elements to count/compare
+--                -> Writer String a
+-- chooseAndCountMsg f p s xs = do
+--   let (val, cnt::Int) =
+--         foldl' ( \ (v, c) x ->
+--                    ( f v x
+--                    , if p x
+--                        then c + 1
+--                        else c
+--                    )
+--                ) (0,0) xs
+--   tell $ printf s cnt
+--   return val
 
 -- | Return the maximum value of a set, as well as a count of the number
 -- of non-zero elements in the set.
@@ -294,4 +322,8 @@ chooseAndCount f p xs = do
 --  where acts = actions s
 
 vsFor = flip VS.map
+
+-- | Mean value of a collection
+mean :: (Foldable f, Fractional a) => f a -> a
+mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0::Integer)
 

@@ -68,8 +68,10 @@ code
 \begin{code}
 import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
-
 import Protolude  hiding (show, for)
+
+-- import GHC.TypeNats
+
 import Options.Generic
 
 import Control.Monad.Writer
@@ -91,19 +93,23 @@ import RL.GPI
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-eps'   = 0.1  -- my choice
-gamma' = 0.9  -- my choice
+eps'  = 0    -- my choice
+disc' = 0.9  -- my choice
 
-pDemand = poisson' $ finite 1
+demand_mean = 1
+demand_var  = 1
+gShape = demand_mean * demand_mean / demand_var
+-- gScale = demand_var / demand_mean
+pDemand = gamma' gShape $ finite $ round demand_mean
 
-gLeadTime     =  5
+gLeadTime     =  3
 gMaxOrder     =  5
 gMaxOnHand    = 10
 gReviewPer    =  1
-gMaxDemand    = 10
-gProfit       =  2
-gHoldingCost  =  2
-gStockOutCost =  3
+gMaxDemand    =  6
+gProfit       =  3
+gHoldingCost  =  1
+gStockOutCost =  1
 
 -- | on-hand : [to-receive(n) | n <- [1 .. gLeadTime]] ++ [epoch]
 -- type MyState  = VS.Vector (gLeadTime + 2) (Finite (gMaxOrder + 1))
@@ -136,10 +142,13 @@ allStates =
   ]
 
 -- Just a sized vector alternative to the list above.
-allStatesV
+-- allStatesV
   -- :: VS.Vector ((gMaxOrder + 1) * gLeadTime * (gMaxOrder + 1))
   --              (VS.Vector (gLeadTime + 1) Int)
-  :: VS.Vector 180 MyState
+-- allStatesV :: KnownNat n => VS.Vector (n + 1) MyState
+-- allStatesV :: KnownNat (n + 1) => VS.Vector (n + 1) MyState
+-- allStatesV :: KnownNat n => VS.Vector n MyState
+allStatesV :: VS.Vector 108 MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
 
@@ -168,7 +177,7 @@ nextStates' MyState{..} toOrder =
 --
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
-rewards' :: MyState -> MyAction -> MyState -> [(Float, Float)]
+rewards' :: MyState -> MyAction -> MyState -> [(Double, Double)]
 rewards' MyState{..} toOrder (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
       - gHoldingCost  * fromIntegral onHand'
@@ -209,10 +218,13 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
 --       needed in the first case, it was easier (and more correct)
 --       to just normalize always.
 
+-- | Show a function from `MyState` as a table.
+--
+-- Note: Naively assumes that lead time = review period.
 showFofState :: (Show a) => (MyState -> a) -> String
 showFofState g = unlines
-  ( "\\begin{array}{" : intersperse '|' (replicate (gLeadTime + 1) 'c') : "}" :
-    ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (gLeadTime + 1) ' ') ++ " \\\\") :
+  ( "\\begin{array}{" : intersperse '|' (replicate (gMaxOrder + 1) 'c') : "}" :
+    ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (gMaxOrder + 1) ' ') ++ " \\\\") :
       ["\\hline"] ++
       intersperse "\\hline"
         ( map ((++ " \\\\") . intercalate " & ")
@@ -231,13 +243,17 @@ showFofState g = unlines
   )
 
 -- | Expected reward for a given state, assuming equiprobable actions.
-testRewards :: MyState -> Float
+testRewards :: MyState -> Double
 testRewards s =
-  sum [ uncurry (*) r
-      | a  <- acts
-      , s' <- nextStates' s a
-      , r  <- rewards' s a s'
-      ] / (fromIntegral . length) acts
+  -- sum [ uncurry (*) r
+  --     | a  <- acts
+  --     , s' <- nextStates' s a
+  --     , r  <- rewards' s a s'
+  --     ] / (fromIntegral . length) acts
+  mean [ (sum . map (uncurry (*))) $ rewards' s a s'
+       | a  <- acts
+       , s' <- nextStates' s a
+       ]
  where acts = actions' s
 
 {----------------------------------------------------------------------
@@ -287,7 +303,7 @@ main = do
                    $ iterate
                        ( optPol
                            rltDef
-                             { gamma      = gamma'
+                             { disc       = disc'
                              , epsilon    = eps'
                              , maxIter    = nEvals
                              , states     = allStatesV
@@ -310,7 +326,7 @@ main = do
   appendFile "other/inventory.md" "\n### Final policy\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState pol
   appendFile "other/inventory.md" "\n### Final value function\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pfloat . val)
+  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . val)
 
   -- DEBUGGING
   appendFile "other/inventory.md" "\n## debug\n\n"
@@ -338,7 +354,7 @@ main = do
   appendFile "other/inventory.md" "![](img/actionDiffs.png)\n"
 
   appendFile "other/inventory.md" "\n### E[reward]\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pfloat . testRewards)
+  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards)
 
 \end{code}
 
