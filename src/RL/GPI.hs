@@ -108,10 +108,10 @@ optPol :: ( Eq s, HasTrie s
        -> (s -> (a, Double), [Int])
 optPol RLType{..} (g, _) = (bestA, cnts)
  where
-  -- bestA   = maximumBy (compare `on` snd) . aVals v'
-  bestA   = minimumBy (compare `on` fst)
-            . P.head . reverse
-            . groupBy ((==) `on` snd)
+  -- bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
+  bestA   = minimumBy (compare `on` fst)  -- This one groups by value and, within the max. value group,
+            . P.head . reverse            -- selects the minimum action. This change was motivated by
+            . groupBy ((==) `on` snd)     -- a warning, re: instability, in the text.
             . sortBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
                    in [ (a, actVal'' (s, a))
@@ -119,7 +119,7 @@ optPol RLType{..} (g, _) = (bestA, cnts)
                       ]
   actVal' = memo . uncurry . actVal
   actVal v s a =
-    fromMaybe
+    fromMaybe  -- We look for terminal states first, before performing the default action.
       ( sum [ pt * disc * u + rt
             | s' <- nextStates s a
             , let u = v s'

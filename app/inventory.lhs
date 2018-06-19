@@ -37,7 +37,6 @@ code
 \begin{code}
 -- doctest doesn't look at the cabal file, so you need pragmas here
 {-# LANGUAGE NoImplicitPrelude #-}
--- {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -58,7 +57,6 @@ code
 - [vector-sized](https://www.stackage.org/package/vector-sized)
 - [finite-typelits](https://www.stackage.org/package/finite-typelits)
 - [extra](https://www.stackage.org/package/extra)
-- [finite-typelits](https://www.stackage.org/package/finite-typelits)
 - [text](https://www.stackage.org/package/text)
 - [random](https://www.stackage.org/package/random)
 - [random-shuffle](https://www.stackage.org/package/random-shuffle)
@@ -71,15 +69,12 @@ import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for)
 
--- import GHC.TypeNats
-
 import Options.Generic
 
 import Control.Arrow                        ((***))
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
--- import Data.Finite.Internal
 import Data.MemoTrie
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
@@ -98,13 +93,10 @@ import RL.GPI
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-eps'  = 0    -- my choice
+eps'  = 10    -- my choice
 disc' = 0.9  -- my choice
 
 demand_mean = 1
--- demand_var  = 1
--- gShape = demand_mean * demand_mean / demand_var
--- gScale = demand_var / demand_mean
 pDemand = gamma' $ finite $ round demand_mean
 
 gLeadTime     =  3
@@ -116,8 +108,6 @@ gProfit       =  0
 gHoldingCost  =  1
 gStockOutCost =  2
 
--- | on-hand : [to-receive(n) | n <- [1 .. gLeadTime]] ++ [epoch]
--- type MyState  = VS.Vector (gLeadTime + 2) (Finite (gMaxOrder + 1))
 data MyState  = MyState
   { onHand  :: Int
   , onOrder :: [Int]
@@ -134,36 +124,25 @@ type MyAction = Int
 
 -- | S
 allStates :: [MyState]
--- allStates = [ fromMaybe (error "main.allStates: Fatal error occured in list comprehension!")
---               $ VS.fromList ( x
---                             : drop n ys ++ take n ys
---                             )
 allStates =
-  [ MyState x (drop n ys ++ take n ys) 0
-  | x <- [0..gMaxOrder]
+  [ MyState x (drop n ys ++ take n ys) n
+  | x <- [0..gMaxOnHand]
   , n <- [0..(gLeadTime - 1)]
   , y <- [0..gMaxOrder]
   , let ys = y : (replicate (gLeadTime - 1) 0)
   ]
 
 -- Just a sized vector alternative to the list above.
--- allStatesV
-  -- :: VS.Vector ((gMaxOrder + 1) * gLeadTime * (gMaxOrder + 1))
-  --              (VS.Vector (gLeadTime + 1) Int)
--- allStatesV :: KnownNat n => VS.Vector (n + 1) MyState
--- allStatesV :: KnownNat (n + 1) => VS.Vector (n + 1) MyState
--- allStatesV :: KnownNat n => VS.Vector n MyState
-allStatesV :: VS.Vector 108 MyState
+allStatesV :: VS.Vector 198 MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
 
 -- | A(s)
 actions' :: MyState -> [MyAction]
 actions' MyState{..} =
-  -- if epoch `mod` gReviewPer /= 0
+  -- if epoch `mod` gReviewPer /= 0  -- Until I have a more sophisticated `showFofState`.
   if epoch `mod` gLeadTime /= 0
      then [0]
-     -- else [0..(finite $ fromIntegral gMaxOrder)]
      else [0..gMaxOrder]
 
 -- | S'(s, a)
@@ -188,7 +167,7 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
       - gHoldingCost  * fromIntegral onHand'
       - gStockOutCost * fromIntegral missedSales
-    , pDemand (finite $ fromIntegral demand1) -- / totProb
+    , pDemand (finite $ fromIntegral demand1)
     )
   | let demands = if onHand' == P.head onOrder
                      then [ (x,                                 x)
@@ -197,32 +176,34 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
                      else [ (onHand + P.head onOrder - onHand', x)
                           | x <- [0..gMaxDemand]
                           ]
-        -- totProb = sum $ map (pDemand . finite . fromIntegral) demands
   , (demand0, demand1) <- demands
   , let totAvailable = onHand + sum onOrder + toOrder
         totDemand    = demand0 + (gLeadTime + 1) * demand1
-        -- sold         = min onHand demand
         sold         = min totAvailable totDemand
-        -- missedSales  = max 0 (demand - onHand)
         missedSales  = max 0 (totDemand - totAvailable)
   ]
 
+-- NOTE: Please, keep the following commentary, as it explains the
+-- above code.
+--
 -- onHand' = onHand + head onOrder - sold
 --         = onHand + head onOrder - min onHand demand
 --
--- demand > onHand:
+-- demand >= onHand:
 --   onHand' = head onOrder
+--   Demand may have exceeded amount on hand; we can't know for sure.
 --   => Allow demand to sweep entire range.
---   => No probability normalization necessary.
 --
 -- otherwise:
 --   onHand' = onHand + head onOrder - demand
 --   demand  = onHand + head onOrder - onHand'
 --   => Demand is deterministic.
 --
--- Note: Although the analysis above shows that no normalization is
---       needed in the first case, it was easier (and more correct)
---       to just normalize always.
+-- NOTE: In order to avoid exponential state space explosion, I'm
+--       assuming that demand is constant for all days of interest
+--       after the first, which is determined according to the
+--       commentary above.
+
 
 -- | Show a function from `MyState` as a table.
 --
@@ -251,11 +232,6 @@ showFofState g = unlines
 -- | Expected reward for a given state, assuming equiprobable actions.
 testRewards :: MyState -> Double
 testRewards s =
-  -- sum [ uncurry (*) r
-  --     | a  <- acts
-  --     , s' <- nextStates' s a
-  --     , r  <- rewards' s a s'
-  --     ] / (fromIntegral . length) acts
   mean [ (sum . map (uncurry (*))) $ rewards' s a s'
        | a  <- acts
        , s' <- nextStates' s a
@@ -291,7 +267,7 @@ main = do
 
   -- Calculate and display optimum policy.
   writeFile "other/inventory.md" "\n### Policy optimization\n\n"
-  let (fs, counts) = unzip $ take (nIters + 1)
+  let (fs, counts) = unzip $ P.tail $ take (nIters + 1)
                    $ iterate
                        ( optPol
                            rltDef
@@ -308,7 +284,8 @@ main = do
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
       ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
-        runWriter $ withinOnM eps'
+        -- runWriter $ withinOnM eps'
+        runWriter $ withinOnM 0
                               ( \ (dv, _) ->
                                   maxAndNonZero dv
                               ) $ zip diffs (P.tail fs)
@@ -321,9 +298,40 @@ main = do
 
   -- DEBUGGING
   appendFile "other/inventory.md" "\n## debug\n\n"
+
+  -- Reward expectations
+  appendFile "other/inventory.md" "\n### E[reward]\n\n"
+  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards)
+
+  -- Value/Action changes vs. Iteration
+  toFile def "img/valueDiffs.png" $ do
+    layout_title .= "Value Changes vs. Evaluation Iteration"
+    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
+    forM_ ( zip counts
+                $ map (printf "Imp. Iter. #%d") [(1::Int)..]
+          ) $ \ (count, lbl) ->
+                plot ( line lbl
+                            [ [ (x, y)
+                              | (x, y) <- zip [(0::Int)..] count
+                              ]
+                            ]
+                     )
+  appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
+
+  toFile def "img/actionDiffs.png" $
+    do layout_title .= "Action Changes vs. Improvement Iteration"
+       setColors $ map opaque [blue, green, red, yellow]
+       plot ( line "Action Changes"
+                   [ [ (x, y)
+                     | (x, y) <- zip [(0::Int)..] cnts
+                     ]
+                   ]
+            )
+  appendFile "other/inventory.md" "\n![](img/actionDiffs.png)\n"
+
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
-             "### Demand Probability Distribution Functions\n\n"
+             "\n### Demand Probability Distribution Functions\n\n"
   let pdf = [ (x, density (gammaDistr (1 + demand_mean) 1) x)
             | x <- [0.1 * n | n <- [0..100]]
             ]
@@ -338,7 +346,6 @@ main = do
             ]
       titles = ["pmf"]
       values :: [ (String,[Double]) ]
-      -- values = map (\(x,y) -> (show x,[y])) pmf
       values = map (show *** (: [])) pmf
   
   toFile def "img/demand.png" $
@@ -350,32 +357,6 @@ main = do
   appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * (sum $ map snd pdf))
   appendFile "other/inventory.md" "\n![](img/demand.png)\n"
   appendFile "other/inventory.md" $ pack $ printf "\n$\\sum pmf = %5.2f$\n" (sum $ map snd pmf)
-
-  toFile def "img/valueDiffs.png" $
-    do layout_title .= "Value Changes vs. Evaluation Iteration"
-       setColors $ map opaque [blue, green, red, yellow]
-       forM_ (zip [P.head counts, P.last counts] ["First", "Last"]) $ \ (count, lbl) ->
-         plot ( line lbl
-                     [ [ (x, y)
-                       | (x, y) <- zip [(0::Int)..] count
-                       ]
-                     ]
-              )
-  appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
-
-  toFile def "img/actionDiffs.png" $
-    do layout_title .= "Action Changes vs. Improvement Iteration"
-       setColors $ map opaque [blue, green, red, yellow]
-       plot ( line "Action Changes"
-                   [ [ (x, y)
-                     | (x, y) <- zip [(0::Int)..] cnts
-                     ]
-                   ]
-            )
-  appendFile "other/inventory.md" "\n![](img/actionDiffs.png)\n"
-
-  appendFile "other/inventory.md" "\n### E[reward]\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards)
 
 \end{code}
 
