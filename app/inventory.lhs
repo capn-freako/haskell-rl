@@ -110,11 +110,11 @@ pDemand = gamma' $ finite $ round demand_mean
 gLeadTime     =  3
 gMaxOrder     =  5
 gMaxOnHand    = 10
-gReviewPer    =  1
-gMaxDemand    =  6
-gProfit       =  3
+-- gReviewPer    =  1  -- `showFofState` assumes: gReviewPer = gLeadTime.
+gMaxDemand    = 10
+gProfit       =  0
 gHoldingCost  =  1
-gStockOutCost =  1
+gStockOutCost =  2
 
 -- | on-hand : [to-receive(n) | n <- [1 .. gLeadTime]] ++ [epoch]
 -- type MyState  = VS.Vector (gLeadTime + 2) (Finite (gMaxOrder + 1))
@@ -160,7 +160,8 @@ allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allSta
 -- | A(s)
 actions' :: MyState -> [MyAction]
 actions' MyState{..} =
-  if epoch `mod` gReviewPer /= 0
+  -- if epoch `mod` gReviewPer /= 0
+  if epoch `mod` gLeadTime /= 0
      then [0]
      -- else [0..(finite $ fromIntegral gMaxOrder)]
      else [0..gMaxOrder]
