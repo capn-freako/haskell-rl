@@ -341,6 +341,7 @@ executable inventory
     , Chart
     , Chart-cairo
     , haskell-rl
+    , statistics
 
 test-suite test
   default-language:

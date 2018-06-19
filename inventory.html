@@ -21,16 +21,17 @@ Original date: June 14, 2018</p>
 <h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
 <div class="sourceCode" id="cb2"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></a>
 <a class="sourceLine" id="cb2-2" data-line-number="2"><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></a>
-<a class="sourceLine" id="cb2-3" data-line-number="3"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></a>
+<a class="sourceLine" id="cb2-3" data-line-number="3"><span class="co">-- {-# LANGUAGE BangPatterns #-}</span></a>
 <a class="sourceLine" id="cb2-4" data-line-number="4"><span class="ot">{-# LANGUAGE DataKinds #-}</span></a>
 <a class="sourceLine" id="cb2-5" data-line-number="5"><span class="ot">{-# LANGUAGE DeriveGeneric #-}</span></a>
 <a class="sourceLine" id="cb2-6" data-line-number="6"><span class="ot">{-# LANGUAGE FlexibleContexts #-}</span></a>
-<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="ot">{-# LANGUAGE RecordWildCards #-}</span></a>
-<a class="sourceLine" id="cb2-8" data-line-number="8"><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></a>
-<a class="sourceLine" id="cb2-9" data-line-number="9"><span class="ot">{-# LANGUAGE TypeOperators #-}</span></a>
-<a class="sourceLine" id="cb2-10" data-line-number="10"><span class="ot">{-# LANGUAGE TypeFamilies #-}</span></a>
-<a class="sourceLine" id="cb2-11" data-line-number="11"><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></a>
-<a class="sourceLine" id="cb2-12" data-line-number="12"><span class="co">-- {-# LANGUAGE BangPatterns #-}</span></a></code></pre></div>
+<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></a>
+<a class="sourceLine" id="cb2-8" data-line-number="8"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></a>
+<a class="sourceLine" id="cb2-9" data-line-number="9"><span class="ot">{-# LANGUAGE RecordWildCards #-}</span></a>
+<a class="sourceLine" id="cb2-10" data-line-number="10"><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></a>
+<a class="sourceLine" id="cb2-11" data-line-number="11"><span class="ot">{-# LANGUAGE TupleSections #-}</span></a>
+<a class="sourceLine" id="cb2-12" data-line-number="12"><span class="ot">{-# LANGUAGE TypeFamilies #-}</span></a>
+<a class="sourceLine" id="cb2-13" data-line-number="13"><span class="ot">{-# LANGUAGE TypeOperators #-}</span></a></code></pre></div>
 <h2 id="libraries"><a href="https://www.stackage.org/">libraries</a></h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/protolude">protolude</a></li>
@@ -54,16 +55,20 @@ Original date: June 14, 2018</p>
 <a class="sourceLine" id="cb3-6" data-line-number="6"></a>
 <a class="sourceLine" id="cb3-7" data-line-number="7"><span class="kw">import</span> <span class="dt">Options.Generic</span></a>
 <a class="sourceLine" id="cb3-8" data-line-number="8"></a>
-<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></a>
-<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
-<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
-<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="co">-- import Data.Finite.Internal</span></a>
-<a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.MemoTrie</span></a>
-<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Data.Text</span>                            (pack)</a>
-<a class="sourceLine" id="cb3-15" data-line-number="15"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span> (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
-<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
-<a class="sourceLine" id="cb3-17" data-line-number="17"></a>
-<a class="sourceLine" id="cb3-18" data-line-number="18"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
+<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="kw">import</span> <span class="dt">Control.Arrow</span>                        ((***))</a>
+<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></a>
+<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
+<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
+<a class="sourceLine" id="cb3-13" data-line-number="13"><span class="co">-- import Data.Finite.Internal</span></a>
+<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Data.MemoTrie</span></a>
+<a class="sourceLine" id="cb3-15" data-line-number="15"><span class="kw">import</span> <span class="dt">Data.Text</span>                            (pack)</a>
+<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span> (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
+<a class="sourceLine" id="cb3-17" data-line-number="17"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
+<a class="sourceLine" id="cb3-18" data-line-number="18"><span class="kw">import</span> <span class="dt">Statistics.Distribution</span>       (density)</a>
+<a class="sourceLine" id="cb3-19" data-line-number="19"><span class="kw">import</span> <span class="dt">Statistics.Distribution.Gamma</span> (gammaDistr)</a>
+<a class="sourceLine" id="cb3-20" data-line-number="20"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
+<a class="sourceLine" id="cb3-21" data-line-number="21"></a>
+<a class="sourceLine" id="cb3-22" data-line-number="22"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
 </ul>
@@ -75,10 +80,10 @@ Original date: June 14, 2018</p>
 <a class="sourceLine" id="cb4-6" data-line-number="6">disc&#39; <span class="fu">=</span> <span class="fl">0.9</span>  <span class="co">-- my choice</span></a>
 <a class="sourceLine" id="cb4-7" data-line-number="7"></a>
 <a class="sourceLine" id="cb4-8" data-line-number="8">demand_mean <span class="fu">=</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb4-9" data-line-number="9">demand_var  <span class="fu">=</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb4-10" data-line-number="10">gShape <span class="fu">=</span> demand_mean <span class="fu">*</span> demand_mean <span class="fu">/</span> demand_var</a>
+<a class="sourceLine" id="cb4-9" data-line-number="9"><span class="co">-- demand_var  = 1</span></a>
+<a class="sourceLine" id="cb4-10" data-line-number="10"><span class="co">-- gShape = demand_mean * demand_mean / demand_var</span></a>
 <a class="sourceLine" id="cb4-11" data-line-number="11"><span class="co">-- gScale = demand_var / demand_mean</span></a>
-<a class="sourceLine" id="cb4-12" data-line-number="12">pDemand <span class="fu">=</span> gamma&#39; gShape <span class="fu">$</span> finite <span class="fu">$</span> round demand_mean</a>
+<a class="sourceLine" id="cb4-12" data-line-number="12">pDemand <span class="fu">=</span> gamma&#39; <span class="fu">$</span> finite <span class="fu">$</span> round demand_mean</a>
 <a class="sourceLine" id="cb4-13" data-line-number="13"></a>
 <a class="sourceLine" id="cb4-14" data-line-number="14">gLeadTime     <span class="fu">=</span>  <span class="dv">3</span></a>
 <a class="sourceLine" id="cb4-15" data-line-number="15">gMaxOrder     <span class="fu">=</span>  <span class="dv">5</span></a>
@@ -261,83 +266,94 @@ Original date: June 14, 2018</p>
 <a class="sourceLine" id="cb4-192" data-line-number="192">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe <span class="dv">2</span> (nIter o)</a>
 <a class="sourceLine" id="cb4-193" data-line-number="193">      nEvals <span class="fu">=</span> fromMaybe <span class="dv">1</span> (nEval o)</a>
 <a class="sourceLine" id="cb4-194" data-line-number="194"></a>
-<a class="sourceLine" id="cb4-195" data-line-number="195">  <span class="co">-- Plot the pdfs.</span></a>
-<a class="sourceLine" id="cb4-196" data-line-number="196">  writeFile  <span class="st">&quot;other/inventory.md&quot;</span></a>
-<a class="sourceLine" id="cb4-197" data-line-number="197">             <span class="st">&quot;### Demand Probability Distribution Function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-198" data-line-number="198">  toFile def <span class="st">&quot;img/demand.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-199" data-line-number="199">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Distribution Function&quot;</span></a>
-<a class="sourceLine" id="cb4-200" data-line-number="200">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
-<a class="sourceLine" id="cb4-201" data-line-number="201">       plot ( line <span class="st">&quot;Demand Probability&quot;</span></a>
-<a class="sourceLine" id="cb4-202" data-line-number="202">                   [ [ (x, pDemand (finite x))</a>
-<a class="sourceLine" id="cb4-203" data-line-number="203">                     <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">20</span>]</a>
-<a class="sourceLine" id="cb4-204" data-line-number="204">                     ]</a>
-<a class="sourceLine" id="cb4-205" data-line-number="205">                   ]</a>
-<a class="sourceLine" id="cb4-206" data-line-number="206">            )</a>
-<a class="sourceLine" id="cb4-207" data-line-number="207">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/demand.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-208" data-line-number="208"></a>
-<a class="sourceLine" id="cb4-209" data-line-number="209">  <span class="co">-- Calculate and display optimum policy.</span></a>
-<a class="sourceLine" id="cb4-210" data-line-number="210">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-211" data-line-number="211">  <span class="kw">let</span> (fs, counts) <span class="fu">=</span> unzip <span class="fu">$</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-212" data-line-number="212">                   <span class="fu">$</span> iterate</a>
-<a class="sourceLine" id="cb4-213" data-line-number="213">                       ( optPol</a>
-<a class="sourceLine" id="cb4-214" data-line-number="214">                           rltDef</a>
-<a class="sourceLine" id="cb4-215" data-line-number="215">                             { disc       <span class="fu">=</span> disc&#39;</a>
-<a class="sourceLine" id="cb4-216" data-line-number="216">                             , epsilon    <span class="fu">=</span> eps&#39;</a>
-<a class="sourceLine" id="cb4-217" data-line-number="217">                             , maxIter    <span class="fu">=</span> nEvals</a>
-<a class="sourceLine" id="cb4-218" data-line-number="218">                             , states     <span class="fu">=</span> allStatesV</a>
-<a class="sourceLine" id="cb4-219" data-line-number="219">                             , actions    <span class="fu">=</span> actions&#39;</a>
-<a class="sourceLine" id="cb4-220" data-line-number="220">                             , nextStates <span class="fu">=</span> nextStates&#39;</a>
-<a class="sourceLine" id="cb4-221" data-line-number="221">                             , rewards    <span class="fu">=</span> rewards&#39;</a>
-<a class="sourceLine" id="cb4-222" data-line-number="222">                             }</a>
-<a class="sourceLine" id="cb4-223" data-line-number="223">                       ) (const (<span class="dv">0</span>,<span class="dv">0</span>), [])</a>
-<a class="sourceLine" id="cb4-224" data-line-number="224">      acts  <span class="fu">=</span> map (\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) fs</a>
-<a class="sourceLine" id="cb4-225" data-line-number="225">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
-<a class="sourceLine" id="cb4-226" data-line-number="226">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
-<a class="sourceLine" id="cb4-227" data-line-number="227">      ((_, g&#39;), cnts) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-228" data-line-number="228">        runWriter <span class="fu">$</span> withinOnM eps&#39;</a>
-<a class="sourceLine" id="cb4-229" data-line-number="229">                              <span class="co">-- ( \ (dv, (_, cnts)) -&gt;</span></a>
-<a class="sourceLine" id="cb4-230" data-line-number="230">                              ( \ (dv, _) <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-231" data-line-number="231">                                  maxAndNonZero dv</a>
-<a class="sourceLine" id="cb4-232" data-line-number="232">                              ) <span class="fu">$</span> zip diffs (P.tail fs)</a>
-<a class="sourceLine" id="cb4-233" data-line-number="233">      pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
-<a class="sourceLine" id="cb4-234" data-line-number="234">      val   <span class="fu">=</span> snd <span class="fu">.</span> g&#39;</a>
-<a class="sourceLine" id="cb4-235" data-line-number="235">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-236" data-line-number="236">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
-<a class="sourceLine" id="cb4-237" data-line-number="237">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-238" data-line-number="238">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
-<a class="sourceLine" id="cb4-239" data-line-number="239"></a>
-<a class="sourceLine" id="cb4-240" data-line-number="240">  <span class="co">-- DEBUGGING</span></a>
-<a class="sourceLine" id="cb4-241" data-line-number="241">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n## debug\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-242" data-line-number="242">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-243" data-line-number="243">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Value Changes vs. Evaluation Iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-244" data-line-number="244">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
-<a class="sourceLine" id="cb4-245" data-line-number="245">       forM_ (zip [P.head counts, P.last counts] [<span class="st">&quot;First&quot;</span>, <span class="st">&quot;Last&quot;</span>]) <span class="fu">$</span> \ (count, lbl) <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-246" data-line-number="246">         plot ( line lbl</a>
-<a class="sourceLine" id="cb4-247" data-line-number="247">                     [ [ (x, y)</a>
-<a class="sourceLine" id="cb4-248" data-line-number="248">                       <span class="fu">|</span> (x, y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] count</a>
-<a class="sourceLine" id="cb4-249" data-line-number="249">                       ]</a>
-<a class="sourceLine" id="cb4-250" data-line-number="250">                     ]</a>
-<a class="sourceLine" id="cb4-251" data-line-number="251">              )</a>
-<a class="sourceLine" id="cb4-252" data-line-number="252">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/valueDiffs.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-253" data-line-number="253"></a>
-<a class="sourceLine" id="cb4-254" data-line-number="254">  toFile def <span class="st">&quot;img/actionDiffs.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-255" data-line-number="255">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Action Changes vs. Improvement Iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-256" data-line-number="256">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
-<a class="sourceLine" id="cb4-257" data-line-number="257">       plot ( line <span class="st">&quot;Action Changes&quot;</span></a>
-<a class="sourceLine" id="cb4-258" data-line-number="258">                   [ [ (x, y)</a>
-<a class="sourceLine" id="cb4-259" data-line-number="259">                     <span class="fu">|</span> (x, y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] cnts</a>
-<a class="sourceLine" id="cb4-260" data-line-number="260">                     ]</a>
-<a class="sourceLine" id="cb4-261" data-line-number="261">                   ]</a>
-<a class="sourceLine" id="cb4-262" data-line-number="262">            )</a>
-<a class="sourceLine" id="cb4-263" data-line-number="263">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/actionDiffs.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-264" data-line-number="264"></a>
-<a class="sourceLine" id="cb4-265" data-line-number="265">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### E[reward]\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-266" data-line-number="266">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> testRewards)</a></code></pre></div>
+<a class="sourceLine" id="cb4-195" data-line-number="195">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-196" data-line-number="196">  writeFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-197" data-line-number="197">  <span class="kw">let</span> (fs, counts) <span class="fu">=</span> unzip <span class="fu">$</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-198" data-line-number="198">                   <span class="fu">$</span> iterate</a>
+<a class="sourceLine" id="cb4-199" data-line-number="199">                       ( optPol</a>
+<a class="sourceLine" id="cb4-200" data-line-number="200">                           rltDef</a>
+<a class="sourceLine" id="cb4-201" data-line-number="201">                             { disc       <span class="fu">=</span> disc&#39;</a>
+<a class="sourceLine" id="cb4-202" data-line-number="202">                             , epsilon    <span class="fu">=</span> eps&#39;</a>
+<a class="sourceLine" id="cb4-203" data-line-number="203">                             , maxIter    <span class="fu">=</span> nEvals</a>
+<a class="sourceLine" id="cb4-204" data-line-number="204">                             , states     <span class="fu">=</span> allStatesV</a>
+<a class="sourceLine" id="cb4-205" data-line-number="205">                             , actions    <span class="fu">=</span> actions&#39;</a>
+<a class="sourceLine" id="cb4-206" data-line-number="206">                             , nextStates <span class="fu">=</span> nextStates&#39;</a>
+<a class="sourceLine" id="cb4-207" data-line-number="207">                             , rewards    <span class="fu">=</span> rewards&#39;</a>
+<a class="sourceLine" id="cb4-208" data-line-number="208">                             }</a>
+<a class="sourceLine" id="cb4-209" data-line-number="209">                       ) (const (<span class="dv">0</span>,<span class="dv">0</span>), [])</a>
+<a class="sourceLine" id="cb4-210" data-line-number="210">      acts  <span class="fu">=</span> map (\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) fs</a>
+<a class="sourceLine" id="cb4-211" data-line-number="211">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
+<a class="sourceLine" id="cb4-212" data-line-number="212">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
+<a class="sourceLine" id="cb4-213" data-line-number="213">      ((_, g&#39;), cnts) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-214" data-line-number="214">        runWriter <span class="fu">$</span> withinOnM eps&#39;</a>
+<a class="sourceLine" id="cb4-215" data-line-number="215">                              ( \ (dv, _) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-216" data-line-number="216">                                  maxAndNonZero dv</a>
+<a class="sourceLine" id="cb4-217" data-line-number="217">                              ) <span class="fu">$</span> zip diffs (P.tail fs)</a>
+<a class="sourceLine" id="cb4-218" data-line-number="218">      pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-219" data-line-number="219">      val   <span class="fu">=</span> snd <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-220" data-line-number="220">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-221" data-line-number="221">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-222" data-line-number="222">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-223" data-line-number="223">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-224" data-line-number="224"></a>
+<a class="sourceLine" id="cb4-225" data-line-number="225">  <span class="co">-- DEBUGGING</span></a>
+<a class="sourceLine" id="cb4-226" data-line-number="226">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n## debug\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-227" data-line-number="227">  <span class="co">-- Plot the pdfs.</span></a>
+<a class="sourceLine" id="cb4-228" data-line-number="228">  appendFile  <span class="st">&quot;other/inventory.md&quot;</span></a>
+<a class="sourceLine" id="cb4-229" data-line-number="229">             <span class="st">&quot;### Demand Probability Distribution Functions\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-230" data-line-number="230">  <span class="kw">let</span> pdf <span class="fu">=</span> [ (x, density (gammaDistr (<span class="dv">1</span> <span class="fu">+</span> demand_mean) <span class="dv">1</span>) x)</a>
+<a class="sourceLine" id="cb4-231" data-line-number="231">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="fl">0.1</span> <span class="fu">*</span> n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]]</a>
+<a class="sourceLine" id="cb4-232" data-line-number="232">            ]</a>
+<a class="sourceLine" id="cb4-233" data-line-number="233">  toFile def <span class="st">&quot;img/pdf.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-234" data-line-number="234">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Density Function (pdf)&quot;</span></a>
+<a class="sourceLine" id="cb4-235" data-line-number="235">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-236" data-line-number="236">       plot ( line <span class="st">&quot;Demand Probability&quot;</span></a>
+<a class="sourceLine" id="cb4-237" data-line-number="237">                   [ pdf ]</a>
+<a class="sourceLine" id="cb4-238" data-line-number="238">            )</a>
+<a class="sourceLine" id="cb4-239" data-line-number="239">  <span class="kw">let</span> pmf <span class="fu">=</span> [ (x, gamma&#39; (finite <span class="fu">$</span> round demand_mean) (finite x))</a>
+<a class="sourceLine" id="cb4-240" data-line-number="240">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">10</span>]</a>
+<a class="sourceLine" id="cb4-241" data-line-number="241">            ]</a>
+<a class="sourceLine" id="cb4-242" data-line-number="242">      titles <span class="fu">=</span> [<span class="st">&quot;pmf&quot;</span>]</a>
+<a class="sourceLine" id="cb4-243" data-line-number="243"><span class="ot">      values ::</span> [ (<span class="dt">String</span>,[<span class="dt">Double</span>]) ]</a>
+<a class="sourceLine" id="cb4-244" data-line-number="244">      <span class="co">-- values = map (\(x,y) -&gt; (show x,[y])) pmf</span></a>
+<a class="sourceLine" id="cb4-245" data-line-number="245">      values <span class="fu">=</span> map (show <span class="fu">***</span> (<span class="fu">:</span> [])) pmf</a>
+<a class="sourceLine" id="cb4-246" data-line-number="246">  </a>
+<a class="sourceLine" id="cb4-247" data-line-number="247">  toFile def <span class="st">&quot;img/demand.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-248" data-line-number="248">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Mass Function (pmf)&quot;</span></a>
+<a class="sourceLine" id="cb4-249" data-line-number="249">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-250" data-line-number="250">       layout_x_axis <span class="fu">.</span> laxis_generate <span class="fu">.=</span> autoIndexAxis (map fst values)</a>
+<a class="sourceLine" id="cb4-251" data-line-number="251">       plot <span class="fu">$</span> fmap plotBars <span class="fu">$</span> bars titles (addIndexes (map snd values))</a>
+<a class="sourceLine" id="cb4-252" data-line-number="252">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/pdf.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-253" data-line-number="253">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\int pdf = %5.2f$\n&quot;</span> (<span class="fl">0.1</span> <span class="fu">*</span> (sum <span class="fu">$</span> map snd pdf))</a>
+<a class="sourceLine" id="cb4-254" data-line-number="254">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/demand.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-255" data-line-number="255">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\sum pmf = %5.2f$\n&quot;</span> (sum <span class="fu">$</span> map snd pmf)</a>
+<a class="sourceLine" id="cb4-256" data-line-number="256"></a>
+<a class="sourceLine" id="cb4-257" data-line-number="257">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-258" data-line-number="258">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Value Changes vs. Evaluation Iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-259" data-line-number="259">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-260" data-line-number="260">       forM_ (zip [P.head counts, P.last counts] [<span class="st">&quot;First&quot;</span>, <span class="st">&quot;Last&quot;</span>]) <span class="fu">$</span> \ (count, lbl) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-261" data-line-number="261">         plot ( line lbl</a>
+<a class="sourceLine" id="cb4-262" data-line-number="262">                     [ [ (x, y)</a>
+<a class="sourceLine" id="cb4-263" data-line-number="263">                       <span class="fu">|</span> (x, y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] count</a>
+<a class="sourceLine" id="cb4-264" data-line-number="264">                       ]</a>
+<a class="sourceLine" id="cb4-265" data-line-number="265">                     ]</a>
+<a class="sourceLine" id="cb4-266" data-line-number="266">              )</a>
+<a class="sourceLine" id="cb4-267" data-line-number="267">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-268" data-line-number="268"></a>
+<a class="sourceLine" id="cb4-269" data-line-number="269">  toFile def <span class="st">&quot;img/actionDiffs.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-270" data-line-number="270">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Action Changes vs. Improvement Iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-271" data-line-number="271">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-272" data-line-number="272">       plot ( line <span class="st">&quot;Action Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-273" data-line-number="273">                   [ [ (x, y)</a>
+<a class="sourceLine" id="cb4-274" data-line-number="274">                     <span class="fu">|</span> (x, y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>] cnts</a>
+<a class="sourceLine" id="cb4-275" data-line-number="275">                     ]</a>
+<a class="sourceLine" id="cb4-276" data-line-number="276">                   ]</a>
+<a class="sourceLine" id="cb4-277" data-line-number="277">            )</a>
+<a class="sourceLine" id="cb4-278" data-line-number="278">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/actionDiffs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-279" data-line-number="279"></a>
+<a class="sourceLine" id="cb4-280" data-line-number="280">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### E[reward]\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-281" data-line-number="281">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> testRewards)</a></code></pre></div>
 <h2 id="output">output</h2>
-<h3 id="demand-probability-distribution-function">Demand Probability Distribution Function</h3>
-<figure>
-<img src="img/demand.png" />
-</figure>
 <h3 id="policy-optimization">Policy optimization</h3>
 <h3 id="final-policy">Final policy</h3>
 <span class="math display">\[\begin{array}{
@@ -345,27 +361,27 @@ c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+10 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
 \hline
-9 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+9 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 \\
 \hline
-8 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+8 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\
 \hline
-7 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+7 &amp; 3 &amp; 2 &amp; 1 &amp; 1 &amp; 0 &amp; 0 \\
 \hline
-6 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+6 &amp; 4 &amp; 3 &amp; 1 &amp; 1 &amp; 1 &amp; 0 \\
 \hline
-5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+5 &amp; 5 &amp; 4 &amp; 2 &amp; 1 &amp; 1 &amp; 0 \\
 \hline
-4 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+4 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 1 \\
 \hline
-3 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+3 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 \\
 \hline
-2 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+2 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 2 &amp; 1 \\
 \hline
-1 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+1 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 \\
 \hline
-0 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+0 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>
@@ -375,59 +391,73 @@ c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; 17615216242973832.0 &amp; 25965505308188948.0 &amp; 37423418724306390.0 &amp; 52893133852848640.0 &amp; 73488956897196960.0 &amp; 100577396634634560.0 \\
+10 &amp; 22128.2 &amp; 29949.1 &amp; 39780.2 &amp; 51855.4 &amp; 66475.3 &amp; 83961.2 \\
 \hline
-9 &amp; 11642856171703122.0 &amp; 17606871623098952.0 &amp; 25929040711970972.0 &amp; 37323744422102080.0 &amp; 52674994552414010.0 &amp; 73070911562439490.0 \\
+9 &amp; 15940.3 &amp; 22063.3 &amp; 29805.0 &amp; 39494.4 &amp; 51344.1 &amp; 65639.3 \\
 \hline
-8 &amp; 7463088239790507.0 &amp; 11634511551828246.0 &amp; 17570407026880976.0 &amp; 25829366409766664.0 &amp; 37105605121667450.0 &amp; 52256949217656536.0 \\
+8 &amp; 11185.5 &amp; 15878.4 &amp; 21915.1 &amp; 29522.2 &amp; 38986.0 &amp; 50511.0 \\
 \hline
-7 &amp; 4609547389016739.0 &amp; 7454743619915631.0 &amp; 11598046955610272.0 &amp; 17470732724676668.0 &amp; 25611227109332032.0 &amp; 36687559786909970.0 \\
+7 &amp; 7628.4 &amp; 11120.2 &amp; 15733.2 &amp; 21621.3 &amp; 29016.7 &amp; 38155.9 \\
 \hline
-6 &amp; 2719419927724463.5 &amp; 4601202769141865.0 &amp; 7418279023697660.0 &amp; 11498372653405966.0 &amp; 17252593424242036.0 &amp; 25193181774574560.0 \\
+6 &amp; 5028.2 &amp; 7559.8 &amp; 10972.5 &amp; 15442.4 &amp; 21103.7 &amp; 28189.6 \\
 \hline
-5 &amp; 1513673440596391.5 &amp; 2711075307849591.0 &amp; 4564738172923895.0 &amp; 7318604721493355.0 &amp; 11280233352971336.0 &amp; 16834548089484570.0 \\
+5 &amp; 3175.4 &amp; 4957.7 &amp; 7407.1 &amp; 10684.6 &amp; 14927.6 &amp; 20263.2 \\
 \hline
-4 &amp; 780668153489211.6 &amp; 1505328820721521.0 &amp; 2674610711631623.0 &amp; 4465063870719592.0 &amp; 7100465421058728.0 &amp; 10862188018213868.0 \\
+4 &amp; 1898.0 &amp; 3103.6 &amp; 4800.9 &amp; 7112.8 &amp; 10172.9 &amp; 14089.1 \\
 \hline
-3 &amp; 362622818731746.6 &amp; 772323533614342.8 &amp; 1468864224503554.8 &amp; 2574936409427321.0 &amp; 4246924570284967.0 &amp; 6682420086301264.0 \\
+3 &amp; 1048.3 &amp; 1828.5 &amp; 2947.4 &amp; 4501.2 &amp; 6593.6 &amp; 9337.3 \\
 \hline
-2 &amp; 144483518297122.6 &amp; 354278198856879.4 &amp; 735858937396378.4 &amp; 1369189922299254.8 &amp; 2356797108992697.5 &amp; 3828879235527504.5 \\
+2 &amp; 515.8 &amp; 981.7 &amp; 1670.2 &amp; 2643.9 &amp; 3977.5 &amp; 5759.4 \\
 \hline
-1 &amp; 44809216092824.2 &amp; 136138898422257.2 &amp; 317813602638916.8 &amp; 636184635192080.0 &amp; 1151050621864633.0 &amp; 1938751774235236.5 \\
+1 &amp; 210.4 &amp; 452.2 &amp; 826.4 &amp; 1365.1 &amp; 2118.7 &amp; 3139.3 \\
 \hline
-0 &amp; 8344619874863.3 &amp; 36464596217960.6 &amp; 99674302204296.3 &amp; 218139300434620.2 &amp; 418045334757460.0 &amp; 733005287107173.8 \\
+0 &amp; 58.1 &amp; 149.8 &amp; 299.9 &amp; 523.9 &amp; 841.2 &amp; 1277.6 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>
 <h2 id="debug">debug</h2>
-<p><img src="img/valueDiffs.png" /> <img src="img/actionDiffs.png" /></p>
+<h3 id="demand-probability-distribution-functions">Demand Probability Distribution Functions</h3>
+<figure>
+<img src="img/pdf.png" />
+</figure>
+<p><span class="math inline">\(\int pdf = 1.00\)</span></p>
+<figure>
+<img src="img/demand.png" />
+</figure>
+<p><span class="math inline">\(\sum pmf = 1.00\)</span></p>
+<figure>
+<img src="img/valueDiffs.png" />
+</figure>
+<figure>
+<img src="img/actionDiffs.png" />
+</figure>
 <h3 id="ereward">E[reward]</h3>
 <span class="math display">\[\begin{array}{
 c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; 12.6 &amp; 12.7 &amp; 12.6 &amp; 12.4 &amp; 12.1 &amp; 11.7 \\
+10 &amp; 21.3 &amp; 21.9 &amp; 22.2 &amp; 22.3 &amp; 22.2 &amp; 22.0 \\
 \hline
-9 &amp; 11.8 &amp; 11.9 &amp; 11.9 &amp; 11.7 &amp; 11.5 &amp; 11.1 \\
+9 &amp; 19.7 &amp; 20.4 &amp; 20.8 &amp; 21.0 &amp; 21.0 &amp; 20.8 \\
 \hline
-8 &amp; 11.0 &amp; 11.2 &amp; 11.2 &amp; 11.1 &amp; 10.8 &amp; 10.5 \\
+8 &amp; 18.0 &amp; 18.8 &amp; 19.3 &amp; 19.6 &amp; 19.7 &amp; 19.6 \\
 \hline
-7 &amp; 10.1 &amp; 10.4 &amp; 10.5 &amp; 10.4 &amp; 10.2 &amp;  9.9 \\
+7 &amp; 16.3 &amp; 17.2 &amp; 17.8 &amp; 18.2 &amp; 18.3 &amp; 18.3 \\
 \hline
-6 &amp;  9.2 &amp;  9.6 &amp;  9.7 &amp;  9.7 &amp;  9.5 &amp;  9.3 \\
+6 &amp; 14.4 &amp; 15.4 &amp; 16.2 &amp; 16.7 &amp; 17.0 &amp; 17.0 \\
 \hline
-5 &amp;  8.3 &amp;  8.7 &amp;  8.9 &amp;  8.9 &amp;  8.8 &amp;  8.6 \\
+5 &amp; 12.5 &amp; 13.6 &amp; 14.5 &amp; 15.2 &amp; 15.5 &amp; 15.7 \\
 \hline
-4 &amp;  7.2 &amp;  7.8 &amp;  8.1 &amp;  8.2 &amp;  8.1 &amp;  8.0 \\
+4 &amp; 10.4 &amp; 11.7 &amp; 12.8 &amp; 13.5 &amp; 14.0 &amp; 14.3 \\
 \hline
-3 &amp;  6.1 &amp;  6.8 &amp;  7.3 &amp;  7.4 &amp;  7.4 &amp;  7.4 \\
+3 &amp;  8.1 &amp;  9.7 &amp; 10.9 &amp; 11.8 &amp; 12.5 &amp; 12.9 \\
 \hline
-2 &amp;  4.8 &amp;  5.7 &amp;  6.3 &amp;  6.7 &amp;  6.8 &amp;  6.8 \\
+2 &amp;  5.7 &amp;  7.5 &amp;  8.9 &amp; 10.1 &amp; 10.8 &amp; 11.4 \\
 \hline
-1 &amp;  3.3 &amp;  4.4 &amp;  5.3 &amp;  5.9 &amp;  6.2 &amp;  6.2 \\
+1 &amp;  3.0 &amp;  5.0 &amp;  6.7 &amp;  8.1 &amp;  9.2 &amp; 10.0 \\
 \hline
-0 &amp;  1.3 &amp;  2.8 &amp;  4.0 &amp;  5.0 &amp;  5.8 &amp;  6.3 \\
+0 &amp; -0.5 &amp;  1.8 &amp;  3.9 &amp;  5.7 &amp;  7.4 &amp;  8.7 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>

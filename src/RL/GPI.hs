@@ -31,6 +31,7 @@ module RL.GPI
   , chooseAndCount
   , poisson'
   , gamma'
+  , gamma
   , withinOnM
   , mean
   ) where
@@ -187,20 +188,32 @@ poisson' n x@(Finite x') =
     then 0   -- for an "apples-to-apples" performance comparison.
     else poissonVals `VS.index` n `VS.index` finite x'
 
-gamma :: Double -> Finite 5 -> Finite 12 -> Double
-gamma shape (Finite expect') (Finite n') =
-  density (gammaDistr shape (expect / shape)) n
- where expect = fromIntegral expect'
-       n      = fromIntegral n'
+-- | Gamma pdf
+--
+-- Assuming `scale = 1`, `shape` should be: 1 + mean.
+gammaPdf :: Double -> Double -> Double -> Double
+gammaPdf shape scale x =
+  density (gammaDistr shape scale) x
 
-gammaVals :: Double -> VS.Vector 5 (VS.Vector 12 Double)
-gammaVals shape = VS.generate (VS.generate . gamma shape)
+-- | Gamma pmf
+--
+-- Scale assumed to be `1`, so as to match the calling signature of
+-- `poisson`.
+gamma :: Finite 5 -> Finite 12 -> Double
+gamma (Finite expect') (Finite n') =
+  0.1 * sum [gammaPdf' (n + x) | x <- [0.1 * m | m <- [-4..5]]]
+    where gammaPdf' = gammaPdf (1 + expect) 1
+          expect    = fromIntegral expect'
+          n         = fromIntegral n'
 
-gamma' :: Double -> Finite 5 -> Finite 21 -> Double
-gamma' shape n x@(Finite x') =
-  if x > 11
+gammaVals :: VS.Vector 5 (VS.Vector 12 Double)
+gammaVals = VS.generate (VS.generate . gamma)
+
+gamma' :: Finite 5 -> Finite 21 -> Double
+gamma' n (Finite x') =
+  if x' > 11
     then 0
-    else gammaVals shape `VS.index` n `VS.index` finite x'
+    else gammaVals `VS.index` n `VS.index` finite x'
 
 -- | First list element less than or equal to given threshold under the
 -- given function, or the last element if the threshold was never met.

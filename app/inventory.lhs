@@ -37,16 +37,17 @@ code
 \begin{code}
 -- doctest doesn't look at the cabal file, so you need pragmas here
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+-- {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
--- {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeOperators #-}
 \end{code}
 
 [libraries](https://www.stackage.org/)
@@ -74,6 +75,7 @@ import Protolude  hiding (show, for)
 
 import Options.Generic
 
+import Control.Arrow                        ((***))
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
@@ -82,6 +84,9 @@ import Data.MemoTrie
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
+import Statistics.Distribution       (density)
+import Statistics.Distribution.Gamma (gammaDistr)
+import Text.Printf
 
 import RL.GPI
 \end{code}
@@ -97,10 +102,10 @@ eps'  = 0    -- my choice
 disc' = 0.9  -- my choice
 
 demand_mean = 1
-demand_var  = 1
-gShape = demand_mean * demand_mean / demand_var
+-- demand_var  = 1
+-- gShape = demand_mean * demand_mean / demand_var
 -- gScale = demand_var / demand_mean
-pDemand = gamma' gShape $ finite $ round demand_mean
+pDemand = gamma' $ finite $ round demand_mean
 
 gLeadTime     =  3
 gMaxOrder     =  5
@@ -283,22 +288,8 @@ main = do
   let nIters = fromMaybe 2 (nIter o)
       nEvals = fromMaybe 1 (nEval o)
 
-  -- Plot the pdfs.
-  writeFile  "other/inventory.md"
-             "### Demand Probability Distribution Function\n\n"
-  toFile def "img/demand.png" $
-    do layout_title .= "Demand Probability Distribution Function"
-       setColors $ map opaque [blue, green, red, yellow]
-       plot ( line "Demand Probability"
-                   [ [ (x, pDemand (finite x))
-                     | x <- [0..20]
-                     ]
-                   ]
-            )
-  appendFile "other/inventory.md" "![](img/demand.png)\n"
-
   -- Calculate and display optimum policy.
-  appendFile "other/inventory.md" "\n### Policy optimization\n\n"
+  writeFile "other/inventory.md" "\n### Policy optimization\n\n"
   let (fs, counts) = unzip $ take (nIters + 1)
                    $ iterate
                        ( optPol
@@ -317,7 +308,6 @@ main = do
                   $ zip acts (P.tail acts)
       ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
         runWriter $ withinOnM eps'
-                              -- ( \ (dv, (_, cnts)) ->
                               ( \ (dv, _) ->
                                   maxAndNonZero dv
                               ) $ zip diffs (P.tail fs)
@@ -330,6 +320,36 @@ main = do
 
   -- DEBUGGING
   appendFile "other/inventory.md" "\n## debug\n\n"
+  -- Plot the pdfs.
+  appendFile  "other/inventory.md"
+             "### Demand Probability Distribution Functions\n\n"
+  let pdf = [ (x, density (gammaDistr (1 + demand_mean) 1) x)
+            | x <- [0.1 * n | n <- [0..100]]
+            ]
+  toFile def "img/pdf.png" $
+    do layout_title .= "Demand Probability Density Function (pdf)"
+       setColors $ map opaque [blue, green, red, yellow]
+       plot ( line "Demand Probability"
+                   [ pdf ]
+            )
+  let pmf = [ (x, gamma' (finite $ round demand_mean) (finite x))
+            | x <- [0..10]
+            ]
+      titles = ["pmf"]
+      values :: [ (String,[Double]) ]
+      -- values = map (\(x,y) -> (show x,[y])) pmf
+      values = map (show *** (: [])) pmf
+  
+  toFile def "img/demand.png" $
+    do layout_title .= "Demand Probability Mass Function (pmf)"
+       setColors $ map opaque [blue, green, red, yellow]
+       layout_x_axis . laxis_generate .= autoIndexAxis (map fst values)
+       plot $ fmap plotBars $ bars titles (addIndexes (map snd values))
+  appendFile "other/inventory.md" "![](img/pdf.png)\n"
+  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * (sum $ map snd pdf))
+  appendFile "other/inventory.md" "\n![](img/demand.png)\n"
+  appendFile "other/inventory.md" $ pack $ printf "\n$\\sum pmf = %5.2f$\n" (sum $ map snd pmf)
+
   toFile def "img/valueDiffs.png" $
     do layout_title .= "Value Changes vs. Evaluation Iteration"
        setColors $ map opaque [blue, green, red, yellow]
@@ -340,7 +360,7 @@ main = do
                        ]
                      ]
               )
-  appendFile "other/inventory.md" "![](img/valueDiffs.png)\n"
+  appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
 
   toFile def "img/actionDiffs.png" $
     do layout_title .= "Action Changes vs. Improvement Iteration"
@@ -351,7 +371,7 @@ main = do
                      ]
                    ]
             )
-  appendFile "other/inventory.md" "![](img/actionDiffs.png)\n"
+  appendFile "other/inventory.md" "\n![](img/actionDiffs.png)\n"
 
   appendFile "other/inventory.md" "\n### E[reward]\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards)
