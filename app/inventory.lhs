@@ -151,7 +151,8 @@ nextStates' MyState{..} toOrder =
   [ MyState (onHand + P.head onOrder - sold)
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
-  | sold <- [0..onHand]
+  -- | sold <- [0..onHand]
+  | sold <- [min onHand 1]
   ]
 
 -- | R(s, a, s')
@@ -167,7 +168,8 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
       - gHoldingCost  * fromIntegral onHand'
       - gStockOutCost * fromIntegral missedSales
-    , pDemand (finite $ fromIntegral demand1)
+    -- , pDemand (finite $ fromIntegral demand1)
+    , 1
     )
   | let demands = [(1,1)]
   -- | let demands = if onHand' == P.head onOrder
