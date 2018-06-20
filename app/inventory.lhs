@@ -169,13 +169,14 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
       - gStockOutCost * fromIntegral missedSales
     , pDemand (finite $ fromIntegral demand1)
     )
-  | let demands = if onHand' == P.head onOrder
-                     then [ (x,                                 x)
-                          | x <- [0..gMaxDemand]
-                          ]
-                     else [ (onHand + P.head onOrder - onHand', x)
-                          | x <- [0..gMaxDemand]
-                          ]
+  | let demands = [(1,1)]
+  -- | let demands = if onHand' == P.head onOrder
+  --                    then [ (x,                                 x)
+  --                         | x <- [0..gMaxDemand]
+  --                         ]
+  --                    else [ (onHand + P.head onOrder - onHand', x)
+  --                         | x <- [0..gMaxDemand]
+  --                         ]
   , (demand0, demand1) <- demands
   , let totAvailable = onHand + sum onOrder + toOrder
         totDemand    = demand0 + (gLeadTime + 1) * demand1
@@ -304,29 +305,25 @@ main = do
 
   -- Value/Action changes vs. Iteration
   toFile def "img/valueDiffs.png" $ do
-    layout_title .= "Value Changes vs. Evaluation Iteration"
+    layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
-    forM_ ( zip counts
-                $ map (printf "Imp. Iter. #%d") [(1::Int)..]
-          ) $ \ (count, lbl) ->
-                plot ( line lbl
-                            [ [ (x, y)
-                              | (x, y) <- zip [(0::Int)..] count
-                              ]
-                            ]
-                     )
+    plot ( line "Policy Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip ( map (* (length $ head counts))
+                                       [(0::Int)..]
+                                 )
+                                 cnts
+                  ]
+                ]
+         )
+    plot ( line "Value Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 (concat counts)
+                  ]
+                ]
+         )
   appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
-
-  toFile def "img/actionDiffs.png" $
-    do layout_title .= "Action Changes vs. Improvement Iteration"
-       setColors $ map opaque [blue, green, red, yellow]
-       plot ( line "Action Changes"
-                   [ [ (x, y)
-                     | (x, y) <- zip [(0::Int)..] cnts
-                     ]
-                   ]
-            )
-  appendFile "other/inventory.md" "\n![](img/actionDiffs.png)\n"
 
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
