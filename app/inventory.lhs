@@ -233,10 +233,9 @@ showFofState g = unlines
 testRewards :: MyState -> Double
 testRewards s =
   mean [ (sum . map (uncurry (*))) $ rewards' s a s'
-       | a  <- acts
+       | a  <- actions' s
        , s' <- nextStates' s a
        ]
- where acts = actions' s
 
 {----------------------------------------------------------------------
   Command line options defintions.
