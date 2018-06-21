@@ -93,8 +93,8 @@ import RL.GPI
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-eps'  = 10    -- my choice
-disc' = 0.9  -- my choice
+eps'  = 10  -- my choice
+disc' =  1  -- my choice
 
 demand_mean = 1
 pDemand = gamma' $ finite $ round demand_mean
@@ -148,12 +148,16 @@ actions' MyState{..} =
 -- | S'(s, a)
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  [ MyState (min gMaxOnHand (onHand + P.head onOrder - sold))
-            (P.tail onOrder ++ [toOrder])
-            (epoch + 1)
-  | sold <- [0..onHand]
-  -- | sold <- [min onHand 1]
-  ]
+  if length (filter (> 0) nextOnOrder) > 1
+    then P.error "nextStates': Found more than one non-zero entries in next onOrder list!"
+    else [ MyState (onHand + P.head onOrder - sold)
+                   nextOnOrder
+                   (epoch + 1)
+         | sold <- [0..onHand]
+         , let onHand' = onHand + P.head onOrder - sold
+         , onHand' <= gMaxOnHand
+         ]
+  where nextOnOrder = P.tail onOrder ++ [toOrder]
 
 -- | R(s, a, s')
 --
@@ -168,15 +172,11 @@ rewards' MyState{..} _ (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
       - gHoldingCost  * fromIntegral onHand'
       - gStockOutCost * fromIntegral missedSales
-    -- , pDemand (finite $ fromIntegral demand)
     , pDemand demand'
-    -- , 1
     )
-  -- | let demands = [(1,1)]
   | let demands = if onHand' == P.head onOrder
                      then [0..gMaxDemand]
                      else [onHand + P.head onOrder - onHand']
-                     -- else [0]
   , demand <- demands
   , let demand' = if demand > 20
                      then P.error (printf "onHand: %d; onOrder: %d; onHand': %d" onHand (P.head onOrder) onHand')

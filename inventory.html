@@ -126,35 +126,35 @@ Original date: June 14, 2018</p>
 <a class="sourceLine" id="cb4-57" data-line-number="57"><span class="co">-- | S&#39;(s, a)</span></a>
 <a class="sourceLine" id="cb4-58" data-line-number="58"><span class="ot">nextStates&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> [<span class="dt">MyState</span>]</a>
 <a class="sourceLine" id="cb4-59" data-line-number="59">nextStates&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} toOrder <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-60" data-line-number="60">  [ <span class="dt">MyState</span> (min gMaxOnHand (onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> sold))</a>
-<a class="sourceLine" id="cb4-61" data-line-number="61">            (P.tail onOrder <span class="fu">++</span> [toOrder])</a>
-<a class="sourceLine" id="cb4-62" data-line-number="62">            (epoch <span class="fu">+</span> <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-63" data-line-number="63">  <span class="fu">|</span> sold <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>onHand]</a>
-<a class="sourceLine" id="cb4-64" data-line-number="64">  <span class="co">-- | sold &lt;- [min onHand 1]</span></a>
-<a class="sourceLine" id="cb4-65" data-line-number="65">  ]</a>
-<a class="sourceLine" id="cb4-66" data-line-number="66"></a>
-<a class="sourceLine" id="cb4-67" data-line-number="67"><span class="co">-- | R(s, a, s&#39;)</span></a>
-<a class="sourceLine" id="cb4-68" data-line-number="68"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-69" data-line-number="69"><span class="co">-- Returns a list of pairs, each containing:</span></a>
-<a class="sourceLine" id="cb4-70" data-line-number="70"><span class="co">-- - a reward value, and</span></a>
-<a class="sourceLine" id="cb4-71" data-line-number="71"><span class="co">-- - the probability of occurence for that value.</span></a>
+<a class="sourceLine" id="cb4-60" data-line-number="60">  <span class="kw">if</span> length (filter (<span class="fu">&gt;</span> <span class="dv">0</span>) nextOnOrder) <span class="fu">&gt;</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-61" data-line-number="61">    <span class="kw">then</span> P.error <span class="st">&quot;nextStates&#39;: Found more than one non-zero entries in next onOrder list!&quot;</span></a>
+<a class="sourceLine" id="cb4-62" data-line-number="62">    <span class="kw">else</span> [ <span class="dt">MyState</span> (onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> sold)</a>
+<a class="sourceLine" id="cb4-63" data-line-number="63">                   nextOnOrder</a>
+<a class="sourceLine" id="cb4-64" data-line-number="64">                   (epoch <span class="fu">+</span> <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-65" data-line-number="65">         <span class="fu">|</span> sold <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>onHand]</a>
+<a class="sourceLine" id="cb4-66" data-line-number="66">         , <span class="kw">let</span> onHand&#39; <span class="fu">=</span> onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> sold</a>
+<a class="sourceLine" id="cb4-67" data-line-number="67">         , onHand&#39; <span class="fu">&lt;=</span> gMaxOnHand</a>
+<a class="sourceLine" id="cb4-68" data-line-number="68">         ]</a>
+<a class="sourceLine" id="cb4-69" data-line-number="69">  <span class="kw">where</span> nextOnOrder <span class="fu">=</span> P.tail onOrder <span class="fu">++</span> [toOrder]</a>
+<a class="sourceLine" id="cb4-70" data-line-number="70"></a>
+<a class="sourceLine" id="cb4-71" data-line-number="71"><span class="co">-- | R(s, a, s&#39;)</span></a>
 <a class="sourceLine" id="cb4-72" data-line-number="72"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-73" data-line-number="73"><span class="co">-- Note: Previous requirement that reward values be unique eliminated,</span></a>
-<a class="sourceLine" id="cb4-74" data-line-number="74"><span class="co">--       for coding convenience and runtime performance improvement.</span></a>
-<a class="sourceLine" id="cb4-75" data-line-number="75"><span class="ot">rewards&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)]</a>
-<a class="sourceLine" id="cb4-76" data-line-number="76">rewards&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} _ (<span class="dt">MyState</span> onHand&#39; _ _) <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-77" data-line-number="77">  [ ( gProfit <span class="fu">*</span> fromIntegral sold</a>
-<a class="sourceLine" id="cb4-78" data-line-number="78">      <span class="fu">-</span> gHoldingCost  <span class="fu">*</span> fromIntegral onHand&#39;</a>
-<a class="sourceLine" id="cb4-79" data-line-number="79">      <span class="fu">-</span> gStockOutCost <span class="fu">*</span> fromIntegral missedSales</a>
-<a class="sourceLine" id="cb4-80" data-line-number="80">    <span class="co">-- , pDemand (finite $ fromIntegral demand)</span></a>
-<a class="sourceLine" id="cb4-81" data-line-number="81">    , pDemand demand&#39;</a>
-<a class="sourceLine" id="cb4-82" data-line-number="82">    <span class="co">-- , 1</span></a>
-<a class="sourceLine" id="cb4-83" data-line-number="83">    )</a>
-<a class="sourceLine" id="cb4-84" data-line-number="84">  <span class="co">-- | let demands = [(1,1)]</span></a>
-<a class="sourceLine" id="cb4-85" data-line-number="85">  <span class="fu">|</span> <span class="kw">let</span> demands <span class="fu">=</span> <span class="kw">if</span> onHand&#39; <span class="fu">==</span> P.head onOrder</a>
-<a class="sourceLine" id="cb4-86" data-line-number="86">                     <span class="kw">then</span> [<span class="dv">0</span><span class="fu">..</span>gMaxDemand]</a>
-<a class="sourceLine" id="cb4-87" data-line-number="87">                     <span class="kw">else</span> [onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> onHand&#39;]</a>
-<a class="sourceLine" id="cb4-88" data-line-number="88">                     <span class="co">-- else [0]</span></a>
+<a class="sourceLine" id="cb4-73" data-line-number="73"><span class="co">-- Returns a list of pairs, each containing:</span></a>
+<a class="sourceLine" id="cb4-74" data-line-number="74"><span class="co">-- - a reward value, and</span></a>
+<a class="sourceLine" id="cb4-75" data-line-number="75"><span class="co">-- - the probability of occurence for that value.</span></a>
+<a class="sourceLine" id="cb4-76" data-line-number="76"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-77" data-line-number="77"><span class="co">-- Note: Previous requirement that reward values be unique eliminated,</span></a>
+<a class="sourceLine" id="cb4-78" data-line-number="78"><span class="co">--       for coding convenience and runtime performance improvement.</span></a>
+<a class="sourceLine" id="cb4-79" data-line-number="79"><span class="ot">rewards&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)]</a>
+<a class="sourceLine" id="cb4-80" data-line-number="80">rewards&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} _ (<span class="dt">MyState</span> onHand&#39; _ _) <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-81" data-line-number="81">  [ ( gProfit <span class="fu">*</span> fromIntegral sold</a>
+<a class="sourceLine" id="cb4-82" data-line-number="82">      <span class="fu">-</span> gHoldingCost  <span class="fu">*</span> fromIntegral onHand&#39;</a>
+<a class="sourceLine" id="cb4-83" data-line-number="83">      <span class="fu">-</span> gStockOutCost <span class="fu">*</span> fromIntegral missedSales</a>
+<a class="sourceLine" id="cb4-84" data-line-number="84">    , pDemand demand&#39;</a>
+<a class="sourceLine" id="cb4-85" data-line-number="85">    )</a>
+<a class="sourceLine" id="cb4-86" data-line-number="86">  <span class="fu">|</span> <span class="kw">let</span> demands <span class="fu">=</span> <span class="kw">if</span> onHand&#39; <span class="fu">==</span> P.head onOrder</a>
+<a class="sourceLine" id="cb4-87" data-line-number="87">                     <span class="kw">then</span> [<span class="dv">0</span><span class="fu">..</span>gMaxDemand]</a>
+<a class="sourceLine" id="cb4-88" data-line-number="88">                     <span class="kw">else</span> [onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> onHand&#39;]</a>
 <a class="sourceLine" id="cb4-89" data-line-number="89">  , demand <span class="ot">&lt;-</span> demands</a>
 <a class="sourceLine" id="cb4-90" data-line-number="90">  , <span class="kw">let</span> demand&#39; <span class="fu">=</span> <span class="kw">if</span> demand <span class="fu">&gt;</span> <span class="dv">20</span></a>
 <a class="sourceLine" id="cb4-91" data-line-number="91">                     <span class="kw">then</span> P.error (printf <span class="st">&quot;onHand: %d; onOrder: %d; onHand&#39;: %d&quot;</span> onHand (P.head onOrder) onHand&#39;)</a>
@@ -369,27 +369,27 @@ c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; -161.5 &amp; -214.0 &amp; -205.7 &amp; -168.8 &amp; -138.4 &amp; -122.9 \\
+10 &amp; -158.4 &amp; -156.5 &amp; -121.9 &amp; -99.1 &amp; -92.2 &amp; -95.5 \\
 \hline
-9 &amp; -148.5 &amp; -164.2 &amp; -226.2 &amp; -219.5 &amp; -182.6 &amp; -152.1 \\
+9 &amp; -145.7 &amp; -161.0 &amp; -168.4 &amp; -135.5 &amp; -112.7 &amp; -105.6 \\
 \hline
-8 &amp; -135.3 &amp; -151.1 &amp; -176.3 &amp; -240.0 &amp; -233.3 &amp; -196.1 \\
+8 &amp; -132.8 &amp; -148.3 &amp; -172.9 &amp; -181.9 &amp; -148.9 &amp; -125.9 \\
 \hline
-7 &amp; -121.8 &amp; -137.8 &amp; -163.1 &amp; -189.9 &amp; -253.4 &amp; -246.4 \\
+7 &amp; -119.6 &amp; -135.2 &amp; -160.0 &amp; -186.2 &amp; -195.1 &amp; -161.8 \\
 \hline
-6 &amp; -108.1 &amp; -124.0 &amp; -149.3 &amp; -176.1 &amp; -202.7 &amp; -265.9 \\
+6 &amp; -106.1 &amp; -121.7 &amp; -146.5 &amp; -172.8 &amp; -198.8 &amp; -207.3 \\
 \hline
-5 &amp; -94.1 &amp; -109.7 &amp; -134.7 &amp; -161.3 &amp; -187.6 &amp; -213.5 \\
+5 &amp; -92.4 &amp; -107.7 &amp; -132.2 &amp; -158.2 &amp; -184.0 &amp; -209.4 \\
 \hline
-4 &amp; -79.9 &amp; -94.4 &amp; -118.6 &amp; -144.4 &amp; -169.9 &amp; -195.0 \\
+4 &amp; -78.5 &amp; -92.7 &amp; -116.4 &amp; -141.7 &amp; -166.7 &amp; -191.3 \\
 \hline
-3 &amp; -65.3 &amp; -77.7 &amp; -100.0 &amp; -123.8 &amp; -147.6 &amp; -170.9 \\
+3 &amp; -64.2 &amp; -76.3 &amp; -98.1 &amp; -121.5 &amp; -144.8 &amp; -167.6 \\
 \hline
-2 &amp; -50.8 &amp; -59.3 &amp; -77.9 &amp; -98.2 &amp; -118.4 &amp; -138.3 \\
+2 &amp; -50.0 &amp; -58.3 &amp; -76.5 &amp; -96.4 &amp; -116.2 &amp; -135.7 \\
 \hline
-1 &amp; -38.2 &amp; -42.2 &amp; -55.9 &amp; -71.3 &amp; -86.7 &amp; -101.8 \\
+1 &amp; -37.6 &amp; -41.5 &amp; -54.9 &amp; -70.0 &amp; -85.1 &amp; -99.9 \\
 \hline
-0 &amp; -36.3 &amp; -39.0 &amp; -51.2 &amp; -65.2 &amp; -79.1 &amp; -92.8 \\
+0 &amp; -35.8 &amp; -38.4 &amp; -50.4 &amp; -64.1 &amp; -77.7 &amp; -91.1 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>
@@ -400,15 +400,15 @@ c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; -0.7 &amp; -1.1 &amp; -1.1 &amp; -0.9 &amp; -0.7 &amp; -0.7 \\
+10 &amp; -0.7 &amp; -0.9 &amp; -0.8 &amp; -0.7 &amp; -0.7 &amp; -0.9 \\
 \hline
-9 &amp; -0.7 &amp; -0.9 &amp; -1.3 &amp; -1.3 &amp; -1.1 &amp; -0.9 \\
+9 &amp; -0.7 &amp; -0.9 &amp; -1.1 &amp; -1.0 &amp; -0.9 &amp; -1.0 \\
 \hline
-8 &amp; -0.7 &amp; -0.9 &amp; -1.1 &amp; -1.6 &amp; -1.6 &amp; -1.3 \\
+8 &amp; -0.7 &amp; -0.9 &amp; -1.1 &amp; -1.4 &amp; -1.3 &amp; -1.3 \\
 \hline
-7 &amp; -0.6 &amp; -0.9 &amp; -1.1 &amp; -1.4 &amp; -1.9 &amp; -1.9 \\
+7 &amp; -0.6 &amp; -0.9 &amp; -1.1 &amp; -1.4 &amp; -1.7 &amp; -1.6 \\
 \hline
-6 &amp; -0.6 &amp; -0.9 &amp; -1.1 &amp; -1.4 &amp; -1.7 &amp; -2.3 \\
+6 &amp; -0.6 &amp; -0.9 &amp; -1.1 &amp; -1.4 &amp; -1.7 &amp; -2.1 \\
 \hline
 5 &amp; -0.5 &amp; -0.9 &amp; -1.2 &amp; -1.5 &amp; -1.8 &amp; -2.1 \\
 \hline
