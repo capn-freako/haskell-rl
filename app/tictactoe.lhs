@@ -451,7 +451,7 @@ main = do
       prss <- getWins $ map runMod runDefs'
       plotWins (printf "img/plot%d.png" i)
                (printf "Average Probability of and Cumulative Learner Wins - %s" title)
-               (toBoth (zip labels) (unzip prss))
+               (toBoth (zip labels) (P.unzip prss))
       appendFile "other/tictactoe.md" $ pack $ printf "![](img/plot%d.png)\n" i
 
 playShowBoth :: [RunDef] -> IO ()

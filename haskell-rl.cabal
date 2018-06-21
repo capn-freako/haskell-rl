@@ -249,35 +249,35 @@ executable tic-tac-toe
 --     TypeFamilies,
 --     TypeOperators
 
-executable gambler
-  default-language:
-    Haskell2010
-  ghc-options:
-    -O2
-    -funbox-strict-fields
-    -threaded
-    -rtsopts
-    -with-rtsopts=-N
-  hs-source-dirs:
-    app
-  main-is:
-    gambler.lhs
-  build-depends:
-    base >= 4.7 && < 5
-    , protolude
-    , mtl
-    , optparse-generic
-    , vector-sized
-    -- , vector
-    , finite-typelits
-    , text
-    -- , QuickCheck
-    -- , monad-extras
-    -- , random-shuffle
-    -- , random
-    , Chart
-    , Chart-cairo
-    , haskell-rl
+-- executable gambler
+--   default-language:
+--     Haskell2010
+--   ghc-options:
+--     -O2
+--     -funbox-strict-fields
+--     -threaded
+--     -rtsopts
+--     -with-rtsopts=-N
+--   hs-source-dirs:
+--     app
+--   main-is:
+--     gambler.lhs
+--   build-depends:
+--     base >= 4.7 && < 5
+--     , protolude
+--     , mtl
+--     , optparse-generic
+--     , vector-sized
+--     -- , vector
+--     , finite-typelits
+--     , text
+--     -- , QuickCheck
+--     -- , monad-extras
+--     -- , random-shuffle
+--     -- , random
+--     , Chart
+--     , Chart-cairo
+--     , haskell-rl
 
 executable blackjack
   default-language:

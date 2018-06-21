@@ -40,7 +40,7 @@ import qualified Prelude as P
 import Prelude (Show(..))  -- , String)
 import Protolude  hiding (show, for)
 
--- import GHC.TypeNats
+import GHC.TypeLits
 
 import qualified Data.Vector.Sized   as VS
 
@@ -108,16 +108,17 @@ optPol :: ( Eq s, HasTrie s
        -> (s -> (a, Double), [Int])
 optPol RLType{..} (g, _) = (bestA, cnts)
  where
-  -- bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
-  bestA   = minimumBy (compare `on` fst)  -- This one groups by value and, within the max. value group,
-            . P.head . reverse            -- selects the minimum action. This change was motivated by
-            . groupBy ((==) `on` snd)     -- a warning, re: instability, in the text.
-            . sortBy (compare `on` snd) . aVals v'
+  bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
+  -- bestA   = minimumBy (compare `on` fst)  -- This one groups by value and, within the max. value group,
+  --           . P.head . reverse            -- selects the minimum action. This change was motivated by
+  --           . groupBy ((==) `on` snd)     -- a warning, re: instability, in the text.
+  --           . sortBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
                    in [ (a, actVal'' (s, a))
                       | a <- actions s
                       ]
   actVal' = memo . uncurry . actVal
+  -- actVal' = uncurry . actVal
   actVal v s a =
     fromMaybe  -- We look for terminal states first, before performing the default action.
       ( sum [ pt * disc * u + rt
@@ -126,6 +127,7 @@ optPol RLType{..} (g, _) = (bestA, cnts)
             , let (pt, rt) = foldl' prSum (0,0)
                                     [ (p, p * r)
                                     | (r, p) <- rs' s a s'
+                                    -- | (r, p) <- rewards s a s'
                                     ]
             ]
       )

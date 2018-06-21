@@ -60,7 +60,7 @@ code
 import qualified Prelude as P
 import Prelude (unlines, Show(..), String, error, (!!))
 
-import Protolude  hiding (show, for)
+import Protolude  hiding (show, for, error)
 import Options.Generic
 
 import qualified Data.Vector.Sized as VS

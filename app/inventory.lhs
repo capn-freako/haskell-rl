@@ -151,8 +151,8 @@ nextStates' MyState{..} toOrder =
   [ MyState (onHand + P.head onOrder - sold)
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
-  -- | sold <- [0..onHand]
-  | sold <- [min onHand 1]
+  | sold <- [0..onHand]
+  -- | sold <- [min onHand 1]
   ]
 
 -- | R(s, a, s')
@@ -164,26 +164,25 @@ nextStates' MyState{..} toOrder =
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
 rewards' :: MyState -> MyAction -> MyState -> [(Double, Double)]
-rewards' MyState{..} toOrder (MyState onHand' _ _) =
+rewards' MyState{..} _ (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
       - gHoldingCost  * fromIntegral onHand'
       - gStockOutCost * fromIntegral missedSales
-    -- , pDemand (finite $ fromIntegral demand1)
-    , 1
+    -- , pDemand (finite $ fromIntegral demand)
+    , pDemand demand'
+    -- , 1
     )
-  | let demands = [(1,1)]
-  -- | let demands = if onHand' == P.head onOrder
-  --                    then [ (x,                                 x)
-  --                         | x <- [0..gMaxDemand]
-  --                         ]
-  --                    else [ (onHand + P.head onOrder - onHand', x)
-  --                         | x <- [0..gMaxDemand]
-  --                         ]
-  , (demand0, demand1) <- demands
-  , let totAvailable = onHand + sum onOrder + toOrder
-        totDemand    = demand0 + (gLeadTime + 1) * demand1
-        sold         = min totAvailable totDemand
-        missedSales  = max 0 (totDemand - totAvailable)
+  -- | let demands = [(1,1)]
+  | let demands = if onHand' == P.head onOrder
+                     then [0..gMaxDemand]
+                     else [onHand + P.head onOrder - onHand']
+                     -- else [0]
+  , demand <- demands
+  , let demand' = if demand > 20
+                     then P.error (printf "onHand: %d; onOrder: %d; onHand': %d" onHand (P.head onOrder) onHand')
+                     else finite (fromIntegral demand)
+  , let sold         = min onHand demand
+        missedSales  = max 0 (demand - onHand)
   ]
 
 -- NOTE: Please, keep the following commentary, as it explains the
@@ -201,11 +200,6 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
 --   onHand' = onHand + head onOrder - demand
 --   demand  = onHand + head onOrder - onHand'
 --   => Demand is deterministic.
---
--- NOTE: In order to avoid exponential state space explosion, I'm
---       assuming that demand is constant for all days of interest
---       after the first, which is determined according to the
---       commentary above.
 
 
 -- | Show a function from `MyState` as a table.
@@ -267,9 +261,13 @@ main = do
   let nIters = fromMaybe 2 (nIter o)
       nEvals = fromMaybe 1 (nEval o)
 
+  -- TEMP DEBUG
+  -- VS.mapM_ (printf "%d " . onHand) allStatesV
+  -- printf "\n"
+
   -- Calculate and display optimum policy.
   writeFile "other/inventory.md" "\n### Policy optimization\n\n"
-  let (fs, counts) = unzip $ P.tail $ take (nIters + 1)
+  let (fs, counts) = P.unzip $ P.tail $ take (nIters + 1)
                    $ iterate
                        ( optPol
                            rltDef
