@@ -148,7 +148,7 @@ actions' MyState{..} =
 -- | S'(s, a)
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  [ MyState (onHand + P.head onOrder - sold)
+  [ MyState (min gMaxOnHand (onHand + P.head onOrder - sold))
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
   | sold <- [0..onHand]
