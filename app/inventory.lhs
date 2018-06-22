@@ -67,14 +67,16 @@ code
 \begin{code}
 import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
-import Protolude  hiding (show, for)
+import Protolude  hiding (show, for, first)
 
 import Options.Generic
 
-import Control.Arrow                        ((***))
+-- import Control.Arrow                        ((***))
+import Control.Arrow
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
+import Data.List                            (sortBy, groupBy)
 import Data.MemoTrie
 import Data.Text                            (pack)
 import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
@@ -148,16 +150,48 @@ actions' MyState{..} =
 -- | S'(s, a)
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  if length (filter (> 0) nextOnOrder) > 1
-    then P.error "nextStates': Found more than one non-zero entries in next onOrder list!"
-    else [ MyState (onHand + P.head onOrder - sold)
-                   nextOnOrder
-                   (epoch + 1)
-         | sold <- [0..onHand]
-         , let onHand' = onHand + P.head onOrder - sold
-         , onHand' <= gMaxOnHand
-         ]
-  where nextOnOrder = P.tail onOrder ++ [toOrder]
+  [ MyState (onHand + P.head onOrder - sold)
+            (P.tail onOrder ++ [toOrder])
+            (epoch + 1)
+  | sold <- [0..onHand]
+  ]
+  -- if length (filter (> 0) onOrder') > 1
+  --   then P.error "nextStates': Found more than one non-zero entries in next onOrder list!"
+  --   else [ MyState onHand' onOrder' (epoch + 1)
+  --        | sold <- [0..onHand]
+  --        , let onHand' = onHand + P.head onOrder - sold
+  --        , onHand' <= gMaxOnHand
+  --        ]
+  -- where onOrder' = P.tail onOrder ++ [toOrder]
+
+-- | Possible demands, along with their probabilities, for a single day.
+initDmnds :: [(Int, Double)]
+initDmnds =
+  [ (d, pDemand $ finite $ fromIntegral d)
+  | d <- [0..gMaxDemand]
+  ]
+
+-- | Possible demands for n days, along with their probabilities.
+residDmnds :: Int -> [([Int], Double)]
+residDmnds = map (map fst &&& product . map snd) . allCombs
+
+-- | Possible uniform demands for n days, along with their probabilities.
+residDmnds' :: Int -> [([Int], Double)]
+residDmnds' n = map (first (\m -> replicate n (m `div` n))) $ residDmndTots n
+
+-- | Possible total demands for n days, along with their probabilities.
+residDmndTots :: Int -> [(Int, Double)]
+residDmndTots n = ( map ((fst . P.head) &&& (sum . map snd))
+                  . groupBy ((==)    `on` fst)
+                  . sortBy  (compare `on` fst)
+                  ) allTotals
+ where
+  allTotals :: [(Int, Double)]
+  allTotals = map (sum . map fst &&& product . map snd) $ allCombs n
+
+-- | All possible combinations of demands for n days.
+allCombs :: Int -> [[(Int, Double)]]
+allCombs n = sequenceA $ replicate n initDmnds
 
 -- | R(s, a, s')
 --
@@ -168,21 +202,33 @@ nextStates' MyState{..} toOrder =
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
 rewards' :: MyState -> MyAction -> MyState -> [(Double, Double)]
-rewards' MyState{..} _ (MyState onHand' _ _) =
+rewards' MyState{..} toOrder (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
-      - gHoldingCost  * fromIntegral onHand'
-      - gStockOutCost * fromIntegral missedSales
-    , pDemand demand'
+      - gHoldingCost  * fromIntegral held
+      - gStockOutCost * fromIntegral stockOut
+    , pInit * pResid
     )
-  | let demands = if onHand' == P.head onOrder
-                     then [0..gMaxDemand]
-                     else [onHand + P.head onOrder - onHand']
-  , demand <- demands
-  , let demand' = if demand > 20
-                     then P.error (printf "onHand: %d; onOrder: %d; onHand': %d" onHand (P.head onOrder) onHand')
-                     else finite (fromIntegral demand)
-  , let sold         = min onHand demand
-        missedSales  = max 0 (demand - onHand)
+  | let initDmnds' =
+          if onHand' == P.head onOrder
+            then initDmnds
+            else [(onHand + P.head onOrder - onHand', 1)]  -- Demand is deterministic in this case.
+  , (initDemand,  pInit)  <- initDmnds'
+  , (residDemand, pResid) <- residDmnds' $ gLeadTime + 1
+  , initDemand >= 0 && initDemand <= gMaxDemand
+  , let sold         = min totAvailable totDemand
+        totAvailable = onHand + sum onOrder + toOrder
+        totDemand    = initDemand + sum residDemand
+        stockOut     = negate $ sum $ map (min 0) stock
+        held         =          sum $ map (max 0) stock
+        stock        =
+          flip evalState 0 $
+            traverse ( \ (deliv, demand) -> do
+                         accum <- get
+                         let newAcc = accum + deliv - demand
+                         put newAcc
+                         return newAcc
+                     ) $ zip (onHand : onOrder ++ [toOrder])
+                             (initDemand : residDemand)
   ]
 
 -- NOTE: Please, keep the following commentary, as it explains the
