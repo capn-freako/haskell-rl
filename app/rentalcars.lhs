@@ -194,6 +194,16 @@ showFofState g = unlines
     )
   )
 
+-- | Expected reward for a given state, assuming equiprobable actions.
+-- testRewards :: RCState -> Float
+-- testRewards s =
+--   sum [ uncurry (*) r
+--       | a  <- acts
+--       , s' <- nextStates s a
+--       , r  <- rewards s a s'
+--       ] / (fromIntegral . length) acts
+--  where acts = actions s
+
 {----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}

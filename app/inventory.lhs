@@ -71,18 +71,17 @@ import Protolude  hiding (show, for, first)
 
 import Options.Generic
 
--- import Control.Arrow                        ((***))
 import Control.Arrow
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
-import Data.List                            (sortBy, groupBy)
+import Data.List                              (sortBy, groupBy)
 import Data.MemoTrie
-import Data.Text                            (pack)
-import Graphics.Rendering.Chart.Easy hiding (Wrapped, Unwrapped, Empty)
+import Data.Text                              (pack)
+import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
-import Statistics.Distribution       (density)
-import Statistics.Distribution.Gamma (gammaDistr)
+import Statistics.Distribution                (density)
+import Statistics.Distribution.Gamma          (gammaDistr)
 import Text.Printf
 
 import RL.GPI
@@ -95,11 +94,10 @@ import RL.GPI
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-eps'  = 10  -- my choice
 disc' =  1  -- my choice
 
-demand_mean = 1
-pDemand = gamma' $ finite $ round demand_mean
+demandMean = 1
+pDemand    = gamma' $ finite $ round demandMean
 
 gLeadTime     =  3
 gMaxOrder     =  5
@@ -107,8 +105,6 @@ gMaxOnHand    = 10
 -- gReviewPer    =  1  -- `showFofState` assumes: gReviewPer = gLeadTime.
 gMaxDemand    = 10
 gProfit       =  0
-gHoldingCost  =  1
-gStockOutCost =  2
 
 data MyState  = MyState
   { onHand  :: Int
@@ -131,10 +127,12 @@ allStates =
   | x <- [0..gMaxOnHand]
   , n <- [0..(gLeadTime - 1)]
   , y <- [0..gMaxOrder]
-  , let ys = y : (replicate (gLeadTime - 1) 0)
+  , let ys = y : replicate (gLeadTime - 1) 0
   ]
 
 -- Just a sized vector alternative to the list above.
+--
+-- TODO: Figure out how to determine the size from the constants above.
 allStatesV :: VS.Vector 198 MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
@@ -155,43 +153,6 @@ nextStates' MyState{..} toOrder =
             (epoch + 1)
   | sold <- [0..onHand]
   ]
-  -- if length (filter (> 0) onOrder') > 1
-  --   then P.error "nextStates': Found more than one non-zero entries in next onOrder list!"
-  --   else [ MyState onHand' onOrder' (epoch + 1)
-  --        | sold <- [0..onHand]
-  --        , let onHand' = onHand + P.head onOrder - sold
-  --        , onHand' <= gMaxOnHand
-  --        ]
-  -- where onOrder' = P.tail onOrder ++ [toOrder]
-
--- | Possible demands, along with their probabilities, for a single day.
-initDmnds :: [(Int, Double)]
-initDmnds =
-  [ (d, pDemand $ finite $ fromIntegral d)
-  | d <- [0..gMaxDemand]
-  ]
-
--- | Possible demands for n days, along with their probabilities.
-residDmnds :: Int -> [([Int], Double)]
-residDmnds = map (map fst &&& product . map snd) . allCombs
-
--- | Possible uniform demands for n days, along with their probabilities.
-residDmnds' :: Int -> [([Int], Double)]
-residDmnds' n = map (first (\m -> replicate n (m `div` n))) $ residDmndTots n
-
--- | Possible total demands for n days, along with their probabilities.
-residDmndTots :: Int -> [(Int, Double)]
-residDmndTots n = ( map ((fst . P.head) &&& (sum . map snd))
-                  . groupBy ((==)    `on` fst)
-                  . sortBy  (compare `on` fst)
-                  ) allTotals
- where
-  allTotals :: [(Int, Double)]
-  allTotals = map (sum . map fst &&& product . map snd) $ allCombs n
-
--- | All possible combinations of demands for n days.
-allCombs :: Int -> [[(Int, Double)]]
-allCombs n = sequenceA $ replicate n initDmnds
 
 -- | R(s, a, s')
 --
@@ -201,11 +162,11 @@ allCombs n = sequenceA $ replicate n initDmnds
 --
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
-rewards' :: MyState -> MyAction -> MyState -> [(Double, Double)]
-rewards' MyState{..} toOrder (MyState onHand' _ _) =
+rewards' :: Int -> MyState -> MyAction -> MyState -> [(Double, Double)]
+rewards' p MyState{..} toOrder (MyState onHand' _ _) =
   [ ( gProfit * fromIntegral sold
-      - gHoldingCost  * fromIntegral held
-      - gStockOutCost * fromIntegral stockOut
+      - fromIntegral held
+      - fromIntegral p * fromIntegral stockOut
     , pInit * pResid
     )
   | let initDmnds' =
@@ -247,20 +208,72 @@ rewards' MyState{..} toOrder (MyState onHand' _ _) =
 --   demand  = onHand + head onOrder - onHand'
 --   => Demand is deterministic.
 
+-- | Possible demands, along with their probabilities, for a single day.
+initDmnds :: [(Int, Double)]
+initDmnds =
+  [ (d, pDemand $ finite $ fromIntegral d)
+  | d <- [0..gMaxDemand]
+  ]
 
--- | Show a function from `MyState` as a table.
+-- | Possible demands for n days, along with their probabilities.
 --
--- Note: Naively assumes that lead time = review period.
-showFofState :: (Show a) => (MyState -> a) -> String
-showFofState g = unlines
+-- Note: This creates approx. 10,000 possibilities, which is not
+--       tractable!
+-- residDmnds :: Int -> [([Int], Double)]
+-- residDmnds = map (map fst &&& product . map snd) . allCombs
+
+-- | Possible uniform demands for n days, along with their probabilities.
+--
+-- Note: Slight deviations from uniformity are allowed, to keep total
+--       demand correct.
+residDmnds' :: Int -> [([Int], Double)]
+residDmnds' n =
+  map ( first ( \ m ->
+                  let r = fromIntegral m / fromIntegral n
+                   in foldl' ( \ ds k ->
+                                 (round (fromIntegral k * r) - sum ds) : ds
+                             ) [] [1..n]
+              )
+      ) $ residDmndTots n
+
+-- | Possible total demands for n days, along with their probabilities.
+residDmndTots :: Int -> [(Int, Double)]
+residDmndTots n = ( map ((fst . P.head) &&& (sum . map snd))
+                  . groupBy ((==)    `on` fst)
+                  . sortBy  (compare `on` fst)
+                  ) allTotals
+ where
+  allTotals :: [(Int, Double)]
+  allTotals = map (sum . map fst &&& product . map snd) $ allCombs n
+
+-- | All possible combinations of demands for n days.
+allCombs :: Int -> [[(Int, Double)]]
+allCombs n = sequenceA $ replicate n initDmnds
+
+-- | Show a function from `MyState`, assuming the `On Order` quantity
+-- is in the first element of the `onOrder` list.
+--
+-- This makes sense as the default, since actions (i.e. - orders) may
+-- only be taken (i.e. - placed) when the first element of `onOrder` is
+-- non-zero, because that corresponds to an epoch that is an integral
+-- multiple of the review period, which is, currently, assumed to be
+-- equal to lead time.
+showFofState :: (Show a, Ord a) => (MyState -> a) -> String
+showFofState = showFofState' 0
+
+-- | Show a function from `MyState`, assuming the `On Order` quantity
+-- is in the `k-th` element of the `onOrder` list.
+showFofState' :: (Show a, Ord a) => Int -> (MyState -> a) -> String
+showFofState' k g = unlines
   ( "\\begin{array}{" : intersperse '|' (replicate (gMaxOrder + 1) 'c') : "}" :
     ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (gMaxOrder + 1) ' ') ++ " \\\\") :
       ["\\hline"] ++
       intersperse "\\hline"
         ( map ((++ " \\\\") . intercalate " & ")
               [ (show onHnd :) $ map show
-                [ g (MyState onHnd (onOrdr : (replicate (gLeadTime - 1) 0)) 0)
+                [ g (MyState onHnd (drop k ys ++ take k ys) k)
                 | onOrdr <- [0..gMaxOrder]
+                , let ys = onOrdr : replicate (gLeadTime - 1) 0
                 ]
               | onHnd' <- [0..gMaxOnHand]
               , let onHnd = gMaxOnHand - onHnd'
@@ -273,9 +286,9 @@ showFofState g = unlines
   )
 
 -- | Expected reward for a given state, assuming equiprobable actions.
-testRewards :: MyState -> Double
-testRewards s =
-  mean [ (sum . map (uncurry (*))) $ rewards' s a s'
+testRewards :: Int -> MyState -> Double
+testRewards p s =
+  mean [ (sum . map (uncurry (*))) $ rewards' p s a s'
        | a  <- actions' s
        , s' <- nextStates' s a
        ]
@@ -289,6 +302,10 @@ data Opts w = Opts
         "The number of policy improvement iterations"
     , nEval :: w ::: Maybe Int <?>
         "The number of policy evaluation iterations per policy improvement iteration"
+    , p     :: w ::: Maybe Int <?>
+        "The ratio of stock-out to holding costs"
+    , eps   :: w ::: Maybe Double <?>
+        "The convergence tolerance for iteration"
     }
     deriving (Generic)
 
@@ -304,16 +321,14 @@ main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A toy inventory optimizer."
-  let nIters = fromMaybe 2 (nIter o)
-      nEvals = fromMaybe 1 (nEval o)
-
-  -- TEMP DEBUG
-  -- VS.mapM_ (printf "%d " . onHand) allStatesV
-  -- printf "\n"
+  let nIters = fromMaybe  2 (nIter o)
+      nEvals = fromMaybe  1 (nEval o)
+      pVal   = fromMaybe 50 (p     o)
+      eps'   = fromMaybe  0.1 (eps o)
 
   -- Calculate and display optimum policy.
   writeFile "other/inventory.md" "\n### Policy optimization\n\n"
-  let (fs, counts) = P.unzip $ P.tail $ take (nIters + 1)
+  let (fs, counts') = P.unzip $ take (nIters + 1)
                    $ iterate
                        ( optPol
                            rltDef
@@ -323,15 +338,16 @@ main = do
                              , states     = allStatesV
                              , actions    = actions'
                              , nextStates = nextStates'
-                             , rewards    = rewards'
+                             , rewards    = rewards' pVal
                              }
-                       ) (const (0,0), [])
+                       ) (const (5, -7000), [])  -- Via iterative guessing.
+      counts = P.tail counts'
       acts  = map (\f -> VS.map (fst . f) allStatesV) fs
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
       ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
         -- runWriter $ withinOnM eps'
-        runWriter $ withinOnM 0
+        runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
                               ( \ (dv, _) ->
                                   maxAndNonZero dv
                               ) $ zip diffs (P.tail fs)
@@ -347,7 +363,7 @@ main = do
 
   -- Reward expectations
   appendFile "other/inventory.md" "\n### E[reward]\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards)
+  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards pVal)
 
   -- Value/Action changes vs. Iteration
   toFile def "img/valueDiffs.png" $ do
@@ -355,7 +371,7 @@ main = do
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
     plot ( line "Policy Changes"
                 [ [ (x,y)
-                  | (x,y) <- zip ( map (* (length $ head counts))
+                  | (x,y) <- zip ( map (* (length $ P.head counts))
                                        [(0::Int)..]
                                  )
                                  cnts
@@ -374,7 +390,7 @@ main = do
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
              "\n### Demand Probability Distribution Functions\n\n"
-  let pdf = [ (x, density (gammaDistr (1 + demand_mean) 1) x)
+  let pdf = [ (x, density (gammaDistr (1 + demandMean) 1) x)
             | x <- [0.1 * n | n <- [0..100]]
             ]
   toFile def "img/pdf.png" $
@@ -383,20 +399,20 @@ main = do
        plot ( line "Demand Probability"
                    [ pdf ]
             )
-  let pmf = [ (x, gamma' (finite $ round demand_mean) (finite x))
+  let pmf = [ (x, gamma' (finite $ round demandMean) (finite x))
             | x <- [0..10]
             ]
       titles = ["pmf"]
       values :: [ (String,[Double]) ]
       values = map (show *** (: [])) pmf
-  
+
   toFile def "img/demand.png" $
     do layout_title .= "Demand Probability Mass Function (pmf)"
        setColors $ map opaque [blue, green, red, yellow]
        layout_x_axis . laxis_generate .= autoIndexAxis (map fst values)
-       plot $ fmap plotBars $ bars titles (addIndexes (map snd values))
+       plot $ plotBars <$> bars titles (addIndexes (map snd values))
   appendFile "other/inventory.md" "![](img/pdf.png)\n"
-  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * (sum $ map snd pdf))
+  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * sum (map snd pdf))
   appendFile "other/inventory.md" "\n![](img/demand.png)\n"
   appendFile "other/inventory.md" $ pack $ printf "\n$\\sum pmf = %5.2f$\n" (sum $ map snd pmf)
 

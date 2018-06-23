@@ -37,10 +37,8 @@ module RL.GPI
   ) where
 
 import qualified Prelude as P
-import Prelude (Show(..))  -- , String)
+import Prelude (Show(..))
 import Protolude  hiding (show, for)
-
-import GHC.TypeLits
 
 import qualified Data.Vector.Sized   as VS
 
@@ -68,10 +66,9 @@ instance (KnownNat n) => HasTrie (Finite n) where
 
 -- | Abstract data type, to future proof API.
 data RLType s a n = RLType
-  { disc       :: Double  -- discount rate
-  , epsilon    :: Double  -- convergence tolerance
-  , maxIter    :: Int    -- max. eval. iterations (0 = Value Iteration)
-  -- , states     :: VS.Vector (n + 1) s
+  { disc       :: Double         -- discount rate
+  , epsilon    :: Double         -- convergence tolerance
+  , maxIter    :: Int            -- max. eval. iterations (0 = Value Iteration)
   , states     :: VS.Vector n s
   , actions    :: s -> [a]
   , nextStates :: s -> a -> [s]
@@ -100,7 +97,6 @@ rltDef = RLType
 -- Returns a combined policy & value function.
 optPol :: ( Eq s, HasTrie s
           , Ord a, HasTrie a
-          -- , KnownNat (n + 1)
           , KnownNat n
           )
        => RLType s a n               -- ^ abstract type, to protect API
@@ -108,31 +104,26 @@ optPol :: ( Eq s, HasTrie s
        -> (s -> (a, Double), [Int])
 optPol RLType{..} (g, _) = (bestA, cnts)
  where
-  bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
-  -- bestA   = minimumBy (compare `on` fst)  -- This one groups by value and, within the max. value group,
-  --           . P.head . reverse            -- selects the minimum action. This change was motivated by
-  --           . groupBy ((==) `on` snd)     -- a warning, re: instability, in the text.
-  --           . sortBy (compare `on` snd) . aVals v'
+  -- bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
+  bestA   = minimumBy (compare `on` fst)  -- This one groups by value and, within the max. value group,
+            . P.last                      -- selects the minimum action. This change was motivated by
+            . groupBy ((==) `on` snd)     -- a warning, re: instability, in the text.
+            . sortBy (compare `on` snd) . aVals v'
   aVals v = \s -> let actVal'' = actVal' v
                    in [ (a, actVal'' (s, a))
                       | a <- actions s
                       ]
   actVal' = memo . uncurry . actVal
-  -- actVal' = uncurry . actVal
   actVal v s a =
     fromMaybe  -- We look for terminal states first, before performing the default action.
-      ( sum [ pt * disc * u + rt
-            | s' <- nextStates s a
-            , let u = v s'
-            , let (pt, rt) = foldl' prSum (0,0)
-                                    [ (p, p * r)
-                                    | (r, p) <- rs' s a s'
-                                    -- | (r, p) <- rewards s a s'
-                                    ]
-            ]
+      ( mean [ disc * v s' + expRwd
+                | s' <- nextStates s a
+                , let expRwd = sum [ p * r
+                                   | (r, p) <- rs' s a s'
+                                   ]
+                ]
       )
       $ lookup s stateVals
-  prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
   ((_, v'), cnts) =  -- `cnts` is # of value changes > epsilon.
     if length evalIters == 1
@@ -166,7 +157,7 @@ instance Show Pfloat where
   show x = printf "%4.1f" (unPfloat x)
 
 newtype Pdouble = Pdouble { unPdouble :: Double }
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Show Pdouble where
   show x = printf "%4.1f" (unPdouble x)
@@ -194,8 +185,7 @@ poisson' n x@(Finite x') =
 --
 -- Assuming `scale = 1`, `shape` should be: 1 + mean.
 gammaPdf :: Double -> Double -> Double -> Double
-gammaPdf shape scale x =
-  density (gammaDistr shape scale) x
+gammaPdf shape scale = density (gammaDistr shape scale)
 
 -- | Gamma pmf
 --
@@ -216,27 +206,6 @@ gamma' n (Finite x') =
   if x' > 11
     then 0
     else gammaVals `VS.index` n `VS.index` finite x'
-
--- | First list element less than or equal to given threshold under the
--- given function, or the last element if the threshold was never met.
---
--- A return value of 'Nothing' indicates an empty list was given.
--- withinOn :: Float -> (a -> Float) -> [a] -> Maybe a
--- withinOn eps f xs = do
---   n <- withinIx eps $ map f xs
---   return $ xs !! n
-
--- | Index of first list element less than or equal to given threshold,
--- or the index of the last element if the threshold was never met.
---
--- A return value of 'Nothing' indicates an empty list was given.
--- withinIx :: Float -> [Float] -> Maybe Int
--- withinIx _   [] = Nothing
--- withinIx eps xs = Just $ withinIx' 0 xs
---  where withinIx' n []     = n - 1
---        withinIx' n (y:ys) = if y <= eps
---                               then n
---                               else withinIx' (n+1) ys
 
 -- | Monadically search list for first element less than
 -- given threshold under the given function, and return the last element
@@ -271,34 +240,6 @@ withinIxM eps xs = withinIxM' 0 xs
          if y' < eps then return (Just n)
                      else withinIxM' (n+1) ys
 
--- | Return the maximum value of a set, as well as a scripted log
--- message, regarding the number of non-zero elements in the set.
---
--- (See documentation for `chooseAndCount` function.)
--- maxAndNonZeroMsg :: (Foldable t, Num a, Ord a) => String -> t a -> Writer String a
--- maxAndNonZeroMsg = chooseAndCountMsg max (/= 0)
-
--- | Choose a value from the set using the given comparison function,
--- and provide a scripted log message, regarding the number of elements
--- in the set meeting the given criteria.
--- chooseAndCountMsg :: (Foldable t, Num a)
---                => (a -> a -> a)  -- ^ choice function
---                -> (a -> Bool)    -- ^ counting predicate
---                -> String         -- ^ message script (Should contain precisely 1 "%d".)
---                -> t a            -- ^ foldable set of elements to count/compare
---                -> Writer String a
--- chooseAndCountMsg f p s xs = do
---   let (val, cnt::Int) =
---         foldl' ( \ (v, c) x ->
---                    ( f v x
---                    , if p x
---                        then c + 1
---                        else c
---                    )
---                ) (0,0) xs
---   tell $ printf s cnt
---   return val
-
 -- | Return the maximum value of a set, as well as a count of the number
 -- of non-zero elements in the set.
 --
@@ -325,16 +266,6 @@ chooseAndCount f p xs = do
                ) (0,0) xs
   tell [cnt]
   return val
-
--- | Expected reward for a given state, assuming equiprobable actions.
--- testRewards :: RCState -> Float
--- testRewards s =
---   sum [ uncurry (*) r
---       | a  <- acts
---       , s' <- nextStates s a
---       , r  <- rewards s a s'
---       ] / (fromIntegral . length) acts
---  where acts = actions s
 
 vsFor = flip VS.map
 
