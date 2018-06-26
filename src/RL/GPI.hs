@@ -116,14 +116,17 @@ optPol RLType{..} (g, _) = (bestA, cnts)
   actVal' = memo . uncurry . actVal
   actVal v s a =
     fromMaybe  -- We look for terminal states first, before performing the default action.
-      ( mean [ disc * v s' + expRwd
-                | s' <- nextStates s a
-                , let expRwd = sum [ p * r
-                                   | (r, p) <- rs' s a s'
-                                   ]
-                ]
+      ( sum [ pt * disc * u + rt
+            | s' <- nextStates s a
+            , let u = v s'
+            , let (pt, rt) = foldl' prSum (0,0)
+                                    [ (p, p * r)
+                                    | (r, p) <- rs' s a s'
+                                    ]
+            ]
       )
       $ lookup s stateVals
+  prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
   ((_, v'), cnts) =  -- `cnts` is # of value changes > epsilon.
     if length evalIters == 1

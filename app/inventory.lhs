@@ -67,7 +67,7 @@ code
 \begin{code}
 import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
-import Protolude  hiding (show, for, first)
+import Protolude  hiding (show, for, first, second)
 
 import Options.Generic
 
@@ -110,7 +110,7 @@ data MyState  = MyState
   { onHand  :: Int
   , onOrder :: [Int]
   , epoch   :: Int
-  } deriving (Show, Eq, Generic)
+  } deriving (Show, Eq, Ord, Generic)
 
 instance HasTrie MyState where
   newtype (MyState :->: b) = MyStateTrie { unMyStateTrie :: Reg MyState :->: b } 
@@ -145,13 +145,13 @@ actions' MyState{..} =
      then [0]
      else [0..gMaxOrder]
 
--- | S'(s, a)
+-- | S'(s, a) - list of next possible states and their probabilities.
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  [ MyState (onHand + P.head onOrder - sold)
+  [ MyState (onHand + P.head onOrder - demand)
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
-  | sold <- [0..onHand]
+  | demand <- [0..gMaxDemand]
   ]
 
 -- | R(s, a, s')
@@ -163,50 +163,14 @@ nextStates' MyState{..} toOrder =
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
 rewards' :: Int -> MyState -> MyAction -> MyState -> [(Double, Double)]
-rewards' p MyState{..} toOrder (MyState onHand' _ _) =
-  [ ( gProfit * fromIntegral sold
-      - fromIntegral held
-      - fromIntegral p * fromIntegral stockOut
-    , pInit * pResid
+rewards' p MyState{..} _ (MyState onHand' _ _) =
+  [ ( fromIntegral p * fromIntegral stockOut - fromIntegral held
+    , pDemand $ finite $ fromIntegral demand
     )
-  | let initDmnds' =
-          if onHand' == P.head onOrder
-            then initDmnds
-            else [(onHand + P.head onOrder - onHand', 1)]  -- Demand is deterministic in this case.
-  , (initDemand,  pInit)  <- initDmnds'
-  , (residDemand, pResid) <- residDmnds' $ gLeadTime + 1
-  , initDemand >= 0 && initDemand <= gMaxDemand
-  , let sold         = min totAvailable totDemand
-        totAvailable = onHand + sum onOrder + toOrder
-        totDemand    = initDemand + sum residDemand
-        stockOut     = negate $ sum $ map (min 0) stock
-        held         =          sum $ map (max 0) stock
-        stock        =
-          flip evalState 0 $
-            traverse ( \ (deliv, demand) -> do
-                         accum <- get
-                         let newAcc = accum + deliv - demand
-                         put newAcc
-                         return newAcc
-                     ) $ zip (onHand : onOrder ++ [toOrder])
-                             (initDemand : residDemand)
+  | let held     = max 0 onHand'
+        stockOut = min 0 onHand'
+        demand   = onHand + P.head onOrder - onHand'
   ]
-
--- NOTE: Please, keep the following commentary, as it explains the
--- above code.
---
--- onHand' = onHand + head onOrder - sold
---         = onHand + head onOrder - min onHand demand
---
--- demand >= onHand:
---   onHand' = head onOrder
---   Demand may have exceeded amount on hand; we can't know for sure.
---   => Allow demand to sweep entire range.
---
--- otherwise:
---   onHand' = onHand + head onOrder - demand
---   demand  = onHand + head onOrder - onHand'
---   => Demand is deterministic.
 
 -- | Possible demands, along with their probabilities, for a single day.
 initDmnds :: [(Int, Double)]
@@ -223,6 +187,9 @@ initDmnds =
 -- residDmnds = map (map fst &&& product . map snd) . allCombs
 
 -- | Possible uniform demands for n days, along with their probabilities.
+--
+-- This reduces the number of possibilities to: n * gMaxDemand,
+-- and makes the solution tractable, although not strictly correct.
 --
 -- Note: Slight deviations from uniformity are allowed, to keep total
 --       demand correct.
@@ -288,10 +255,14 @@ showFofState' k g = unlines
 -- | Expected reward for a given state, assuming equiprobable actions.
 testRewards :: Int -> MyState -> Double
 testRewards p s =
-  mean [ (sum . map (uncurry (*))) $ rewards' p s a s'
-       | a  <- actions' s
+  mean [ ( sum
+         . map (uncurry (*) . second (/ pNorm))
+         ) $ rewards' p s a s'
+       | a  <- acts
        , s' <- nextStates' s a
        ]
+  where acts  = actions' s
+        pNorm = fromIntegral $ length acts
 
 {----------------------------------------------------------------------
   Command line options defintions.
@@ -340,7 +311,7 @@ main = do
                              , nextStates = nextStates'
                              , rewards    = rewards' pVal
                              }
-                       ) (const (5, -7000), [])  -- Via iterative guessing.
+                       ) (const (0, 0), [])
       counts = P.tail counts'
       acts  = map (\f -> VS.map (fst . f) allStatesV) fs
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
@@ -390,6 +361,8 @@ main = do
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
              "\n### Demand Probability Distribution Functions\n\n"
+
+  -- - demand PDF
   let pdf = [ (x, density (gammaDistr (1 + demandMean) 1) x)
             | x <- [0.1 * n | n <- [0..100]]
             ]
@@ -399,23 +372,41 @@ main = do
        plot ( line "Demand Probability"
                    [ pdf ]
             )
+  appendFile "other/inventory.md" "![](img/pdf.png)\n"
+  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * sum (map snd pdf))
+
+  -- - demand PMF
   let pmf = [ (x, gamma' (finite $ round demandMean) (finite x))
             | x <- [0..10]
             ]
       titles = ["pmf"]
       values :: [ (String,[Double]) ]
       values = map (show *** (: [])) pmf
-
   toFile def "img/demand.png" $
     do layout_title .= "Demand Probability Mass Function (pmf)"
        setColors $ map opaque [blue, green, red, yellow]
        layout_x_axis . laxis_generate .= autoIndexAxis (map fst values)
        plot $ plotBars <$> bars titles (addIndexes (map snd values))
-  appendFile "other/inventory.md" "![](img/pdf.png)\n"
-  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * sum (map snd pdf))
   appendFile "other/inventory.md" "\n![](img/demand.png)\n"
   appendFile "other/inventory.md" $ pack $ printf "\n$\\sum pmf = %5.2f$\n" (sum $ map snd pmf)
 
+  -- - next state PMF
+  let nxtStPMFs :: [[(MyState, Double)]]
+      nxtStPMFs = map ( map (fst . P.head &&& sum . map snd)
+                      . groupBy ((==) `on` fst)
+                      . sortBy (compare `on` fst)
+                      . ( \ st ->
+                            [ (nxtSt, prob / fromIntegral (length (actions' st)))
+                            | act   <- actions' st
+                            , nxtSt <- nextStates' st act
+                            , let prob = (sum . map snd) $ rewards' pVal st act nxtSt
+                            ]
+                        )
+                      ) allStates
+      pmfSums :: [Double]
+      pmfSums = map (sum . map snd) nxtStPMFs
+  appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
+                                                  (minimum pmfSums) (maximum pmfSums)
 \end{code}
 
 output
