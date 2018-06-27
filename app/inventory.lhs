@@ -94,7 +94,7 @@ import RL.GPI
   Problem specific definitions
 ----------------------------------------------------------------------}
 
-disc' =  1  -- my choice
+disc' =  0.9  -- my choice
 
 demandMean = 1
 pDemand    = gamma' $ finite $ round demandMean
