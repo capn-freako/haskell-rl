@@ -343,6 +343,39 @@ executable inventory
     , haskell-rl
     , statistics
 
+executable windygrid
+  default-language:
+    Haskell2010
+  ghc-options:
+    -O2
+    -funbox-strict-fields
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+  hs-source-dirs:
+    app
+  main-is:
+    windygrid.lhs
+  build-depends:
+    base >= 4.7 && < 5
+    , protolude
+    , mtl
+    , optparse-generic
+    , vector-sized
+    -- , vector
+    , finite-typelits
+    , text
+    -- , QuickCheck
+    , MemoTrie
+    , monad-extras
+    , random-shuffle
+    , Useful
+    -- , random
+    , Chart
+    , Chart-cairo
+    , haskell-rl
+    , statistics
+
 test-suite test
   default-language:
     Haskell2010

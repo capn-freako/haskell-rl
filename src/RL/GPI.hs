@@ -27,6 +27,7 @@ module RL.GPI
   , RLType (..)
   , rltDef
   , optPol
+  , runEpoch
   , maxAndNonZero
   , chooseAndCount
   , poisson'
@@ -147,6 +148,19 @@ optPol RLType{..} (g, _) = (bestA, cnts)
   evalIters = take (maxIter + 1) $ iterate (evalPol (fst . g)) $ snd . g
   evalPol p v = let actVal'' = actVal' v
                  in \s -> actVal'' (s, p s)
+
+-- | Run one epoch of a MDP, returning the list of states visited.
+runEpoch
+  :: Eq s
+  => Int            -- ^ Max. state transitions
+  -> (s -> a)       -- ^ Policy
+  -> (s -> a -> s)  -- ^ Next state calculator
+  -> [s]            -- ^ Terminal states
+  -> s              -- ^ Initial state
+  -> [s]
+runEpoch n pol nxt terms init =
+  takeWhile (flip notElem terms) $
+    take n $ iterate (\s -> nxt s (pol s)) init
 
 {----------------------------------------------------------------------
   Misc.
