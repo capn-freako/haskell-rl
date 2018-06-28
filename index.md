@@ -38,6 +38,7 @@ The following examples are available:
 - [gambler](https://pages.git.target.com/RedOptHaskell/haskell-rl/gambler.html)
 - [blackjack](https://pages.git.target.com/RedOptHaskell/haskell-rl/blackjack.html)
 - [inventory](https://pages.git.target.com/RedOptHaskell/haskell-rl/inventory.html)
+- [windygrid](https://pages.git.target.com/RedOptHaskell/haskell-rl/windygrid.html)
 
 Each example above was created from a [literate Haskell](https://wiki.haskell.org/Literate_programming) source file, which you can find in the [_app_ directory of this repository](https://git.target.com/RedOptHaskell/haskell-rl/tree/master/app), and contains:
 
