@@ -143,7 +143,10 @@ myActions = const [Up, Dn, Rt, Lt]
 
 -- | S'(s, a) - list of next possible states.
 myNextStates :: MyState -> MyAction -> [MyState]
-myNextStates (r, c) act = [(r', c')]
+myNextStates s@(r, c) act =
+  if s `elem` myTermStates
+    then [s]
+    else [(r', c')]
   where r' = min (gNumRows - 1) (max 0 (r + dr + wr))
         c' = min (gNumCols - 1) (max 0 (c + dc))
         dr = case act of
@@ -156,7 +159,7 @@ myNextStates (r, c) act = [(r', c')]
                Dn  ->  0
                Lt  -> -1
                Rt ->  1
-        wr = gWind `VS.index` (finite $ fromIntegral c')
+        wr = gWind `VS.index` (finite $ fromIntegral c)
 
 myTermStates :: [MyState]
 myTermStates = [(3,7)]
@@ -258,11 +261,12 @@ main = do
                              , actions    = myActions
                              , nextStates = myNextStates
                              , rewards    = myRewards
+                             , stateVals  = zip myTermStates $ repeat 0
                              }
                        ) (const (Rt, 0), [])
       counts = P.tail counts'
       acts   = map (\f -> VS.map (fst . f) allStatesV) fs
-      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (==)))
+      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
                   $ zip acts (P.tail acts)
       ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
         -- runWriter $ withinOnM eps'
