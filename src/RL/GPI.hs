@@ -27,7 +27,8 @@ module RL.GPI
   , RLType (..)
   , rltDef
   , optPol
-  , runEpoch
+  , optQ
+  , runEpisode
   , maxAndNonZero
   , chooseAndCount
   , poisson'
@@ -41,20 +42,26 @@ import qualified Prelude as P
 import Prelude (Show(..))
 import Protolude  hiding (show, for)
 
+import GHC.TypeLits
+
 import qualified Data.Vector.Sized   as VS
 
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
 import Data.List                     ((!!), lookup, groupBy)
+import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import Statistics.Distribution       (density)
 import Statistics.Distribution.Gamma (gammaDistr)
+import System.Random
+import ToolShed.System.Random        (shuffle)
 import Text.Printf
 
 {----------------------------------------------------------------------
   Orphans
 ----------------------------------------------------------------------}
+
 instance (KnownNat n) => HasTrie (Finite n) where
   data Finite n :->: x     = FiniteTrie (VS.Vector n x)
   trie f                   = FiniteTrie (VS.generate (f . finite . fromIntegral))
@@ -65,35 +72,63 @@ instance (KnownNat n) => HasTrie (Finite n) where
   General policy iterator
 ----------------------------------------------------------------------}
 
--- | Abstract data type, to future proof API.
+-- | Abstract data type, to future-proof API.
+--
+-- Note: Some fields have overloaded meanings/uses, depending upon
+--       whether we're `optPol`ing, `optQ`ing, or ...
+--       Individual functions, below, call out such differences, in
+--       their header commentary, as appropriate.
+--
+-- Note: The functions in this module presume:
+--       Pr[S' = s' | S = s, A = a] = (sum . map snd) R(s, a, s')
 data RLType s a n = RLType
-  { disc       :: Double         -- discount rate
-  , epsilon    :: Double         -- convergence tolerance
-  , maxIter    :: Int            -- max. eval. iterations (0 = Value Iteration)
+  { disc       :: Double  -- ^ discount rate
+  , epsilon    :: Double  -- ^ convergence tolerance
+  , alpha      :: Double  -- ^ error correction gain
+  , maxIter    :: Int     -- ^ max. iterations of ?
+
+  -- | S - all possible states
   , states     :: VS.Vector n s
+
+  -- | A(s) - all possible actions from state s
   , actions    :: s -> [a]
+
+  -- | S'(s, a) - all possible next states, given current state-action pair
   , nextStates :: s -> a -> [s]
+
+  -- | R(s, a, s') - all possible rewards, along with their probabilities
+  -- of occurence, given current state-action pair and next state
   , rewards    :: s -> a -> s -> [(Double,Double)]
-  , stateVals  :: [(s, Double)]  -- overides for terminal states
+
+  , stateVals  :: [(s, Double)]  -- ^ overides for terminal states
+
+  -- | Possible fixed initial state.
+  --
+  -- If list is non-empty
+  --   then use its head as the initial state;
+  --   else randomly select initial state from `states`.
+  , initState  :: [s]
   }
 
+-- | A default value of type `RLType`, to use as a starting point.
+--
+-- Note that this value is virtual, leaving fields: `states`, `actions`,
+-- `nextStates`, and `rewards` undefined, and must be completed for a
+-- particular MDP before use.
 rltDef :: RLType s a n
 rltDef = RLType
   { disc      = 1
   , epsilon   = 0.1
+  , alpha     = 0.1
   , maxIter   = 10
   , stateVals = []
+  , initState = []
   }
 
--- | Yields a single policy improvment iteration, given:
---   - gamma           - discount rate
---   - eps             - convergence tolerance
---   - n               - max. policy evaluation iterations
---   - S               - set of all possible system states
---   - A(s)            - all possible actions in state s,
---   - S'(s, a)        - all possible next states, for a given state/action pair, and
---   - R(s, a, s')     - all possible rewards for a given state/action/next-state triple,
---                       along with their probabilities of occurence.
+-- | Yields a single policy improvment iteration.
+--
+-- RLType field overrides:
+-- - maxIter: max. policy evaluation iterations (0 = Value Iteration)
 --
 -- Returns a combined policy & value function.
 optPol :: ( Eq s, HasTrie s
@@ -149,8 +184,8 @@ optPol RLType{..} (g, _) = (bestA, cnts)
   evalPol p v = let actVal'' = actVal' v
                  in \s -> actVal'' (s, p s)
 
--- | Run one epoch of a MDP, returning the list of states visited.
-runEpoch
+-- | Run one episode of a MDP, returning the list of states visited.
+runEpisode
   :: Eq s
   => Int            -- ^ Max. state transitions
   -> (s -> a)       -- ^ Policy
@@ -158,15 +193,80 @@ runEpoch
   -> [s]            -- ^ Terminal states
   -> s              -- ^ Initial state
   -> [s]
-runEpoch n pol nxt terms init =
+runEpisode n pol nxt terms init =
   takeWhile (flip notElem terms) $
     take n $ iterate (\s -> nxt s (pol s)) init
+
+-- | Yields a single episodic action-value improvement iteration.
+--
+-- RLType field overrides:
+-- - epsilon: Used to form an "epsilon-greedy" policy.
+-- - maxIter: max. # of state transitions allowed
+-- - states:  First in list is assumed to be the initial state.
+optQ
+  :: (KnownNat n, Eq s, Eq a, RandomGen g)
+  => RLType s a (1 + n)  -- ^ abstract type, to protect API
+  -> (((s, a) -> Double), g)  -- ^ initial action-value function and random generator
+  -> (((s, a) -> Double), g)  -- ^ updated action-value function and random generator
+optQ RLType{..} (q0, gen) = (q1, gen') where
+  p s        = argmax (curry q0 s) (actions s)
+  termStates = map fst stateVals
+  s0         = case initState of
+                 [] -> P.head $ shuffle gen $ VS.toList states
+                 _  -> P.head initState
+  (_, q1, gen') = flip execState (s0, q0, gen) $ replicateM maxIter $ do
+    (s, q, g) <- get
+    let (x, g') = random g
+        a         = if x > epsilon
+                       then p s
+                       else P.head $ shuffle g' $ actions s
+        -- Use maximum likelihood to select from among, potentially,
+        -- a list of next possible states.
+        s's   = nextStates s a
+        rss   = map (rewards s a) s's
+        p's   = map (sum . map snd) rss  -- next state probabilities
+        s'p's = zip s's p's
+        s'    = fst . P.last . sortBy (compare `on` snd) $ s'p's
+        -- Use expectation to handle (potentially) multiple rewards.
+        r     = (/ ps') . sum . map (uncurry (*)) $
+                  fromMaybe (P.error "optQ: Failed lookup of next state rewards!")
+                            $ lookup s' $ zip s's rss
+        ps'   = fromMaybe (P.error "optQ: Failed lookup of next state probability!")
+                          $ lookup s' s'p's
+        a'    = p s'
+        q'    = sarsa alpha s a s' r a' q  -- temporary hard-wiring to SARSA
+    put (s', q', g')
+    return $ if s' `elem` termStates
+                then Nothing
+                else Just r
+
+-- | Take one temporal difference (TD) step, using SARSA.
+sarsa
+  :: (Eq s, Eq a)
+  => Double              -- ^ error correction gain
+  -> s                   -- ^ initial state
+  -> a                   -- ^ initial action
+  -> s                   -- ^ next state
+  -> Double              -- ^ reward
+  -> a                   -- ^ next action
+  -> ((s, a) -> Double)  -- ^ initial action-value function
+  -> ((s, a) -> Double)  -- ^ updated action-value function
+sarsa alpha s a s' r a' q = \ (st, act) ->
+  if (st, act) == (s, a)
+     then q (s, a) + alpha * ( r
+                             + q (s', a')
+                             - q (s,  a)
+                             )
+     else q (st, act)
 
 {----------------------------------------------------------------------
   Misc.
 ----------------------------------------------------------------------}
 
---- | To control the formatting of printed floats in output matrices.
+-- Unary function type alias, for notational convenience.
+-- type Unary a = a -> a
+
+-- | To control the formatting of printed floats in output matrices.
 newtype Pfloat = Pfloat { unPfloat :: Float}
   deriving (Eq)
 

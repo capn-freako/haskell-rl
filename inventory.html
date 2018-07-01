@@ -56,335 +56,427 @@ Original date: June 14, 2018</p>
 <a class="sourceLine" id="cb3-9" data-line-number="9"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
 <a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
 <a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.List</span>                              (sortBy, groupBy)</a>
-<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.MemoTrie</span></a>
-<a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.Text</span>                              (pack)</a>
-<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span>   (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
-<a class="sourceLine" id="cb3-15" data-line-number="15"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
-<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">Statistics.Distribution</span>                (density)</a>
-<a class="sourceLine" id="cb3-17" data-line-number="17"><span class="kw">import</span> <span class="dt">Statistics.Distribution.Gamma</span>          (gammaDistr)</a>
-<a class="sourceLine" id="cb3-18" data-line-number="18"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
-<a class="sourceLine" id="cb3-19" data-line-number="19"></a>
-<a class="sourceLine" id="cb3-20" data-line-number="20"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
+<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.List.Extras.Argmax</span>                (argmax, argmin)</a>
+<a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.MemoTrie</span></a>
+<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Data.Text</span>                              (pack)</a>
+<a class="sourceLine" id="cb3-15" data-line-number="15"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span>   (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
+<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
+<a class="sourceLine" id="cb3-17" data-line-number="17"><span class="kw">import</span> <span class="dt">Statistics.Distribution</span>                (density)</a>
+<a class="sourceLine" id="cb3-18" data-line-number="18"><span class="kw">import</span> <span class="dt">Statistics.Distribution.Gamma</span>          (gammaDistr)</a>
+<a class="sourceLine" id="cb3-19" data-line-number="19"><span class="kw">import</span> <span class="dt">System.Random</span></a>
+<a class="sourceLine" id="cb3-20" data-line-number="20"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
+<a class="sourceLine" id="cb3-21" data-line-number="21"></a>
+<a class="sourceLine" id="cb3-22" data-line-number="22"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
 </ul>
-<div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="co">  Problem specific definitions</span></a>
-<a class="sourceLine" id="cb4-3" data-line-number="3"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-4" data-line-number="4"></a>
-<a class="sourceLine" id="cb4-5" data-line-number="5">disc&#39; <span class="fu">=</span>  <span class="fl">0.9</span>  <span class="co">-- my choice</span></a>
-<a class="sourceLine" id="cb4-6" data-line-number="6"></a>
-<a class="sourceLine" id="cb4-7" data-line-number="7">demandMean <span class="fu">=</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb4-8" data-line-number="8">pDemand    <span class="fu">=</span> gamma&#39; <span class="fu">$</span> finite <span class="fu">$</span> round demandMean</a>
-<a class="sourceLine" id="cb4-9" data-line-number="9"></a>
-<a class="sourceLine" id="cb4-10" data-line-number="10">gLeadTime     <span class="fu">=</span>  <span class="dv">3</span></a>
-<a class="sourceLine" id="cb4-11" data-line-number="11">gMaxOrder     <span class="fu">=</span>  <span class="dv">5</span></a>
-<a class="sourceLine" id="cb4-12" data-line-number="12">gMaxOnHand    <span class="fu">=</span> <span class="dv">10</span></a>
-<a class="sourceLine" id="cb4-13" data-line-number="13"><span class="co">-- gReviewPer    =  1  -- `showFofState` assumes: gReviewPer = gLeadTime.</span></a>
-<a class="sourceLine" id="cb4-14" data-line-number="14">gMaxDemand    <span class="fu">=</span> <span class="dv">10</span></a>
-<a class="sourceLine" id="cb4-15" data-line-number="15">gProfit       <span class="fu">=</span>  <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-16" data-line-number="16"></a>
-<a class="sourceLine" id="cb4-17" data-line-number="17"><span class="kw">data</span> <span class="dt">MyState</span>  <span class="fu">=</span> <span class="dt">MyState</span></a>
-<a class="sourceLine" id="cb4-18" data-line-number="18">  {<span class="ot"> onHand  ::</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb4-19" data-line-number="19">  ,<span class="ot"> onOrder ::</span> [<span class="dt">Int</span>]</a>
-<a class="sourceLine" id="cb4-20" data-line-number="20">  ,<span class="ot"> epoch   ::</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb4-21" data-line-number="21">  } <span class="kw">deriving</span> (<span class="dt">Show</span>, <span class="dt">Eq</span>, <span class="dt">Ord</span>, <span class="dt">Generic</span>)</a>
-<a class="sourceLine" id="cb4-22" data-line-number="22"></a>
-<a class="sourceLine" id="cb4-23" data-line-number="23"><span class="kw">instance</span> <span class="dt">HasTrie</span> <span class="dt">MyState</span> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb4-24" data-line-number="24">  <span class="kw">newtype</span> (<span class="dt">MyState</span> <span class="fu">:-&gt;:</span> b) <span class="fu">=</span> <span class="dt">MyStateTrie</span> {<span class="ot"> unMyStateTrie ::</span> <span class="dt">Reg</span> <span class="dt">MyState</span> <span class="fu">:-&gt;:</span> b } </a>
-<a class="sourceLine" id="cb4-25" data-line-number="25">  trie      <span class="fu">=</span> trieGeneric      <span class="dt">MyStateTrie</span> </a>
-<a class="sourceLine" id="cb4-26" data-line-number="26">  untrie    <span class="fu">=</span> untrieGeneric    unMyStateTrie</a>
-<a class="sourceLine" id="cb4-27" data-line-number="27">  enumerate <span class="fu">=</span> enumerateGeneric unMyStateTrie</a>
-<a class="sourceLine" id="cb4-28" data-line-number="28"></a>
-<a class="sourceLine" id="cb4-29" data-line-number="29"><span class="kw">type</span> <span class="dt">MyAction</span> <span class="fu">=</span> <span class="dt">Int</span></a>
+<div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"></a>
+<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-3" data-line-number="3"><span class="co">  Problem specific definitions</span></a>
+<a class="sourceLine" id="cb4-4" data-line-number="4"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-5" data-line-number="5"></a>
+<a class="sourceLine" id="cb4-6" data-line-number="6">demandMean <span class="fu">=</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-7" data-line-number="7">pDemand    <span class="fu">=</span> gamma&#39; <span class="fu">$</span> finite <span class="fu">$</span> round demandMean</a>
+<a class="sourceLine" id="cb4-8" data-line-number="8"></a>
+<a class="sourceLine" id="cb4-9" data-line-number="9">gLeadTime     <span class="fu">=</span>  <span class="dv">3</span></a>
+<a class="sourceLine" id="cb4-10" data-line-number="10">gMaxOrder     <span class="fu">=</span>  <span class="dv">5</span></a>
+<a class="sourceLine" id="cb4-11" data-line-number="11">gMaxOnHand    <span class="fu">=</span> <span class="dv">10</span></a>
+<a class="sourceLine" id="cb4-12" data-line-number="12"><span class="co">-- gReviewPer    =  1  -- `showFofState` assumes: gReviewPer = gLeadTime.</span></a>
+<a class="sourceLine" id="cb4-13" data-line-number="13">gMaxDemand    <span class="fu">=</span> <span class="dv">10</span></a>
+<a class="sourceLine" id="cb4-14" data-line-number="14"><span class="co">-- gProfit       =  0</span></a>
+<a class="sourceLine" id="cb4-15" data-line-number="15"></a>
+<a class="sourceLine" id="cb4-16" data-line-number="16"><span class="co">-- | State data type for &quot;single-store / single-item&quot; inventory optimization problem.</span></a>
+<a class="sourceLine" id="cb4-17" data-line-number="17"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-18" data-line-number="18"><span class="co">-- TODO: Enforce length of `onOrder`, using sized vector instead of list?</span></a>
+<a class="sourceLine" id="cb4-19" data-line-number="19"><span class="kw">data</span> <span class="dt">MyState</span>  <span class="fu">=</span> <span class="dt">MyState</span></a>
+<a class="sourceLine" id="cb4-20" data-line-number="20">  {<span class="ot"> onHand  ::</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-21" data-line-number="21">  ,<span class="ot"> onOrder ::</span> [<span class="dt">Int</span>]  <span class="co">-- Should have length `gLeadTime`.</span></a>
+<a class="sourceLine" id="cb4-22" data-line-number="22">  ,<span class="ot"> epoch   ::</span> <span class="dt">Int</span>    <span class="co">-- Needed, to determine if ordering is allowed.</span></a>
+<a class="sourceLine" id="cb4-23" data-line-number="23">  } <span class="kw">deriving</span> (<span class="dt">Show</span>, <span class="dt">Eq</span>, <span class="dt">Ord</span>, <span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb4-24" data-line-number="24"></a>
+<a class="sourceLine" id="cb4-25" data-line-number="25"><span class="kw">instance</span> <span class="dt">HasTrie</span> <span class="dt">MyState</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb4-26" data-line-number="26">  <span class="kw">newtype</span> (<span class="dt">MyState</span> <span class="fu">:-&gt;:</span> b) <span class="fu">=</span> <span class="dt">MyStateTrie</span> {<span class="ot"> unMyStateTrie ::</span> <span class="dt">Reg</span> <span class="dt">MyState</span> <span class="fu">:-&gt;:</span> b } </a>
+<a class="sourceLine" id="cb4-27" data-line-number="27">  trie      <span class="fu">=</span> trieGeneric      <span class="dt">MyStateTrie</span> </a>
+<a class="sourceLine" id="cb4-28" data-line-number="28">  untrie    <span class="fu">=</span> untrieGeneric    unMyStateTrie</a>
+<a class="sourceLine" id="cb4-29" data-line-number="29">  enumerate <span class="fu">=</span> enumerateGeneric unMyStateTrie</a>
 <a class="sourceLine" id="cb4-30" data-line-number="30"></a>
-<a class="sourceLine" id="cb4-31" data-line-number="31"><span class="co">-- | S</span></a>
-<a class="sourceLine" id="cb4-32" data-line-number="32"><span class="ot">allStates ::</span> [<span class="dt">MyState</span>]</a>
-<a class="sourceLine" id="cb4-33" data-line-number="33">allStates <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-34" data-line-number="34">  [ <span class="dt">MyState</span> x (drop n ys <span class="fu">++</span> take n ys) n</a>
-<a class="sourceLine" id="cb4-35" data-line-number="35">  <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOnHand]</a>
-<a class="sourceLine" id="cb4-36" data-line-number="36">  , n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gLeadTime <span class="fu">-</span> <span class="dv">1</span>)]</a>
-<a class="sourceLine" id="cb4-37" data-line-number="37">  , y <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]</a>
-<a class="sourceLine" id="cb4-38" data-line-number="38">  , <span class="kw">let</span> ys <span class="fu">=</span> y <span class="fu">:</span> replicate (gLeadTime <span class="fu">-</span> <span class="dv">1</span>) <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-39" data-line-number="39">  ]</a>
-<a class="sourceLine" id="cb4-40" data-line-number="40"></a>
-<a class="sourceLine" id="cb4-41" data-line-number="41"><span class="co">-- Just a sized vector alternative to the list above.</span></a>
-<a class="sourceLine" id="cb4-42" data-line-number="42"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-43" data-line-number="43"><span class="co">-- TODO: Figure out how to determine the size from the constants above.</span></a>
-<a class="sourceLine" id="cb4-44" data-line-number="44"><span class="ot">allStatesV ::</span> <span class="dt">VS.Vector</span> <span class="dv">198</span> <span class="dt">MyState</span></a>
-<a class="sourceLine" id="cb4-45" data-line-number="45">allStatesV <span class="fu">=</span> fromMaybe (P.error <span class="st">&quot;main.allStatesV: Fatal error converting `allStates`!&quot;</span>)</a>
-<a class="sourceLine" id="cb4-46" data-line-number="46">                       <span class="fu">$</span> VS.fromList allStates</a>
-<a class="sourceLine" id="cb4-47" data-line-number="47"></a>
-<a class="sourceLine" id="cb4-48" data-line-number="48"><span class="co">-- | A(s)</span></a>
-<a class="sourceLine" id="cb4-49" data-line-number="49"><span class="ot">actions&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [<span class="dt">MyAction</span>]</a>
-<a class="sourceLine" id="cb4-50" data-line-number="50">actions&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-51" data-line-number="51">  <span class="co">-- if epoch `mod` gReviewPer /= 0  -- Until I have a more sophisticated `showFofState`.</span></a>
-<a class="sourceLine" id="cb4-52" data-line-number="52">  <span class="kw">if</span> epoch <span class="ot">`mod`</span> gLeadTime <span class="fu">/=</span> <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-53" data-line-number="53">     <span class="kw">then</span> [<span class="dv">0</span>]</a>
-<a class="sourceLine" id="cb4-54" data-line-number="54">     <span class="kw">else</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]</a>
-<a class="sourceLine" id="cb4-55" data-line-number="55"></a>
-<a class="sourceLine" id="cb4-56" data-line-number="56"><span class="co">-- | S&#39;(s, a) - list of next possible states and their probabilities.</span></a>
-<a class="sourceLine" id="cb4-57" data-line-number="57"><span class="ot">nextStates&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> [<span class="dt">MyState</span>]</a>
-<a class="sourceLine" id="cb4-58" data-line-number="58">nextStates&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} toOrder <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-59" data-line-number="59">  [ <span class="dt">MyState</span> (onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> demand)</a>
-<a class="sourceLine" id="cb4-60" data-line-number="60">            (P.tail onOrder <span class="fu">++</span> [toOrder])</a>
-<a class="sourceLine" id="cb4-61" data-line-number="61">            (epoch <span class="fu">+</span> <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-62" data-line-number="62">  <span class="fu">|</span> demand <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxDemand]</a>
-<a class="sourceLine" id="cb4-63" data-line-number="63">  ]</a>
-<a class="sourceLine" id="cb4-64" data-line-number="64"></a>
-<a class="sourceLine" id="cb4-65" data-line-number="65"><span class="co">-- | R(s, a, s&#39;)</span></a>
-<a class="sourceLine" id="cb4-66" data-line-number="66"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-67" data-line-number="67"><span class="co">-- Returns a list of pairs, each containing:</span></a>
-<a class="sourceLine" id="cb4-68" data-line-number="68"><span class="co">-- - a reward value, and</span></a>
-<a class="sourceLine" id="cb4-69" data-line-number="69"><span class="co">-- - the probability of occurence for that value.</span></a>
-<a class="sourceLine" id="cb4-70" data-line-number="70"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-71" data-line-number="71"><span class="co">-- Note: Previous requirement that reward values be unique eliminated,</span></a>
-<a class="sourceLine" id="cb4-72" data-line-number="72"><span class="co">--       for coding convenience and runtime performance improvement.</span></a>
-<a class="sourceLine" id="cb4-73" data-line-number="73"><span class="ot">rewards&#39; ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)]</a>
-<a class="sourceLine" id="cb4-74" data-line-number="74">rewards&#39; p <span class="dt">MyState</span>{<span class="fu">..</span>} _ (<span class="dt">MyState</span> onHand&#39; _ _) <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-75" data-line-number="75">  [ ( fromIntegral p <span class="fu">*</span> fromIntegral stockOut <span class="fu">-</span> fromIntegral held</a>
-<a class="sourceLine" id="cb4-76" data-line-number="76">    , pDemand <span class="fu">$</span> finite <span class="fu">$</span> fromIntegral demand</a>
-<a class="sourceLine" id="cb4-77" data-line-number="77">    )</a>
-<a class="sourceLine" id="cb4-78" data-line-number="78">  <span class="fu">|</span> <span class="kw">let</span> held     <span class="fu">=</span> max <span class="dv">0</span> onHand&#39;</a>
-<a class="sourceLine" id="cb4-79" data-line-number="79">        stockOut <span class="fu">=</span> min <span class="dv">0</span> onHand&#39;</a>
-<a class="sourceLine" id="cb4-80" data-line-number="80">        demand   <span class="fu">=</span> onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> onHand&#39;</a>
-<a class="sourceLine" id="cb4-81" data-line-number="81">  ]</a>
-<a class="sourceLine" id="cb4-82" data-line-number="82"></a>
-<a class="sourceLine" id="cb4-83" data-line-number="83"><span class="co">-- | Possible demands, along with their probabilities, for a single day.</span></a>
-<a class="sourceLine" id="cb4-84" data-line-number="84"><span class="ot">initDmnds ::</span> [(<span class="dt">Int</span>, <span class="dt">Double</span>)]</a>
-<a class="sourceLine" id="cb4-85" data-line-number="85">initDmnds <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-86" data-line-number="86">  [ (d, pDemand <span class="fu">$</span> finite <span class="fu">$</span> fromIntegral d)</a>
-<a class="sourceLine" id="cb4-87" data-line-number="87">  <span class="fu">|</span> d <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxDemand]</a>
-<a class="sourceLine" id="cb4-88" data-line-number="88">  ]</a>
-<a class="sourceLine" id="cb4-89" data-line-number="89"></a>
-<a class="sourceLine" id="cb4-90" data-line-number="90"><span class="co">-- | Possible demands for n days, along with their probabilities.</span></a>
-<a class="sourceLine" id="cb4-91" data-line-number="91"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-92" data-line-number="92"><span class="co">-- Note: This creates approx. 10,000 possibilities, which is not</span></a>
-<a class="sourceLine" id="cb4-93" data-line-number="93"><span class="co">--       tractable!</span></a>
-<a class="sourceLine" id="cb4-94" data-line-number="94"><span class="co">-- residDmnds :: Int -&gt; [([Int], Double)]</span></a>
-<a class="sourceLine" id="cb4-95" data-line-number="95"><span class="co">-- residDmnds = map (map fst &amp;&amp;&amp; product . map snd) . allCombs</span></a>
-<a class="sourceLine" id="cb4-96" data-line-number="96"></a>
-<a class="sourceLine" id="cb4-97" data-line-number="97"><span class="co">-- | Possible uniform demands for n days, along with their probabilities.</span></a>
-<a class="sourceLine" id="cb4-98" data-line-number="98"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-99" data-line-number="99"><span class="co">-- This reduces the number of possibilities to: n * gMaxDemand,</span></a>
-<a class="sourceLine" id="cb4-100" data-line-number="100"><span class="co">-- and makes the solution tractable, although not strictly correct.</span></a>
-<a class="sourceLine" id="cb4-101" data-line-number="101"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-102" data-line-number="102"><span class="co">-- Note: Slight deviations from uniformity are allowed, to keep total</span></a>
-<a class="sourceLine" id="cb4-103" data-line-number="103"><span class="co">--       demand correct.</span></a>
-<a class="sourceLine" id="cb4-104" data-line-number="104"><span class="ot">residDmnds&#39; ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> [([<span class="dt">Int</span>], <span class="dt">Double</span>)]</a>
-<a class="sourceLine" id="cb4-105" data-line-number="105">residDmnds&#39; n <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-106" data-line-number="106">  map ( first ( \ m <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-107" data-line-number="107">                  <span class="kw">let</span> r <span class="fu">=</span> fromIntegral m <span class="fu">/</span> fromIntegral n</a>
-<a class="sourceLine" id="cb4-108" data-line-number="108">                   <span class="kw">in</span> foldl&#39; ( \ ds k <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-109" data-line-number="109">                                 (round (fromIntegral k <span class="fu">*</span> r) <span class="fu">-</span> sum ds) <span class="fu">:</span> ds</a>
-<a class="sourceLine" id="cb4-110" data-line-number="110">                             ) [] [<span class="dv">1</span><span class="fu">..</span>n]</a>
-<a class="sourceLine" id="cb4-111" data-line-number="111">              )</a>
-<a class="sourceLine" id="cb4-112" data-line-number="112">      ) <span class="fu">$</span> residDmndTots n</a>
-<a class="sourceLine" id="cb4-113" data-line-number="113"></a>
-<a class="sourceLine" id="cb4-114" data-line-number="114"><span class="co">-- | Possible total demands for n days, along with their probabilities.</span></a>
-<a class="sourceLine" id="cb4-115" data-line-number="115"><span class="ot">residDmndTots ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> [(<span class="dt">Int</span>, <span class="dt">Double</span>)]</a>
-<a class="sourceLine" id="cb4-116" data-line-number="116">residDmndTots n <span class="fu">=</span> ( map ((fst <span class="fu">.</span> P.head) <span class="fu">&amp;&amp;&amp;</span> (sum <span class="fu">.</span> map snd))</a>
-<a class="sourceLine" id="cb4-117" data-line-number="117">                  <span class="fu">.</span> groupBy ((<span class="fu">==</span>)    <span class="ot">`on`</span> fst)</a>
-<a class="sourceLine" id="cb4-118" data-line-number="118">                  <span class="fu">.</span> sortBy  (compare <span class="ot">`on`</span> fst)</a>
-<a class="sourceLine" id="cb4-119" data-line-number="119">                  ) allTotals</a>
-<a class="sourceLine" id="cb4-120" data-line-number="120"> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb4-121" data-line-number="121"><span class="ot">  allTotals ::</span> [(<span class="dt">Int</span>, <span class="dt">Double</span>)]</a>
-<a class="sourceLine" id="cb4-122" data-line-number="122">  allTotals <span class="fu">=</span> map (sum <span class="fu">.</span> map fst <span class="fu">&amp;&amp;&amp;</span> product <span class="fu">.</span> map snd) <span class="fu">$</span> allCombs n</a>
-<a class="sourceLine" id="cb4-123" data-line-number="123"></a>
-<a class="sourceLine" id="cb4-124" data-line-number="124"><span class="co">-- | All possible combinations of demands for n days.</span></a>
-<a class="sourceLine" id="cb4-125" data-line-number="125"><span class="ot">allCombs ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> [[(<span class="dt">Int</span>, <span class="dt">Double</span>)]]</a>
-<a class="sourceLine" id="cb4-126" data-line-number="126">allCombs n <span class="fu">=</span> sequenceA <span class="fu">$</span> replicate n initDmnds</a>
-<a class="sourceLine" id="cb4-127" data-line-number="127"></a>
-<a class="sourceLine" id="cb4-128" data-line-number="128"><span class="co">-- | Show a function from `MyState`, assuming the `On Order` quantity</span></a>
-<a class="sourceLine" id="cb4-129" data-line-number="129"><span class="co">-- is in the first element of the `onOrder` list.</span></a>
-<a class="sourceLine" id="cb4-130" data-line-number="130"><span class="co">--</span></a>
-<a class="sourceLine" id="cb4-131" data-line-number="131"><span class="co">-- This makes sense as the default, since actions (i.e. - orders) may</span></a>
-<a class="sourceLine" id="cb4-132" data-line-number="132"><span class="co">-- only be taken (i.e. - placed) when the first element of `onOrder` is</span></a>
-<a class="sourceLine" id="cb4-133" data-line-number="133"><span class="co">-- non-zero, because that corresponds to an epoch that is an integral</span></a>
-<a class="sourceLine" id="cb4-134" data-line-number="134"><span class="co">-- multiple of the review period, which is, currently, assumed to be</span></a>
-<a class="sourceLine" id="cb4-135" data-line-number="135"><span class="co">-- equal to lead time.</span></a>
-<a class="sourceLine" id="cb4-136" data-line-number="136"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a, <span class="dt">Ord</span> a) <span class="ot">=&gt;</span> (<span class="dt">MyState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-137" data-line-number="137">showFofState <span class="fu">=</span> showFofState&#39; <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-138" data-line-number="138"></a>
-<a class="sourceLine" id="cb4-139" data-line-number="139"><span class="co">-- | Show a function from `MyState`, assuming the `On Order` quantity</span></a>
-<a class="sourceLine" id="cb4-140" data-line-number="140"><span class="co">-- is in the `k-th` element of the `onOrder` list.</span></a>
-<a class="sourceLine" id="cb4-141" data-line-number="141"><span class="ot">showFofState&#39; ::</span> (<span class="dt">Show</span> a, <span class="dt">Ord</span> a) <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> (<span class="dt">MyState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb4-142" data-line-number="142">showFofState&#39; k g <span class="fu">=</span> unlines</a>
-<a class="sourceLine" id="cb4-143" data-line-number="143">  ( <span class="st">&quot;\\begin{array}{&quot;</span> <span class="fu">:</span> intersperse <span class="ch">&#39;|&#39;</span> (replicate (gMaxOrder <span class="fu">+</span> <span class="dv">1</span>) <span class="ch">&#39;c&#39;</span>) <span class="fu">:</span> <span class="st">&quot;}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-144" data-line-number="144">    ( (<span class="st">&quot;\\text{On Hand} &amp;&quot;</span> <span class="fu">++</span> intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate (gMaxOrder <span class="fu">+</span> <span class="dv">1</span>) <span class="ch">&#39; &#39;</span>) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
-<a class="sourceLine" id="cb4-145" data-line-number="145">      [<span class="st">&quot;\\hline&quot;</span>] <span class="fu">++</span></a>
-<a class="sourceLine" id="cb4-146" data-line-number="146">      intersperse <span class="st">&quot;\\hline&quot;</span></a>
-<a class="sourceLine" id="cb4-147" data-line-number="147">        ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
-<a class="sourceLine" id="cb4-148" data-line-number="148">              [ (show onHnd <span class="fu">:</span>) <span class="fu">$</span> map show</a>
-<a class="sourceLine" id="cb4-149" data-line-number="149">                [ g (<span class="dt">MyState</span> onHnd (drop k ys <span class="fu">++</span> take k ys) k)</a>
-<a class="sourceLine" id="cb4-150" data-line-number="150">                <span class="fu">|</span> onOrdr <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]</a>
-<a class="sourceLine" id="cb4-151" data-line-number="151">                , <span class="kw">let</span> ys <span class="fu">=</span> onOrdr <span class="fu">:</span> replicate (gLeadTime <span class="fu">-</span> <span class="dv">1</span>) <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-152" data-line-number="152">                ]</a>
-<a class="sourceLine" id="cb4-153" data-line-number="153">              <span class="fu">|</span> onHnd&#39; <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOnHand]</a>
-<a class="sourceLine" id="cb4-154" data-line-number="154">              , <span class="kw">let</span> onHnd <span class="fu">=</span> gMaxOnHand <span class="fu">-</span> onHnd&#39;</a>
-<a class="sourceLine" id="cb4-155" data-line-number="155">              ]</a>
-<a class="sourceLine" id="cb4-156" data-line-number="156">        )</a>
-<a class="sourceLine" id="cb4-157" data-line-number="157">      <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]</a>
-<a class="sourceLine" id="cb4-158" data-line-number="158">      <span class="fu">++</span> [intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">$</span> <span class="st">&quot;\\text{On Order:} &quot;</span> <span class="fu">:</span> [show n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]]]</a>
-<a class="sourceLine" id="cb4-159" data-line-number="159">      <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
-<a class="sourceLine" id="cb4-160" data-line-number="160">    )</a>
-<a class="sourceLine" id="cb4-161" data-line-number="161">  )</a>
-<a class="sourceLine" id="cb4-162" data-line-number="162"></a>
-<a class="sourceLine" id="cb4-163" data-line-number="163"><span class="co">-- | Expected reward for a given state, assuming equiprobable actions.</span></a>
-<a class="sourceLine" id="cb4-164" data-line-number="164"><span class="ot">testRewards ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
-<a class="sourceLine" id="cb4-165" data-line-number="165">testRewards p s <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-166" data-line-number="166">  mean [ ( sum</a>
-<a class="sourceLine" id="cb4-167" data-line-number="167">         <span class="fu">.</span> map (uncurry (<span class="fu">*</span>) <span class="fu">.</span> second (<span class="fu">/</span> pNorm))</a>
-<a class="sourceLine" id="cb4-168" data-line-number="168">         ) <span class="fu">$</span> rewards&#39; p s a s&#39;</a>
-<a class="sourceLine" id="cb4-169" data-line-number="169">       <span class="fu">|</span> a  <span class="ot">&lt;-</span> acts</a>
-<a class="sourceLine" id="cb4-170" data-line-number="170">       , s&#39; <span class="ot">&lt;-</span> nextStates&#39; s a</a>
-<a class="sourceLine" id="cb4-171" data-line-number="171">       ]</a>
-<a class="sourceLine" id="cb4-172" data-line-number="172">  <span class="kw">where</span> acts  <span class="fu">=</span> actions&#39; s</a>
-<a class="sourceLine" id="cb4-173" data-line-number="173">        pNorm <span class="fu">=</span> fromIntegral <span class="fu">$</span> length acts</a>
-<a class="sourceLine" id="cb4-174" data-line-number="174"></a>
-<a class="sourceLine" id="cb4-175" data-line-number="175"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-176" data-line-number="176"><span class="co">  Command line options defintions.</span></a>
-<a class="sourceLine" id="cb4-177" data-line-number="177"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-178" data-line-number="178"></a>
-<a class="sourceLine" id="cb4-179" data-line-number="179"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
-<a class="sourceLine" id="cb4-180" data-line-number="180">    {<span class="ot"> nIter ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
-<a class="sourceLine" id="cb4-181" data-line-number="181">        <span class="st">&quot;The number of policy improvement iterations&quot;</span></a>
-<a class="sourceLine" id="cb4-182" data-line-number="182">    ,<span class="ot"> nEval ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
-<a class="sourceLine" id="cb4-183" data-line-number="183">        <span class="st">&quot;The number of policy evaluation iterations per policy improvement iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-184" data-line-number="184">    ,<span class="ot"> p     ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
-<a class="sourceLine" id="cb4-185" data-line-number="185">        <span class="st">&quot;The ratio of stock-out to holding costs&quot;</span></a>
-<a class="sourceLine" id="cb4-186" data-line-number="186">    ,<span class="ot"> eps   ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Double</span> <span class="fu">&lt;?&gt;</span></a>
-<a class="sourceLine" id="cb4-187" data-line-number="187">        <span class="st">&quot;The convergence tolerance for iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-188" data-line-number="188">    }</a>
-<a class="sourceLine" id="cb4-189" data-line-number="189">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
-<a class="sourceLine" id="cb4-190" data-line-number="190"></a>
-<a class="sourceLine" id="cb4-191" data-line-number="191"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
-<a class="sourceLine" id="cb4-192" data-line-number="192"></a>
-<a class="sourceLine" id="cb4-193" data-line-number="193"></a>
-<a class="sourceLine" id="cb4-194" data-line-number="194"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb4-195" data-line-number="195"><span class="co">  main()</span></a>
-<a class="sourceLine" id="cb4-196" data-line-number="196"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb4-197" data-line-number="197"></a>
-<a class="sourceLine" id="cb4-198" data-line-number="198"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb4-199" data-line-number="199">main <span class="fu">=</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-200" data-line-number="200">  <span class="co">-- Process command line options.</span></a>
-<a class="sourceLine" id="cb4-201" data-line-number="201"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
-<a class="sourceLine" id="cb4-202" data-line-number="202">    unwrapRecord <span class="st">&quot;A toy inventory optimizer.&quot;</span></a>
-<a class="sourceLine" id="cb4-203" data-line-number="203">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe  <span class="dv">2</span> (nIter o)</a>
-<a class="sourceLine" id="cb4-204" data-line-number="204">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span> (nEval o)</a>
-<a class="sourceLine" id="cb4-205" data-line-number="205">      pVal   <span class="fu">=</span> fromMaybe <span class="dv">50</span> (p     o)</a>
-<a class="sourceLine" id="cb4-206" data-line-number="206">      eps&#39;   <span class="fu">=</span> fromMaybe  <span class="fl">0.1</span> (eps o)</a>
-<a class="sourceLine" id="cb4-207" data-line-number="207"></a>
-<a class="sourceLine" id="cb4-208" data-line-number="208">  <span class="co">-- Calculate and display optimum policy.</span></a>
-<a class="sourceLine" id="cb4-209" data-line-number="209">  writeFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-210" data-line-number="210">  <span class="kw">let</span> (fs, counts&#39;) <span class="fu">=</span> P.unzip <span class="fu">$</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-211" data-line-number="211">                   <span class="fu">$</span> iterate</a>
-<a class="sourceLine" id="cb4-212" data-line-number="212">                       ( optPol</a>
-<a class="sourceLine" id="cb4-213" data-line-number="213">                           rltDef</a>
-<a class="sourceLine" id="cb4-214" data-line-number="214">                             { disc       <span class="fu">=</span> disc&#39;</a>
-<a class="sourceLine" id="cb4-215" data-line-number="215">                             , epsilon    <span class="fu">=</span> eps&#39;</a>
-<a class="sourceLine" id="cb4-216" data-line-number="216">                             , maxIter    <span class="fu">=</span> nEvals</a>
-<a class="sourceLine" id="cb4-217" data-line-number="217">                             , states     <span class="fu">=</span> allStatesV</a>
-<a class="sourceLine" id="cb4-218" data-line-number="218">                             , actions    <span class="fu">=</span> actions&#39;</a>
-<a class="sourceLine" id="cb4-219" data-line-number="219">                             , nextStates <span class="fu">=</span> nextStates&#39;</a>
-<a class="sourceLine" id="cb4-220" data-line-number="220">                             , rewards    <span class="fu">=</span> rewards&#39; pVal</a>
-<a class="sourceLine" id="cb4-221" data-line-number="221">                             }</a>
-<a class="sourceLine" id="cb4-222" data-line-number="222">                       ) (const (<span class="dv">0</span>, <span class="dv">0</span>), [])</a>
-<a class="sourceLine" id="cb4-223" data-line-number="223">      counts <span class="fu">=</span> P.tail counts&#39;</a>
-<a class="sourceLine" id="cb4-224" data-line-number="224">      acts  <span class="fu">=</span> map (\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) fs</a>
-<a class="sourceLine" id="cb4-225" data-line-number="225">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
-<a class="sourceLine" id="cb4-226" data-line-number="226">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
-<a class="sourceLine" id="cb4-227" data-line-number="227">      ((_, g&#39;), cnts) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-228" data-line-number="228">        <span class="co">-- runWriter $ withinOnM eps&#39;</span></a>
-<a class="sourceLine" id="cb4-229" data-line-number="229">        runWriter <span class="fu">$</span> withinOnM <span class="dv">0</span>  <span class="co">-- Temporary, to force `nIters` policy improvements.</span></a>
-<a class="sourceLine" id="cb4-230" data-line-number="230">                              ( \ (dv, _) <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-231" data-line-number="231">                                  maxAndNonZero dv</a>
-<a class="sourceLine" id="cb4-232" data-line-number="232">                              ) <span class="fu">$</span> zip diffs (P.tail fs)</a>
-<a class="sourceLine" id="cb4-233" data-line-number="233">      pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
-<a class="sourceLine" id="cb4-234" data-line-number="234">      val   <span class="fu">=</span> snd <span class="fu">.</span> g&#39;</a>
-<a class="sourceLine" id="cb4-235" data-line-number="235">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-236" data-line-number="236">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
-<a class="sourceLine" id="cb4-237" data-line-number="237">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-238" data-line-number="238">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
-<a class="sourceLine" id="cb4-239" data-line-number="239"></a>
-<a class="sourceLine" id="cb4-240" data-line-number="240">  <span class="co">-- DEBUGGING</span></a>
-<a class="sourceLine" id="cb4-241" data-line-number="241">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n## debug\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-31" data-line-number="31"><span class="kw">type</span> <span class="dt">MyAction</span> <span class="fu">=</span> <span class="dt">Int</span></a>
+<a class="sourceLine" id="cb4-32" data-line-number="32"></a>
+<a class="sourceLine" id="cb4-33" data-line-number="33"><span class="co">-- | S - all possible states.</span></a>
+<a class="sourceLine" id="cb4-34" data-line-number="34"><span class="ot">allStates ::</span> [<span class="dt">MyState</span>]</a>
+<a class="sourceLine" id="cb4-35" data-line-number="35">allStates <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-36" data-line-number="36">  [ <span class="dt">MyState</span> x (drop n ys <span class="fu">++</span> take n ys) n</a>
+<a class="sourceLine" id="cb4-37" data-line-number="37">  <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOnHand]</a>
+<a class="sourceLine" id="cb4-38" data-line-number="38">  , n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gLeadTime <span class="fu">-</span> <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-39" data-line-number="39">  , y <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]</a>
+<a class="sourceLine" id="cb4-40" data-line-number="40">  , <span class="kw">let</span> ys <span class="fu">=</span> y <span class="fu">:</span> replicate (gLeadTime <span class="fu">-</span> <span class="dv">1</span>) <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-41" data-line-number="41">  ]</a>
+<a class="sourceLine" id="cb4-42" data-line-number="42"></a>
+<a class="sourceLine" id="cb4-43" data-line-number="43"><span class="co">-- Just a sized vector alternative to the list above.</span></a>
+<a class="sourceLine" id="cb4-44" data-line-number="44"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-45" data-line-number="45"><span class="co">-- TODO: Figure out how to determine the size from the constants above.</span></a>
+<a class="sourceLine" id="cb4-46" data-line-number="46"><span class="ot">allStatesV ::</span> <span class="dt">VS.Vector</span> <span class="dv">198</span> <span class="dt">MyState</span></a>
+<a class="sourceLine" id="cb4-47" data-line-number="47">allStatesV <span class="fu">=</span> fromMaybe (P.error <span class="st">&quot;main.allStatesV: Fatal error converting `allStates`!&quot;</span>)</a>
+<a class="sourceLine" id="cb4-48" data-line-number="48">                       <span class="fu">$</span> VS.fromList allStates</a>
+<a class="sourceLine" id="cb4-49" data-line-number="49"></a>
+<a class="sourceLine" id="cb4-50" data-line-number="50"><span class="co">-- | A(s) - all possible actions from state `s`.</span></a>
+<a class="sourceLine" id="cb4-51" data-line-number="51"><span class="ot">actions&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [<span class="dt">MyAction</span>]</a>
+<a class="sourceLine" id="cb4-52" data-line-number="52">actions&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-53" data-line-number="53">  <span class="co">-- if epoch `mod` gReviewPer /= 0  -- Until I have a more sophisticated `showFofState`.</span></a>
+<a class="sourceLine" id="cb4-54" data-line-number="54">  <span class="kw">if</span> epoch <span class="ot">`mod`</span> gLeadTime <span class="fu">/=</span> <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-55" data-line-number="55">     <span class="kw">then</span> [<span class="dv">0</span>]</a>
+<a class="sourceLine" id="cb4-56" data-line-number="56">     <span class="kw">else</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]</a>
+<a class="sourceLine" id="cb4-57" data-line-number="57"></a>
+<a class="sourceLine" id="cb4-58" data-line-number="58"><span class="co">-- | S&#39;(s, a) - list of next possible states.</span></a>
+<a class="sourceLine" id="cb4-59" data-line-number="59"><span class="ot">nextStates&#39; ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> [<span class="dt">MyState</span>]</a>
+<a class="sourceLine" id="cb4-60" data-line-number="60">nextStates&#39; <span class="dt">MyState</span>{<span class="fu">..</span>} toOrder <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-61" data-line-number="61">  [ <span class="dt">MyState</span> (onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> demand)</a>
+<a class="sourceLine" id="cb4-62" data-line-number="62">            (P.tail onOrder <span class="fu">++</span> [toOrder])</a>
+<a class="sourceLine" id="cb4-63" data-line-number="63">            (epoch <span class="fu">+</span> <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-64" data-line-number="64">  <span class="fu">|</span> demand <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxDemand]</a>
+<a class="sourceLine" id="cb4-65" data-line-number="65">  ]</a>
+<a class="sourceLine" id="cb4-66" data-line-number="66"></a>
+<a class="sourceLine" id="cb4-67" data-line-number="67"><span class="co">-- | R(s, a, s&#39;)</span></a>
+<a class="sourceLine" id="cb4-68" data-line-number="68"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-69" data-line-number="69"><span class="co">-- Returns a list of pairs, each containing:</span></a>
+<a class="sourceLine" id="cb4-70" data-line-number="70"><span class="co">-- - a reward value, and</span></a>
+<a class="sourceLine" id="cb4-71" data-line-number="71"><span class="co">-- - the probability of occurence for that value.</span></a>
+<a class="sourceLine" id="cb4-72" data-line-number="72"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-73" data-line-number="73"><span class="co">-- Note: Previous requirement that reward values be unique eliminated,</span></a>
+<a class="sourceLine" id="cb4-74" data-line-number="74"><span class="co">--       for coding convenience and runtime performance improvement.</span></a>
+<a class="sourceLine" id="cb4-75" data-line-number="75"><span class="ot">rewards&#39; ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)]</a>
+<a class="sourceLine" id="cb4-76" data-line-number="76">rewards&#39; p <span class="dt">MyState</span>{<span class="fu">..</span>} _ (<span class="dt">MyState</span> onHand&#39; _ _) <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-77" data-line-number="77">  [ ( fromIntegral p <span class="fu">*</span> fromIntegral stockOut <span class="fu">-</span> fromIntegral held</a>
+<a class="sourceLine" id="cb4-78" data-line-number="78">    , pDemand <span class="fu">$</span> finite <span class="fu">$</span> fromIntegral demand</a>
+<a class="sourceLine" id="cb4-79" data-line-number="79">    )</a>
+<a class="sourceLine" id="cb4-80" data-line-number="80">  <span class="fu">|</span> <span class="kw">let</span> held     <span class="fu">=</span> max <span class="dv">0</span> onHand&#39;</a>
+<a class="sourceLine" id="cb4-81" data-line-number="81">        stockOut <span class="fu">=</span> min <span class="dv">0</span> onHand&#39;</a>
+<a class="sourceLine" id="cb4-82" data-line-number="82">        demand   <span class="fu">=</span> onHand <span class="fu">+</span> P.head onOrder <span class="fu">-</span> onHand&#39;</a>
+<a class="sourceLine" id="cb4-83" data-line-number="83">  ]</a>
+<a class="sourceLine" id="cb4-84" data-line-number="84"></a>
+<a class="sourceLine" id="cb4-85" data-line-number="85"><span class="co">-- | Show a function from `MyState`, assuming the `On Order` quantity</span></a>
+<a class="sourceLine" id="cb4-86" data-line-number="86"><span class="co">-- is in the first element of the `onOrder` list.</span></a>
+<a class="sourceLine" id="cb4-87" data-line-number="87"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-88" data-line-number="88"><span class="co">-- This makes sense as the default, since actions (i.e. - orders) may</span></a>
+<a class="sourceLine" id="cb4-89" data-line-number="89"><span class="co">-- only be taken (i.e. - placed) when the first element of `onOrder` is</span></a>
+<a class="sourceLine" id="cb4-90" data-line-number="90"><span class="co">-- non-zero, because that corresponds to an epoch that is an integral</span></a>
+<a class="sourceLine" id="cb4-91" data-line-number="91"><span class="co">-- multiple of the review period, which is, currently, assumed to be</span></a>
+<a class="sourceLine" id="cb4-92" data-line-number="92"><span class="co">-- equal to lead time.</span></a>
+<a class="sourceLine" id="cb4-93" data-line-number="93"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a, <span class="dt">Ord</span> a) <span class="ot">=&gt;</span> (<span class="dt">MyState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-94" data-line-number="94">showFofState <span class="fu">=</span> showFofState&#39; <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-95" data-line-number="95"></a>
+<a class="sourceLine" id="cb4-96" data-line-number="96"><span class="co">-- | Show a function from `MyState`, assuming the `On Order` quantity</span></a>
+<a class="sourceLine" id="cb4-97" data-line-number="97"><span class="co">-- is in the `k-th` element of the `onOrder` list.</span></a>
+<a class="sourceLine" id="cb4-98" data-line-number="98"><span class="ot">showFofState&#39; ::</span> (<span class="dt">Show</span> a, <span class="dt">Ord</span> a) <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> (<span class="dt">MyState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-99" data-line-number="99">showFofState&#39; k g <span class="fu">=</span> unlines</a>
+<a class="sourceLine" id="cb4-100" data-line-number="100">  ( <span class="st">&quot;\\begin{array}{&quot;</span> <span class="fu">:</span> intersperse <span class="ch">&#39;|&#39;</span> (replicate (gMaxOrder <span class="fu">+</span> <span class="dv">1</span>) <span class="ch">&#39;c&#39;</span>) <span class="fu">:</span> <span class="st">&quot;}&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-101" data-line-number="101">    ( (<span class="st">&quot;\\text{On Hand} &amp;&quot;</span> <span class="fu">++</span> intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate (gMaxOrder <span class="fu">+</span> <span class="dv">1</span>) <span class="ch">&#39; &#39;</span>) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-102" data-line-number="102">      [<span class="st">&quot;\\hline&quot;</span>] <span class="fu">++</span></a>
+<a class="sourceLine" id="cb4-103" data-line-number="103">      intersperse <span class="st">&quot;\\hline&quot;</span></a>
+<a class="sourceLine" id="cb4-104" data-line-number="104">        ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
+<a class="sourceLine" id="cb4-105" data-line-number="105">              [ (show onHnd <span class="fu">:</span>) <span class="fu">$</span> map show</a>
+<a class="sourceLine" id="cb4-106" data-line-number="106">                [ g (<span class="dt">MyState</span> onHnd (drop k ys <span class="fu">++</span> take k ys) k)</a>
+<a class="sourceLine" id="cb4-107" data-line-number="107">                <span class="fu">|</span> onOrdr <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]</a>
+<a class="sourceLine" id="cb4-108" data-line-number="108">                , <span class="kw">let</span> ys <span class="fu">=</span> onOrdr <span class="fu">:</span> replicate (gLeadTime <span class="fu">-</span> <span class="dv">1</span>) <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-109" data-line-number="109">                ]</a>
+<a class="sourceLine" id="cb4-110" data-line-number="110">              <span class="fu">|</span> onHnd&#39; <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOnHand]</a>
+<a class="sourceLine" id="cb4-111" data-line-number="111">              , <span class="kw">let</span> onHnd <span class="fu">=</span> gMaxOnHand <span class="fu">-</span> onHnd&#39;</a>
+<a class="sourceLine" id="cb4-112" data-line-number="112">              ]</a>
+<a class="sourceLine" id="cb4-113" data-line-number="113">        )</a>
+<a class="sourceLine" id="cb4-114" data-line-number="114">      <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]</a>
+<a class="sourceLine" id="cb4-115" data-line-number="115">      <span class="fu">++</span> [intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">$</span> <span class="st">&quot;\\text{On Order:} &quot;</span> <span class="fu">:</span> [show n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>gMaxOrder]]]</a>
+<a class="sourceLine" id="cb4-116" data-line-number="116">      <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
+<a class="sourceLine" id="cb4-117" data-line-number="117">    )</a>
+<a class="sourceLine" id="cb4-118" data-line-number="118">  )</a>
+<a class="sourceLine" id="cb4-119" data-line-number="119"></a>
+<a class="sourceLine" id="cb4-120" data-line-number="120"><span class="co">-- | Expected reward for a given state, assuming equiprobable actions.</span></a>
+<a class="sourceLine" id="cb4-121" data-line-number="121"><span class="ot">testRewards ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
+<a class="sourceLine" id="cb4-122" data-line-number="122">testRewards p s <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-123" data-line-number="123">  mean [ ( sum</a>
+<a class="sourceLine" id="cb4-124" data-line-number="124">         <span class="fu">.</span> map (uncurry (<span class="fu">*</span>) <span class="fu">.</span> second (<span class="fu">/</span> pNorm))</a>
+<a class="sourceLine" id="cb4-125" data-line-number="125">         ) <span class="fu">$</span> rewards&#39; p s a s&#39;</a>
+<a class="sourceLine" id="cb4-126" data-line-number="126">       <span class="fu">|</span> a  <span class="ot">&lt;-</span> acts</a>
+<a class="sourceLine" id="cb4-127" data-line-number="127">       , s&#39; <span class="ot">&lt;-</span> nextStates&#39; s a</a>
+<a class="sourceLine" id="cb4-128" data-line-number="128">       ]</a>
+<a class="sourceLine" id="cb4-129" data-line-number="129">  <span class="kw">where</span> acts  <span class="fu">=</span> actions&#39; s</a>
+<a class="sourceLine" id="cb4-130" data-line-number="130">        pNorm <span class="fu">=</span> fromIntegral <span class="fu">$</span> length acts</a>
+<a class="sourceLine" id="cb4-131" data-line-number="131"></a>
+<a class="sourceLine" id="cb4-132" data-line-number="132"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-133" data-line-number="133"><span class="co">  Command line options defintions.</span></a>
+<a class="sourceLine" id="cb4-134" data-line-number="134"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-135" data-line-number="135"></a>
+<a class="sourceLine" id="cb4-136" data-line-number="136"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
+<a class="sourceLine" id="cb4-137" data-line-number="137">    {<span class="ot"> nIter ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-138" data-line-number="138">        <span class="st">&quot;The number of policy improvement iterations&quot;</span></a>
+<a class="sourceLine" id="cb4-139" data-line-number="139">    ,<span class="ot"> nEval ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-140" data-line-number="140">        <span class="st">&quot;The number of policy evaluation iterations per policy improvement iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-141" data-line-number="141">    ,<span class="ot"> p     ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-142" data-line-number="142">        <span class="st">&quot;The ratio of stock-out to holding costs&quot;</span></a>
+<a class="sourceLine" id="cb4-143" data-line-number="143">    ,<span class="ot"> eps   ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Double</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-144" data-line-number="144">        <span class="st">&quot;The convergence tolerance for iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-145" data-line-number="145">    ,<span class="ot"> alph  ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Double</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-146" data-line-number="146">        <span class="st">&quot;The error correction gain&quot;</span></a>
+<a class="sourceLine" id="cb4-147" data-line-number="147">    ,<span class="ot"> dis   ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Double</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-148" data-line-number="148">        <span class="st">&quot;The discount rate&quot;</span></a>
+<a class="sourceLine" id="cb4-149" data-line-number="149">    }</a>
+<a class="sourceLine" id="cb4-150" data-line-number="150">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb4-151" data-line-number="151"></a>
+<a class="sourceLine" id="cb4-152" data-line-number="152"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb4-153" data-line-number="153"></a>
+<a class="sourceLine" id="cb4-154" data-line-number="154"></a>
+<a class="sourceLine" id="cb4-155" data-line-number="155"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-156" data-line-number="156"><span class="co">  main()</span></a>
+<a class="sourceLine" id="cb4-157" data-line-number="157"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-158" data-line-number="158"></a>
+<a class="sourceLine" id="cb4-159" data-line-number="159"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-160" data-line-number="160">main <span class="fu">=</span> mainTD</a>
+<a class="sourceLine" id="cb4-161" data-line-number="161"></a>
+<a class="sourceLine" id="cb4-162" data-line-number="162">mainTD <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-163" data-line-number="163">  <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-164" data-line-number="164"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
+<a class="sourceLine" id="cb4-165" data-line-number="165">    unwrapRecord <span class="st">&quot;A toy inventory optimizer.&quot;</span></a>
+<a class="sourceLine" id="cb4-166" data-line-number="166">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe  <span class="dv">2</span>   (nIter o)</a>
+<a class="sourceLine" id="cb4-167" data-line-number="167">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span>   (nEval o)</a>
+<a class="sourceLine" id="cb4-168" data-line-number="168">      pVal   <span class="fu">=</span> fromMaybe <span class="dv">50</span>   (p     o)</a>
+<a class="sourceLine" id="cb4-169" data-line-number="169">      eps&#39;   <span class="fu">=</span> fromMaybe  <span class="fl">0.1</span> (eps   o)</a>
+<a class="sourceLine" id="cb4-170" data-line-number="170">      alpha&#39; <span class="fu">=</span> fromMaybe  <span class="fl">0.5</span> (alph  o)</a>
+<a class="sourceLine" id="cb4-171" data-line-number="171">      disc&#39;  <span class="fu">=</span> fromMaybe  <span class="fl">0.9</span> (dis   o)</a>
+<a class="sourceLine" id="cb4-172" data-line-number="172"></a>
+<a class="sourceLine" id="cb4-173" data-line-number="173">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-174" data-line-number="174">  writeFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-175" data-line-number="175">  <span class="kw">let</span> (qs, _) <span class="fu">=</span> unzip <span class="fu">$</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>) <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-176" data-line-number="176">        iterate</a>
+<a class="sourceLine" id="cb4-177" data-line-number="177">         ( optQ</a>
+<a class="sourceLine" id="cb4-178" data-line-number="178">             rltDef</a>
+<a class="sourceLine" id="cb4-179" data-line-number="179">               { disc       <span class="fu">=</span> disc&#39;</a>
+<a class="sourceLine" id="cb4-180" data-line-number="180">               , epsilon    <span class="fu">=</span> eps&#39;</a>
+<a class="sourceLine" id="cb4-181" data-line-number="181">               , alpha      <span class="fu">=</span> alpha&#39;</a>
+<a class="sourceLine" id="cb4-182" data-line-number="182">               , maxIter    <span class="fu">=</span> nEvals</a>
+<a class="sourceLine" id="cb4-183" data-line-number="183">               , states     <span class="fu">=</span> allStatesV</a>
+<a class="sourceLine" id="cb4-184" data-line-number="184">               , actions    <span class="fu">=</span> actions&#39;</a>
+<a class="sourceLine" id="cb4-185" data-line-number="185">               , nextStates <span class="fu">=</span> nextStates&#39;</a>
+<a class="sourceLine" id="cb4-186" data-line-number="186">               , rewards    <span class="fu">=</span> rewards&#39; pVal</a>
+<a class="sourceLine" id="cb4-187" data-line-number="187">               }</a>
+<a class="sourceLine" id="cb4-188" data-line-number="188">         ) <span class="fu">$</span> (const <span class="dv">0</span>, mkStdGen <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-189" data-line-number="189">      ps    <span class="fu">=</span> map ( \ q <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-190" data-line-number="190">                      \ s <span class="ot">-&gt;</span> argmin (curry q s) (actions&#39; s)</a>
+<a class="sourceLine" id="cb4-191" data-line-number="191">                  ) qs</a>
+<a class="sourceLine" id="cb4-192" data-line-number="192">      acts  <span class="fu">=</span> map (\p <span class="ot">-&gt;</span> VS.map p allStatesV) ps</a>
+<a class="sourceLine" id="cb4-193" data-line-number="193">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
+<a class="sourceLine" id="cb4-194" data-line-number="194">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
+<a class="sourceLine" id="cb4-195" data-line-number="195">      ((_, pol), cnts) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-196" data-line-number="196">        runWriter <span class="fu">$</span> withinOnM <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-197" data-line-number="197">                              ( \ (da, _) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-198" data-line-number="198">                                  maxAndNonZero da</a>
+<a class="sourceLine" id="cb4-199" data-line-number="199">                              ) <span class="fu">$</span> zip diffs (P.tail ps)</a>
+<a class="sourceLine" id="cb4-200" data-line-number="200">      vs    <span class="fu">=</span> map ( \ q <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-201" data-line-number="201">                      \ s <span class="ot">-&gt;</span> q (s, pol s)</a>
+<a class="sourceLine" id="cb4-202" data-line-number="202">                  ) qs</a>
+<a class="sourceLine" id="cb4-203" data-line-number="203">      val   <span class="fu">=</span> P.last vs</a>
+<a class="sourceLine" id="cb4-204" data-line-number="204">      <span class="co">-- counts = map () $ zip vs $ tail vs</span></a>
+<a class="sourceLine" id="cb4-205" data-line-number="205">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-206" data-line-number="206">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-207" data-line-number="207">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-208" data-line-number="208">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-209" data-line-number="209"></a>
+<a class="sourceLine" id="cb4-210" data-line-number="210">  <span class="co">-- DEBUGGING</span></a>
+<a class="sourceLine" id="cb4-211" data-line-number="211">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n## debug\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-212" data-line-number="212"></a>
+<a class="sourceLine" id="cb4-213" data-line-number="213">  <span class="co">-- Reward expectations</span></a>
+<a class="sourceLine" id="cb4-214" data-line-number="214">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### E[reward]\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-215" data-line-number="215">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> testRewards pVal)</a>
+<a class="sourceLine" id="cb4-216" data-line-number="216"></a>
+<a class="sourceLine" id="cb4-217" data-line-number="217">  <span class="co">-- Value/Action changes vs. Iteration</span></a>
+<a class="sourceLine" id="cb4-218" data-line-number="218">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-219" data-line-number="219">    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Changes vs. Evaluation Iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-220" data-line-number="220">    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]</a>
+<a class="sourceLine" id="cb4-221" data-line-number="221">    plot ( line <span class="st">&quot;Policy Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-222" data-line-number="222">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-223" data-line-number="223">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip ( map (<span class="fu">*</span> nEvals)</a>
+<a class="sourceLine" id="cb4-224" data-line-number="224">                                       [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-225" data-line-number="225">                                 )</a>
+<a class="sourceLine" id="cb4-226" data-line-number="226">                                 cnts</a>
+<a class="sourceLine" id="cb4-227" data-line-number="227">                  ]</a>
+<a class="sourceLine" id="cb4-228" data-line-number="228">                ]</a>
+<a class="sourceLine" id="cb4-229" data-line-number="229">         )</a>
+<a class="sourceLine" id="cb4-230" data-line-number="230">    <span class="co">-- plot ( line &quot;Value Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-231" data-line-number="231">    <span class="co">--             [ [ (x,y)</span></a>
+<a class="sourceLine" id="cb4-232" data-line-number="232">    <span class="co">--               | (x,y) &lt;- zip [(0::Int)..]</span></a>
+<a class="sourceLine" id="cb4-233" data-line-number="233">    <span class="co">--                              (concat counts)</span></a>
+<a class="sourceLine" id="cb4-234" data-line-number="234">    <span class="co">--               ]</span></a>
+<a class="sourceLine" id="cb4-235" data-line-number="235">    <span class="co">--             ]</span></a>
+<a class="sourceLine" id="cb4-236" data-line-number="236">    <span class="co">--      )</span></a>
+<a class="sourceLine" id="cb4-237" data-line-number="237">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-238" data-line-number="238"></a>
+<a class="sourceLine" id="cb4-239" data-line-number="239">  <span class="co">-- Plot the pdfs.</span></a>
+<a class="sourceLine" id="cb4-240" data-line-number="240">  appendFile  <span class="st">&quot;other/inventory.md&quot;</span></a>
+<a class="sourceLine" id="cb4-241" data-line-number="241">             <span class="st">&quot;\n### Demand Probability Distribution Functions\n\n&quot;</span></a>
 <a class="sourceLine" id="cb4-242" data-line-number="242"></a>
-<a class="sourceLine" id="cb4-243" data-line-number="243">  <span class="co">-- Reward expectations</span></a>
-<a class="sourceLine" id="cb4-244" data-line-number="244">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### E[reward]\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-245" data-line-number="245">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> testRewards pVal)</a>
-<a class="sourceLine" id="cb4-246" data-line-number="246"></a>
-<a class="sourceLine" id="cb4-247" data-line-number="247">  <span class="co">-- Value/Action changes vs. Iteration</span></a>
-<a class="sourceLine" id="cb4-248" data-line-number="248">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-249" data-line-number="249">    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Changes vs. Evaluation Iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-250" data-line-number="250">    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]</a>
-<a class="sourceLine" id="cb4-251" data-line-number="251">    plot ( line <span class="st">&quot;Policy Changes&quot;</span></a>
-<a class="sourceLine" id="cb4-252" data-line-number="252">                [ [ (x,y)</a>
-<a class="sourceLine" id="cb4-253" data-line-number="253">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip ( map (<span class="fu">*</span> (length <span class="fu">$</span> P.head counts))</a>
-<a class="sourceLine" id="cb4-254" data-line-number="254">                                       [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
-<a class="sourceLine" id="cb4-255" data-line-number="255">                                 )</a>
-<a class="sourceLine" id="cb4-256" data-line-number="256">                                 cnts</a>
-<a class="sourceLine" id="cb4-257" data-line-number="257">                  ]</a>
-<a class="sourceLine" id="cb4-258" data-line-number="258">                ]</a>
-<a class="sourceLine" id="cb4-259" data-line-number="259">         )</a>
-<a class="sourceLine" id="cb4-260" data-line-number="260">    plot ( line <span class="st">&quot;Value Changes&quot;</span></a>
-<a class="sourceLine" id="cb4-261" data-line-number="261">                [ [ (x,y)</a>
-<a class="sourceLine" id="cb4-262" data-line-number="262">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
-<a class="sourceLine" id="cb4-263" data-line-number="263">                                 (concat counts)</a>
-<a class="sourceLine" id="cb4-264" data-line-number="264">                  ]</a>
-<a class="sourceLine" id="cb4-265" data-line-number="265">                ]</a>
-<a class="sourceLine" id="cb4-266" data-line-number="266">         )</a>
-<a class="sourceLine" id="cb4-267" data-line-number="267">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-268" data-line-number="268"></a>
-<a class="sourceLine" id="cb4-269" data-line-number="269">  <span class="co">-- Plot the pdfs.</span></a>
-<a class="sourceLine" id="cb4-270" data-line-number="270">  appendFile  <span class="st">&quot;other/inventory.md&quot;</span></a>
-<a class="sourceLine" id="cb4-271" data-line-number="271">             <span class="st">&quot;\n### Demand Probability Distribution Functions\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-272" data-line-number="272"></a>
-<a class="sourceLine" id="cb4-273" data-line-number="273">  <span class="co">-- - demand PDF</span></a>
-<a class="sourceLine" id="cb4-274" data-line-number="274">  <span class="kw">let</span> pdf <span class="fu">=</span> [ (x, density (gammaDistr (<span class="dv">1</span> <span class="fu">+</span> demandMean) <span class="dv">1</span>) x)</a>
-<a class="sourceLine" id="cb4-275" data-line-number="275">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="fl">0.1</span> <span class="fu">*</span> n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]]</a>
-<a class="sourceLine" id="cb4-276" data-line-number="276">            ]</a>
-<a class="sourceLine" id="cb4-277" data-line-number="277">  toFile def <span class="st">&quot;img/pdf.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-278" data-line-number="278">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Density Function (pdf)&quot;</span></a>
-<a class="sourceLine" id="cb4-279" data-line-number="279">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
-<a class="sourceLine" id="cb4-280" data-line-number="280">       plot ( line <span class="st">&quot;Demand Probability&quot;</span></a>
-<a class="sourceLine" id="cb4-281" data-line-number="281">                   [ pdf ]</a>
-<a class="sourceLine" id="cb4-282" data-line-number="282">            )</a>
-<a class="sourceLine" id="cb4-283" data-line-number="283">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/pdf.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-284" data-line-number="284">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\int pdf = %5.2f$\n&quot;</span> (<span class="fl">0.1</span> <span class="fu">*</span> sum (map snd pdf))</a>
-<a class="sourceLine" id="cb4-285" data-line-number="285"></a>
-<a class="sourceLine" id="cb4-286" data-line-number="286">  <span class="co">-- - demand PMF</span></a>
-<a class="sourceLine" id="cb4-287" data-line-number="287">  <span class="kw">let</span> pmf <span class="fu">=</span> [ (x, gamma&#39; (finite <span class="fu">$</span> round demandMean) (finite x))</a>
-<a class="sourceLine" id="cb4-288" data-line-number="288">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">10</span>]</a>
-<a class="sourceLine" id="cb4-289" data-line-number="289">            ]</a>
-<a class="sourceLine" id="cb4-290" data-line-number="290">      titles <span class="fu">=</span> [<span class="st">&quot;pmf&quot;</span>]</a>
-<a class="sourceLine" id="cb4-291" data-line-number="291"><span class="ot">      values ::</span> [ (<span class="dt">String</span>,[<span class="dt">Double</span>]) ]</a>
-<a class="sourceLine" id="cb4-292" data-line-number="292">      values <span class="fu">=</span> map (show <span class="fu">***</span> (<span class="fu">:</span> [])) pmf</a>
-<a class="sourceLine" id="cb4-293" data-line-number="293">  toFile def <span class="st">&quot;img/demand.png&quot;</span> <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-294" data-line-number="294">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Mass Function (pmf)&quot;</span></a>
-<a class="sourceLine" id="cb4-295" data-line-number="295">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
-<a class="sourceLine" id="cb4-296" data-line-number="296">       layout_x_axis <span class="fu">.</span> laxis_generate <span class="fu">.=</span> autoIndexAxis (map fst values)</a>
-<a class="sourceLine" id="cb4-297" data-line-number="297">       plot <span class="fu">$</span> plotBars <span class="fu">&lt;$&gt;</span> bars titles (addIndexes (map snd values))</a>
-<a class="sourceLine" id="cb4-298" data-line-number="298">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/demand.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-299" data-line-number="299">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\sum pmf = %5.2f$\n&quot;</span> (sum <span class="fu">$</span> map snd pmf)</a>
-<a class="sourceLine" id="cb4-300" data-line-number="300"></a>
-<a class="sourceLine" id="cb4-301" data-line-number="301">  <span class="co">-- - next state PMF</span></a>
-<a class="sourceLine" id="cb4-302" data-line-number="302">  <span class="kw">let</span><span class="ot"> nxtStPMFs ::</span> [[(<span class="dt">MyState</span>, <span class="dt">Double</span>)]]</a>
-<a class="sourceLine" id="cb4-303" data-line-number="303">      nxtStPMFs <span class="fu">=</span> map ( map (fst <span class="fu">.</span> P.head <span class="fu">&amp;&amp;&amp;</span> sum <span class="fu">.</span> map snd)</a>
-<a class="sourceLine" id="cb4-304" data-line-number="304">                      <span class="fu">.</span> groupBy ((<span class="fu">==</span>) <span class="ot">`on`</span> fst)</a>
-<a class="sourceLine" id="cb4-305" data-line-number="305">                      <span class="fu">.</span> sortBy (compare <span class="ot">`on`</span> fst)</a>
-<a class="sourceLine" id="cb4-306" data-line-number="306">                      <span class="fu">.</span> ( \ st <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-307" data-line-number="307">                            [ (nxtSt, prob <span class="fu">/</span> fromIntegral (length (actions&#39; st)))</a>
-<a class="sourceLine" id="cb4-308" data-line-number="308">                            <span class="fu">|</span> act   <span class="ot">&lt;-</span> actions&#39; st</a>
-<a class="sourceLine" id="cb4-309" data-line-number="309">                            , nxtSt <span class="ot">&lt;-</span> nextStates&#39; st act</a>
-<a class="sourceLine" id="cb4-310" data-line-number="310">                            , <span class="kw">let</span> prob <span class="fu">=</span> (sum <span class="fu">.</span> map snd) <span class="fu">$</span> rewards&#39; pVal st act nxtSt</a>
-<a class="sourceLine" id="cb4-311" data-line-number="311">                            ]</a>
-<a class="sourceLine" id="cb4-312" data-line-number="312">                        )</a>
-<a class="sourceLine" id="cb4-313" data-line-number="313">                      ) allStates</a>
-<a class="sourceLine" id="cb4-314" data-line-number="314"><span class="ot">      pmfSums ::</span> [<span class="dt">Double</span>]</a>
-<a class="sourceLine" id="cb4-315" data-line-number="315">      pmfSums <span class="fu">=</span> map (sum <span class="fu">.</span> map snd) nxtStPMFs</a>
-<a class="sourceLine" id="cb4-316" data-line-number="316">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\nNext state PMF sums: min = %5.2f; max = %5.2f.\n&quot;</span></a>
-<a class="sourceLine" id="cb4-317" data-line-number="317">                                                  (minimum pmfSums) (maximum pmfSums)</a></code></pre></div>
+<a class="sourceLine" id="cb4-243" data-line-number="243">  <span class="co">-- - demand PDF</span></a>
+<a class="sourceLine" id="cb4-244" data-line-number="244">  <span class="kw">let</span> pdf <span class="fu">=</span> [ (x, density (gammaDistr (<span class="dv">1</span> <span class="fu">+</span> demandMean) <span class="dv">1</span>) x)</a>
+<a class="sourceLine" id="cb4-245" data-line-number="245">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="fl">0.1</span> <span class="fu">*</span> n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]]</a>
+<a class="sourceLine" id="cb4-246" data-line-number="246">            ]</a>
+<a class="sourceLine" id="cb4-247" data-line-number="247">  toFile def <span class="st">&quot;img/pdf.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-248" data-line-number="248">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Density Function (pdf)&quot;</span></a>
+<a class="sourceLine" id="cb4-249" data-line-number="249">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-250" data-line-number="250">       plot ( line <span class="st">&quot;Demand Probability&quot;</span></a>
+<a class="sourceLine" id="cb4-251" data-line-number="251">                   [ pdf ]</a>
+<a class="sourceLine" id="cb4-252" data-line-number="252">            )</a>
+<a class="sourceLine" id="cb4-253" data-line-number="253">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/pdf.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-254" data-line-number="254">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\int pdf = %5.2f$\n&quot;</span> (<span class="fl">0.1</span> <span class="fu">*</span> sum (map snd pdf))</a>
+<a class="sourceLine" id="cb4-255" data-line-number="255"></a>
+<a class="sourceLine" id="cb4-256" data-line-number="256">  <span class="co">-- - demand PMF</span></a>
+<a class="sourceLine" id="cb4-257" data-line-number="257">  <span class="kw">let</span> pmf <span class="fu">=</span> [ (x, gamma&#39; (finite <span class="fu">$</span> round demandMean) (finite x))</a>
+<a class="sourceLine" id="cb4-258" data-line-number="258">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">10</span>]</a>
+<a class="sourceLine" id="cb4-259" data-line-number="259">            ]</a>
+<a class="sourceLine" id="cb4-260" data-line-number="260">      titles <span class="fu">=</span> [<span class="st">&quot;pmf&quot;</span>]</a>
+<a class="sourceLine" id="cb4-261" data-line-number="261"><span class="ot">      values ::</span> [ (<span class="dt">String</span>,[<span class="dt">Double</span>]) ]</a>
+<a class="sourceLine" id="cb4-262" data-line-number="262">      values <span class="fu">=</span> map (show <span class="fu">***</span> (<span class="fu">:</span> [])) pmf</a>
+<a class="sourceLine" id="cb4-263" data-line-number="263">  toFile def <span class="st">&quot;img/demand.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-264" data-line-number="264">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Mass Function (pmf)&quot;</span></a>
+<a class="sourceLine" id="cb4-265" data-line-number="265">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-266" data-line-number="266">       layout_x_axis <span class="fu">.</span> laxis_generate <span class="fu">.=</span> autoIndexAxis (map fst values)</a>
+<a class="sourceLine" id="cb4-267" data-line-number="267">       plot <span class="fu">$</span> plotBars <span class="fu">&lt;$&gt;</span> bars titles (addIndexes (map snd values))</a>
+<a class="sourceLine" id="cb4-268" data-line-number="268">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/demand.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-269" data-line-number="269">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\sum pmf = %5.2f$\n&quot;</span> (sum <span class="fu">$</span> map snd pmf)</a>
+<a class="sourceLine" id="cb4-270" data-line-number="270"></a>
+<a class="sourceLine" id="cb4-271" data-line-number="271">  <span class="co">-- - next state PMF</span></a>
+<a class="sourceLine" id="cb4-272" data-line-number="272">  <span class="kw">let</span><span class="ot"> nxtStPMFs ::</span> [[(<span class="dt">MyState</span>, <span class="dt">Double</span>)]]</a>
+<a class="sourceLine" id="cb4-273" data-line-number="273">      nxtStPMFs <span class="fu">=</span> map ( map (fst <span class="fu">.</span> P.head <span class="fu">&amp;&amp;&amp;</span> sum <span class="fu">.</span> map snd)</a>
+<a class="sourceLine" id="cb4-274" data-line-number="274">                      <span class="fu">.</span> groupBy ((<span class="fu">==</span>) <span class="ot">`on`</span> fst)</a>
+<a class="sourceLine" id="cb4-275" data-line-number="275">                      <span class="fu">.</span> sortBy (compare <span class="ot">`on`</span> fst)</a>
+<a class="sourceLine" id="cb4-276" data-line-number="276">                      <span class="fu">.</span> ( \ st <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-277" data-line-number="277">                            [ (nxtSt, prob <span class="fu">/</span> fromIntegral (length (actions&#39; st)))</a>
+<a class="sourceLine" id="cb4-278" data-line-number="278">                            <span class="fu">|</span> act   <span class="ot">&lt;-</span> actions&#39; st</a>
+<a class="sourceLine" id="cb4-279" data-line-number="279">                            , nxtSt <span class="ot">&lt;-</span> nextStates&#39; st act</a>
+<a class="sourceLine" id="cb4-280" data-line-number="280">                            , <span class="kw">let</span> prob <span class="fu">=</span> (sum <span class="fu">.</span> map snd) <span class="fu">$</span> rewards&#39; pVal st act nxtSt</a>
+<a class="sourceLine" id="cb4-281" data-line-number="281">                            ]</a>
+<a class="sourceLine" id="cb4-282" data-line-number="282">                        )</a>
+<a class="sourceLine" id="cb4-283" data-line-number="283">                      ) allStates</a>
+<a class="sourceLine" id="cb4-284" data-line-number="284"><span class="ot">      pmfSums ::</span> [<span class="dt">Double</span>]</a>
+<a class="sourceLine" id="cb4-285" data-line-number="285">      pmfSums <span class="fu">=</span> map (sum <span class="fu">.</span> map snd) nxtStPMFs</a>
+<a class="sourceLine" id="cb4-286" data-line-number="286">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\nNext state PMF sums: min = %5.2f; max = %5.2f.\n&quot;</span></a>
+<a class="sourceLine" id="cb4-287" data-line-number="287">                                                  (minimum pmfSums) (maximum pmfSums)</a>
+<a class="sourceLine" id="cb4-288" data-line-number="288">mainDP <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-289" data-line-number="289">  <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-290" data-line-number="290"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
+<a class="sourceLine" id="cb4-291" data-line-number="291">    unwrapRecord <span class="st">&quot;A toy inventory optimizer.&quot;</span></a>
+<a class="sourceLine" id="cb4-292" data-line-number="292">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe  <span class="dv">2</span> (nIter o)</a>
+<a class="sourceLine" id="cb4-293" data-line-number="293">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span> (nEval o)</a>
+<a class="sourceLine" id="cb4-294" data-line-number="294">      pVal   <span class="fu">=</span> fromMaybe <span class="dv">50</span> (p     o)</a>
+<a class="sourceLine" id="cb4-295" data-line-number="295">      eps&#39;   <span class="fu">=</span> fromMaybe  <span class="fl">0.1</span> (eps o)</a>
+<a class="sourceLine" id="cb4-296" data-line-number="296">      disc&#39;  <span class="fu">=</span> fromMaybe  <span class="fl">0.1</span> (dis o)</a>
+<a class="sourceLine" id="cb4-297" data-line-number="297"></a>
+<a class="sourceLine" id="cb4-298" data-line-number="298">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-299" data-line-number="299">  writeFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-300" data-line-number="300">  <span class="kw">let</span> (fs, counts&#39;) <span class="fu">=</span> P.unzip <span class="fu">$</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb4-301" data-line-number="301">                   <span class="fu">$</span> iterate</a>
+<a class="sourceLine" id="cb4-302" data-line-number="302">                       ( optPol</a>
+<a class="sourceLine" id="cb4-303" data-line-number="303">                           rltDef</a>
+<a class="sourceLine" id="cb4-304" data-line-number="304">                             { disc       <span class="fu">=</span> disc&#39;</a>
+<a class="sourceLine" id="cb4-305" data-line-number="305">                             , epsilon    <span class="fu">=</span> eps&#39;</a>
+<a class="sourceLine" id="cb4-306" data-line-number="306">                             , maxIter    <span class="fu">=</span> nEvals</a>
+<a class="sourceLine" id="cb4-307" data-line-number="307">                             , states     <span class="fu">=</span> allStatesV</a>
+<a class="sourceLine" id="cb4-308" data-line-number="308">                             , actions    <span class="fu">=</span> actions&#39;</a>
+<a class="sourceLine" id="cb4-309" data-line-number="309">                             , nextStates <span class="fu">=</span> nextStates&#39;</a>
+<a class="sourceLine" id="cb4-310" data-line-number="310">                             , rewards    <span class="fu">=</span> rewards&#39; pVal</a>
+<a class="sourceLine" id="cb4-311" data-line-number="311">                             }</a>
+<a class="sourceLine" id="cb4-312" data-line-number="312">                       ) (const (<span class="dv">0</span>, <span class="dv">0</span>), [])</a>
+<a class="sourceLine" id="cb4-313" data-line-number="313">      counts <span class="fu">=</span> P.tail counts&#39;</a>
+<a class="sourceLine" id="cb4-314" data-line-number="314">      acts  <span class="fu">=</span> map (\f <span class="ot">-&gt;</span> VS.map (fst <span class="fu">.</span> f) allStatesV) fs</a>
+<a class="sourceLine" id="cb4-315" data-line-number="315">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
+<a class="sourceLine" id="cb4-316" data-line-number="316">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
+<a class="sourceLine" id="cb4-317" data-line-number="317">      ((_, g&#39;), cnts) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;main: Major failure!&quot;</span>)) <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-318" data-line-number="318">        <span class="co">-- runWriter $ withinOnM eps&#39;</span></a>
+<a class="sourceLine" id="cb4-319" data-line-number="319">        runWriter <span class="fu">$</span> withinOnM <span class="dv">0</span>  <span class="co">-- Temporary, to force `nIters` policy improvements.</span></a>
+<a class="sourceLine" id="cb4-320" data-line-number="320">                              ( \ (dv, _) <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-321" data-line-number="321">                                  maxAndNonZero dv</a>
+<a class="sourceLine" id="cb4-322" data-line-number="322">                              ) <span class="fu">$</span> zip diffs (P.tail fs)</a>
+<a class="sourceLine" id="cb4-323" data-line-number="323">      pol   <span class="fu">=</span> fst <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-324" data-line-number="324">      val   <span class="fu">=</span> snd <span class="fu">.</span> g&#39;</a>
+<a class="sourceLine" id="cb4-325" data-line-number="325">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-326" data-line-number="326">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-327" data-line-number="327">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-328" data-line-number="328">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-329" data-line-number="329"></a>
+<a class="sourceLine" id="cb4-330" data-line-number="330">  <span class="co">-- DEBUGGING</span></a>
+<a class="sourceLine" id="cb4-331" data-line-number="331">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n## debug\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-332" data-line-number="332"></a>
+<a class="sourceLine" id="cb4-333" data-line-number="333">  <span class="co">-- Reward expectations</span></a>
+<a class="sourceLine" id="cb4-334" data-line-number="334">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n### E[reward]\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-335" data-line-number="335">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> testRewards pVal)</a>
+<a class="sourceLine" id="cb4-336" data-line-number="336"></a>
+<a class="sourceLine" id="cb4-337" data-line-number="337">  <span class="co">-- Value/Action changes vs. Iteration</span></a>
+<a class="sourceLine" id="cb4-338" data-line-number="338">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-339" data-line-number="339">    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Changes vs. Evaluation Iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-340" data-line-number="340">    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]</a>
+<a class="sourceLine" id="cb4-341" data-line-number="341">    plot ( line <span class="st">&quot;Policy Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-342" data-line-number="342">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-343" data-line-number="343">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip ( map (<span class="fu">*</span> (length <span class="fu">$</span> P.head counts))</a>
+<a class="sourceLine" id="cb4-344" data-line-number="344">                                       [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-345" data-line-number="345">                                 )</a>
+<a class="sourceLine" id="cb4-346" data-line-number="346">                                 cnts</a>
+<a class="sourceLine" id="cb4-347" data-line-number="347">                  ]</a>
+<a class="sourceLine" id="cb4-348" data-line-number="348">                ]</a>
+<a class="sourceLine" id="cb4-349" data-line-number="349">         )</a>
+<a class="sourceLine" id="cb4-350" data-line-number="350">    plot ( line <span class="st">&quot;Value Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-351" data-line-number="351">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-352" data-line-number="352">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-353" data-line-number="353">                                 (concat counts)</a>
+<a class="sourceLine" id="cb4-354" data-line-number="354">                  ]</a>
+<a class="sourceLine" id="cb4-355" data-line-number="355">                ]</a>
+<a class="sourceLine" id="cb4-356" data-line-number="356">         )</a>
+<a class="sourceLine" id="cb4-357" data-line-number="357">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-358" data-line-number="358"></a>
+<a class="sourceLine" id="cb4-359" data-line-number="359">  <span class="co">-- Plot the pdfs.</span></a>
+<a class="sourceLine" id="cb4-360" data-line-number="360">  appendFile  <span class="st">&quot;other/inventory.md&quot;</span></a>
+<a class="sourceLine" id="cb4-361" data-line-number="361">             <span class="st">&quot;\n### Demand Probability Distribution Functions\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-362" data-line-number="362"></a>
+<a class="sourceLine" id="cb4-363" data-line-number="363">  <span class="co">-- - demand PDF</span></a>
+<a class="sourceLine" id="cb4-364" data-line-number="364">  <span class="kw">let</span> pdf <span class="fu">=</span> [ (x, density (gammaDistr (<span class="dv">1</span> <span class="fu">+</span> demandMean) <span class="dv">1</span>) x)</a>
+<a class="sourceLine" id="cb4-365" data-line-number="365">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="fl">0.1</span> <span class="fu">*</span> n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">100</span>]]</a>
+<a class="sourceLine" id="cb4-366" data-line-number="366">            ]</a>
+<a class="sourceLine" id="cb4-367" data-line-number="367">  toFile def <span class="st">&quot;img/pdf.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-368" data-line-number="368">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Density Function (pdf)&quot;</span></a>
+<a class="sourceLine" id="cb4-369" data-line-number="369">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-370" data-line-number="370">       plot ( line <span class="st">&quot;Demand Probability&quot;</span></a>
+<a class="sourceLine" id="cb4-371" data-line-number="371">                   [ pdf ]</a>
+<a class="sourceLine" id="cb4-372" data-line-number="372">            )</a>
+<a class="sourceLine" id="cb4-373" data-line-number="373">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;![](img/pdf.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-374" data-line-number="374">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\int pdf = %5.2f$\n&quot;</span> (<span class="fl">0.1</span> <span class="fu">*</span> sum (map snd pdf))</a>
+<a class="sourceLine" id="cb4-375" data-line-number="375"></a>
+<a class="sourceLine" id="cb4-376" data-line-number="376">  <span class="co">-- - demand PMF</span></a>
+<a class="sourceLine" id="cb4-377" data-line-number="377">  <span class="kw">let</span> pmf <span class="fu">=</span> [ (x, gamma&#39; (finite <span class="fu">$</span> round demandMean) (finite x))</a>
+<a class="sourceLine" id="cb4-378" data-line-number="378">            <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span><span class="dv">10</span>]</a>
+<a class="sourceLine" id="cb4-379" data-line-number="379">            ]</a>
+<a class="sourceLine" id="cb4-380" data-line-number="380">      titles <span class="fu">=</span> [<span class="st">&quot;pmf&quot;</span>]</a>
+<a class="sourceLine" id="cb4-381" data-line-number="381"><span class="ot">      values ::</span> [ (<span class="dt">String</span>,[<span class="dt">Double</span>]) ]</a>
+<a class="sourceLine" id="cb4-382" data-line-number="382">      values <span class="fu">=</span> map (show <span class="fu">***</span> (<span class="fu">:</span> [])) pmf</a>
+<a class="sourceLine" id="cb4-383" data-line-number="383">  toFile def <span class="st">&quot;img/demand.png&quot;</span> <span class="fu">$</span></a>
+<a class="sourceLine" id="cb4-384" data-line-number="384">    <span class="kw">do</span> layout_title <span class="fu">.=</span> <span class="st">&quot;Demand Probability Mass Function (pmf)&quot;</span></a>
+<a class="sourceLine" id="cb4-385" data-line-number="385">       setColors <span class="fu">$</span> map opaque [blue, green, red, yellow]</a>
+<a class="sourceLine" id="cb4-386" data-line-number="386">       layout_x_axis <span class="fu">.</span> laxis_generate <span class="fu">.=</span> autoIndexAxis (map fst values)</a>
+<a class="sourceLine" id="cb4-387" data-line-number="387">       plot <span class="fu">$</span> plotBars <span class="fu">&lt;$&gt;</span> bars titles (addIndexes (map snd values))</a>
+<a class="sourceLine" id="cb4-388" data-line-number="388">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="st">&quot;\n![](img/demand.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-389" data-line-number="389">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n$\\sum pmf = %5.2f$\n&quot;</span> (sum <span class="fu">$</span> map snd pmf)</a>
+<a class="sourceLine" id="cb4-390" data-line-number="390"></a>
+<a class="sourceLine" id="cb4-391" data-line-number="391">  <span class="co">-- - next state PMF</span></a>
+<a class="sourceLine" id="cb4-392" data-line-number="392">  <span class="kw">let</span><span class="ot"> nxtStPMFs ::</span> [[(<span class="dt">MyState</span>, <span class="dt">Double</span>)]]</a>
+<a class="sourceLine" id="cb4-393" data-line-number="393">      nxtStPMFs <span class="fu">=</span> map ( map (fst <span class="fu">.</span> P.head <span class="fu">&amp;&amp;&amp;</span> sum <span class="fu">.</span> map snd)</a>
+<a class="sourceLine" id="cb4-394" data-line-number="394">                      <span class="fu">.</span> groupBy ((<span class="fu">==</span>) <span class="ot">`on`</span> fst)</a>
+<a class="sourceLine" id="cb4-395" data-line-number="395">                      <span class="fu">.</span> sortBy (compare <span class="ot">`on`</span> fst)</a>
+<a class="sourceLine" id="cb4-396" data-line-number="396">                      <span class="fu">.</span> ( \ st <span class="ot">-&gt;</span></a>
+<a class="sourceLine" id="cb4-397" data-line-number="397">                            [ (nxtSt, prob <span class="fu">/</span> fromIntegral (length (actions&#39; st)))</a>
+<a class="sourceLine" id="cb4-398" data-line-number="398">                            <span class="fu">|</span> act   <span class="ot">&lt;-</span> actions&#39; st</a>
+<a class="sourceLine" id="cb4-399" data-line-number="399">                            , nxtSt <span class="ot">&lt;-</span> nextStates&#39; st act</a>
+<a class="sourceLine" id="cb4-400" data-line-number="400">                            , <span class="kw">let</span> prob <span class="fu">=</span> (sum <span class="fu">.</span> map snd) <span class="fu">$</span> rewards&#39; pVal st act nxtSt</a>
+<a class="sourceLine" id="cb4-401" data-line-number="401">                            ]</a>
+<a class="sourceLine" id="cb4-402" data-line-number="402">                        )</a>
+<a class="sourceLine" id="cb4-403" data-line-number="403">                      ) allStates</a>
+<a class="sourceLine" id="cb4-404" data-line-number="404"><span class="ot">      pmfSums ::</span> [<span class="dt">Double</span>]</a>
+<a class="sourceLine" id="cb4-405" data-line-number="405">      pmfSums <span class="fu">=</span> map (sum <span class="fu">.</span> map snd) nxtStPMFs</a>
+<a class="sourceLine" id="cb4-406" data-line-number="406">  appendFile <span class="st">&quot;other/inventory.md&quot;</span> <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\nNext state PMF sums: min = %5.2f; max = %5.2f.\n&quot;</span></a>
+<a class="sourceLine" id="cb4-407" data-line-number="407">                                                  (minimum pmfSums) (maximum pmfSums)</a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="policy-optimization">Policy optimization</h3>
 <h3 id="final-policy">Final policy</h3>
@@ -393,27 +485,27 @@ c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 &amp; 0 \\
+10 &amp; 2 &amp; 2 &amp; 2 &amp; 0 &amp; 0 &amp; 2 \\
 \hline
-9 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 &amp; 0 \\
+9 &amp; 2 &amp; 3 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\
 \hline
-8 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 &amp; 1 \\
+8 &amp; 3 &amp; 0 &amp; 0 &amp; 0 &amp; 4 &amp; 0 \\
 \hline
-7 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 &amp; 2 \\
+7 &amp; 0 &amp; 2 &amp; 5 &amp; 1 &amp; 0 &amp; 0 \\
 \hline
-6 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 &amp; 3 \\
+6 &amp; 2 &amp; 0 &amp; 0 &amp; 2 &amp; 2 &amp; 4 \\
 \hline
-5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 4 \\
+5 &amp; 2 &amp; 0 &amp; 3 &amp; 0 &amp; 2 &amp; 2 \\
 \hline
-4 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+4 &amp; 4 &amp; 2 &amp; 0 &amp; 1 &amp; 5 &amp; 5 \\
 \hline
-3 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+3 &amp; 2 &amp; 1 &amp; 3 &amp; 5 &amp; 4 &amp; 1 \\
 \hline
-2 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+2 &amp; 3 &amp; 2 &amp; 3 &amp; 2 &amp; 4 &amp; 1 \\
 \hline
-1 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+1 &amp; 1 &amp; 0 &amp; 1 &amp; 0 &amp; 2 &amp; 1 \\
 \hline
-0 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 &amp; 5 \\
+0 &amp; 0 &amp; 5 &amp; 0 &amp; 0 &amp; 5 &amp; 1 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>
@@ -423,27 +515,27 @@ c|c|c|c|c|c
 }
 \text{On Hand} &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-10 &amp; -61.1 &amp; -63.7 &amp; -66.3 &amp; -69.0 &amp; -71.7 &amp; -74.9 \\
+10 &amp; -17.8 &amp; -18.7 &amp; -14.7 &amp; -11.4 &amp; -15.6 &amp; -13.8 \\
 \hline
-9 &amp; -58.7 &amp; -61.1 &amp; -63.7 &amp; -66.3 &amp; -69.0 &amp; -71.7 \\
+9 &amp; -10.6 &amp; -11.6 &amp; -15.8 &amp; -11.2 &amp; -16.3 &amp; -9.5 \\
 \hline
-8 &amp; -56.7 &amp; -58.7 &amp; -61.1 &amp; -63.7 &amp; -66.3 &amp; -69.0 \\
+8 &amp; -10.3 &amp; -10.3 &amp;  0.0 &amp; -20.6 &amp; -10.2 &amp; -19.0 \\
 \hline
-7 &amp; -56.1 &amp; -56.7 &amp; -58.7 &amp; -61.1 &amp; -63.7 &amp; -66.3 \\
+7 &amp; -7.2 &amp; -14.9 &amp; -14.7 &amp; -12.9 &amp; -17.3 &amp; -13.0 \\
 \hline
-6 &amp; -57.2 &amp; -56.1 &amp; -56.7 &amp; -58.7 &amp; -61.1 &amp; -63.7 \\
+6 &amp; -7.6 &amp; -9.8 &amp; -8.7 &amp; -15.4 &amp; -19.7 &amp; -15.8 \\
 \hline
-5 &amp; -60.5 &amp; -57.2 &amp; -56.1 &amp; -56.7 &amp; -58.7 &amp; -61.1 \\
+5 &amp; -6.6 &amp; -9.3 &amp; -10.5 &amp; -10.0 &amp; -17.1 &amp; -17.3 \\
 \hline
-4 &amp; -66.3 &amp; -60.5 &amp; -57.2 &amp; -56.1 &amp; -56.7 &amp; -58.7 \\
+4 &amp; -3.7 &amp; -8.0 &amp; -6.1 &amp; -10.7 &amp; -9.8 &amp; -13.7 \\
 \hline
-3 &amp; -74.9 &amp; -66.3 &amp; -60.5 &amp; -57.2 &amp; -56.1 &amp; -56.7 \\
+3 &amp; -2.5 &amp; -4.2 &amp; -6.0 &amp; -8.1 &amp; -5.8 &amp; -3.5 \\
 \hline
-2 &amp; -86.4 &amp; -74.9 &amp; -66.3 &amp; -60.5 &amp; -57.2 &amp; -56.1 \\
+2 &amp; -37.6 &amp; -3.5 &amp; -3.3 &amp; -5.3 &amp; -12.6 &amp; -8.1 \\
 \hline
-1 &amp; -100.8 &amp; -86.4 &amp; -74.9 &amp; -66.3 &amp; -60.5 &amp; -57.2 \\
+1 &amp; -80.5 &amp; -42.2 &amp; -10.5 &amp; -8.9 &amp; -6.3 &amp; -9.0 \\
 \hline
-0 &amp; -117.6 &amp; -100.8 &amp; -86.4 &amp; -74.9 &amp; -66.3 &amp; -60.5 \\
+0 &amp; -62.5 &amp; -64.8 &amp; -13.0 &amp;  0.0 &amp; -5.1 &amp; -6.1 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>
@@ -464,17 +556,17 @@ c|c|c|c|c|c
 \hline
 6 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
 \hline
-5 &amp; -0.0 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
+5 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
 \hline
-4 &amp; -0.0 &amp; -0.0 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
+4 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
 \hline
-3 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
+3 &amp; -0.2 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
 \hline
-2 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.1 &amp; -0.1 \\
+2 &amp; -0.4 &amp; -0.2 &amp; -0.1 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
 \hline
-1 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.1 \\
+1 &amp; -0.8 &amp; -0.4 &amp; -0.2 &amp; -0.1 &amp; -0.1 &amp; -0.1 \\
 \hline
-0 &amp; -0.1 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.0 &amp; -0.0 \\
+0 &amp; -1.5 &amp; -0.8 &amp; -0.4 &amp; -0.2 &amp; -0.1 &amp; -0.1 \\
 \hline
 \text{On Order:}  &amp; 0 &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5
 \end{array}\]</span>

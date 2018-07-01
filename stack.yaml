@@ -46,6 +46,8 @@ extra-deps:
 - vector-sized-1.0.2.0
 - indexed-list-literals-0.2.1.1
 - Useful-0.0.6
+- list-extras-0.4.1.4
+- toolshed-0.18.0.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

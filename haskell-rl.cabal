@@ -39,6 +39,9 @@ library
     , statistics
     , vector-sized
     , MemoTrie
+    , list-extras
+    , random
+    , toolshed
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,
@@ -342,6 +345,8 @@ executable inventory
     , Chart-cairo
     , haskell-rl
     , statistics
+    , list-extras
+    , random
 
 executable windygrid
   default-language:
