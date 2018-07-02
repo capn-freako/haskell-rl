@@ -71,12 +71,14 @@ import Protolude  hiding (show, for, first, second)
 
 import Options.Generic
 
+import qualified Data.Vector.Sized   as VS
+-- import Data.Vector.Sized                      (Vector)
+
 import Control.Arrow
 import Control.Monad.Writer
-import qualified Data.Vector.Sized   as VS
 import Data.Finite
 import Data.List                              (sortBy, groupBy)
-import Data.List.Extras.Argmax                (argmax, argmin)
+-- import Data.List.Extras.Argmax                (argmax, argmin)
 import Data.MemoTrie
 import Data.Text                              (pack)
 import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty)
@@ -109,10 +111,10 @@ gMaxDemand    = 10
 
 -- | State data type for "single-store / single-item" inventory optimization problem.
 --
--- TODO: Enforce length of `onOrder`, using sized vector instead of list?
+-- TODO: Enforce limits, using sized vector / Finite instead of list / Int.
 data MyState  = MyState
-  { onHand  :: Int
-  , onOrder :: [Int]  -- Should have length `gLeadTime`.
+  { onHand  :: Int    -- Should lie in [-gMaxOnHand, gMaxOnHand].
+  , onOrder :: [Int]  -- Should have length `gLeadTime`. Elements should lie in [0, gMaxOrder].
   , epoch   :: Int    -- Needed, to determine if ordering is allowed.
   } deriving (Show, Eq, Ord, Generic)
 
@@ -122,13 +124,16 @@ instance HasTrie MyState where
   untrie    = untrieGeneric    unMyStateTrie
   enumerate = enumerateGeneric unMyStateTrie
 
+-- TODO: Convert this to Finite (gMaxOrder + 1).
 type MyAction = Int
 
 -- | S - all possible states.
+--
+-- Note: There is no need to track epochs [gLeadTime..].
 allStates :: [MyState]
 allStates =
   [ MyState x (drop n ys ++ take n ys) n
-  | x <- [0..gMaxOnHand]
+  | x <- [-gMaxOnHand..gMaxOnHand]
   , n <- [0..(gLeadTime - 1)]
   , y <- [0..gMaxOrder]
   , let ys = y : replicate (gLeadTime - 1) 0
@@ -137,9 +142,19 @@ allStates =
 -- Just a sized vector alternative to the list above.
 --
 -- TODO: Figure out how to determine the size from the constants above.
-allStatesV :: VS.Vector 198 MyState
+allStatesV :: VS.Vector 378 MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
+
+sEnum' :: MyState -> Finite 378
+sEnum' MyState{..} = finite . fromIntegral $ tot where
+  tot =
+    if onHand < (-gMaxOnHand)
+       then P.error $ printf "sEnum': onHand out of bounds: %d" onHand
+       else
+         epoch +
+         gLeadTime * (onHand + gMaxOnHand) +
+         (gLeadTime + 2 * gMaxOnHand + 1) * (sum onOrder)
 
 -- | A(s) - all possible actions from state `s`.
 actions' :: MyState -> [MyAction]
@@ -149,13 +164,25 @@ actions' MyState{..} =
      then [0]
      else [0..gMaxOrder]
 
+aEnum' :: MyAction -> Finite 6
+-- aEnum' a = finite $ fromIntegral a
+aEnum' = finite . fromIntegral
+
+aGen' :: Finite 6 -> MyAction
+aGen' = fromIntegral . getFinite
+
 -- | S'(s, a) - list of next possible states.
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  [ MyState (onHand + P.head onOrder - demand)
+  [ MyState onHand'
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
   | demand <- [0..gMaxDemand]
+  , let onHand' =
+          max (-gMaxOnHand)
+              ( min gMaxOnHand
+                    (onHand + P.head onOrder - demand)
+              )
   ]
 
 -- | R(s, a, s')
@@ -278,23 +305,23 @@ mainTD = do
                , actions    = actions'
                , nextStates = nextStates'
                , rewards    = rewards' pVal
+               , sEnum      = sEnum'
+               , aEnum      = aEnum'
+               , aGen       = aGen'
                }
-         ) $ (const 0, mkStdGen 1)
-      ps    = map ( \ q ->
-                      \ s -> argmin (curry q s) (actions' s)
-                  ) qs
-      acts  = map (\p -> VS.map p allStatesV) ps
+         ) $ (VS.replicate (VS.replicate 0), mkStdGen 1)
+      ps    = map (qToP aGen') qs
+      acts  = map (\p -> VS.map (appP sEnum' p) allStatesV) ps
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
-      ((_, pol), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
+      ((_, p'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
         runWriter $ withinOnM 0
                               ( \ (da, _) ->
                                   maxAndNonZero da
                               ) $ zip diffs (P.tail ps)
-      vs    = map ( \ q ->
-                      \ s -> q (s, pol s)
-                  ) qs
-      val   = P.last vs
+      vs    = map qToV qs
+      val   = appV sEnum' $ P.last vs
+      pol   = appP sEnum' p'
       -- counts = map () $ zip vs $ tail vs
   appendFile "other/inventory.md" "\n### Final policy\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState pol
@@ -402,6 +429,9 @@ mainDP = do
                              , actions    = actions'
                              , nextStates = nextStates'
                              , rewards    = rewards' pVal
+                             , sEnum      = sEnum'
+                             , aEnum      = aEnum'
+                             , aGen       = aGen'
                              }
                        ) (const (0, 0), [])
       counts = P.tail counts'

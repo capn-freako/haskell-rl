@@ -36,6 +36,11 @@ module RL.GPI
   , gamma
   , withinOnM
   , mean
+  , qToV
+  , qToP
+  , appV
+  , appP
+  , appQ
   ) where
 
 import qualified Prelude as P
@@ -45,6 +50,7 @@ import Protolude  hiding (show, for)
 import GHC.TypeLits
 
 import qualified Data.Vector.Sized   as VS
+import Data.Vector.Sized             (Vector)
 
 import Control.Monad.Writer
 import Data.Finite
@@ -81,14 +87,14 @@ instance (KnownNat n) => HasTrie (Finite n) where
 --
 -- Note: The functions in this module presume:
 --       Pr[S' = s' | S = s, A = a] = (sum . map snd) R(s, a, s')
-data RLType s a n = RLType
+data RLType s a m n = RLType
   { disc       :: Double  -- ^ discount rate
   , epsilon    :: Double  -- ^ convergence tolerance
   , alpha      :: Double  -- ^ error correction gain
   , maxIter    :: Int     -- ^ max. iterations of ?
 
   -- | S - all possible states
-  , states     :: VS.Vector n s
+  , states     :: VS.Vector m s
 
   -- | A(s) - all possible actions from state s
   , actions    :: s -> [a]
@@ -99,6 +105,11 @@ data RLType s a n = RLType
   -- | R(s, a, s') - all possible rewards, along with their probabilities
   -- of occurence, given current state-action pair and next state
   , rewards    :: s -> a -> s -> [(Double,Double)]
+
+  , sEnum      :: s -> Finite m  -- ^ state enumeration function
+  , aEnum      :: a -> Finite n  -- ^ action enumeration function
+  , sGen       :: Finite m -> s  -- ^ state generation function
+  , aGen       :: Finite n -> a  -- ^ action generation function
 
   , stateVals  :: [(s, Double)]  -- ^ overides for terminal states
 
@@ -113,9 +124,9 @@ data RLType s a n = RLType
 -- | A default value of type `RLType`, to use as a starting point.
 --
 -- Note that this value is virtual, leaving fields: `states`, `actions`,
--- `nextStates`, and `rewards` undefined, and must be completed for a
--- particular MDP before use.
-rltDef :: RLType s a n
+-- `nextStates`, `rewards`, `sEnum`, and `aEnum` undefined, and must be
+-- completed for a particular MDP before use.
+rltDef :: RLType s a m n
 rltDef = RLType
   { disc      = 1
   , epsilon   = 0.1
@@ -133,9 +144,9 @@ rltDef = RLType
 -- Returns a combined policy & value function.
 optPol :: ( Eq s, HasTrie s
           , Ord a, HasTrie a
-          , KnownNat n
+          , KnownNat m, KnownNat n
           )
-       => RLType s a n               -- ^ abstract type, to protect API
+       => RLType s a m n             -- ^ abstract type, to protect API
        -> (s -> (a, Double), [Int])  -- ^ initial policy & value functions
        -> (s -> (a, Double), [Int])
 optPol RLType{..} (g, _) = (bestA, cnts)
@@ -204,12 +215,16 @@ runEpisode n pol nxt terms init =
 -- - maxIter: max. # of state transitions allowed
 -- - states:  First in list is assumed to be the initial state.
 optQ
-  :: (KnownNat n, Eq s, Eq a, RandomGen g)
-  => RLType s a (1 + n)  -- ^ abstract type, to protect API
-  -> (((s, a) -> Double), g)  -- ^ initial action-value function and random generator
-  -> (((s, a) -> Double), g)  -- ^ updated action-value function and random generator
+  :: ( KnownNat m, KnownNat n, KnownNat k, m ~ (k + 1)
+     -- , Eq s, Eq a, RandomGen g
+     , Eq s, RandomGen g
+     )
+  -- => RLType s a (1 + n)  -- ^ abstract type, to protect API
+  => RLType s a m n                   -- ^ abstract type, to protect API
+  -> (Vector m (Vector n Double), g)  -- ^ initial action-value matrix and random generator
+  -> (Vector m (Vector n Double), g)  -- ^ updated action-value matrix and random generator
 optQ RLType{..} (q0, gen) = (q1, gen') where
-  p s        = argmax (curry q0 s) (actions s)
+  p s        = argmax (appQ sEnum aEnum q0 s) (actions s)
   termStates = map fst stateVals
   s0         = case initState of
                  [] -> P.head $ shuffle gen $ VS.toList states
@@ -217,9 +232,9 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
   (_, q1, gen') = flip execState (s0, q0, gen) $ replicateM maxIter $ do
     (s, q, g) <- get
     let (x, g') = random g
-        a         = if x > epsilon
-                       then p s
-                       else P.head $ shuffle g' $ actions s
+        a       = if x > epsilon
+                     then p s
+                     else P.head $ shuffle g' $ actions s
         -- Use maximum likelihood to select from among, potentially,
         -- a list of next possible states.
         s's   = nextStates s a
@@ -234,30 +249,67 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
         ps'   = fromMaybe (P.error "optQ: Failed lookup of next state probability!")
                           $ lookup s' s'p's
         a'    = p s'
-        q'    = sarsa alpha s a s' r a' q  -- temporary hard-wiring to SARSA
+        -- q' :: Vector m (Vector n Double)
+        q'    = q VS.// [ ( sEnum s
+                          , q `VS.index` (sEnum s) VS.// [(aEnum a, newVal)]
+                          )
+                        ]
+        -- temporary hard-wiring to SARSA
+        newVal = oldVal + alpha * (r + appQ sEnum aEnum q s' a' - oldVal)
+        oldVal = appQ sEnum aEnum q s a
     put (s', q', g')
     return $ if s' `elem` termStates
                 then Nothing
                 else Just r
 
--- | Take one temporal difference (TD) step, using SARSA.
-sarsa
-  :: (Eq s, Eq a)
-  => Double              -- ^ error correction gain
-  -> s                   -- ^ initial state
-  -> a                   -- ^ initial action
-  -> s                   -- ^ next state
-  -> Double              -- ^ reward
-  -> a                   -- ^ next action
-  -> ((s, a) -> Double)  -- ^ initial action-value function
-  -> ((s, a) -> Double)  -- ^ updated action-value function
-sarsa alpha s a s' r a' q = \ (st, act) ->
-  if (st, act) == (s, a)
-     then q (s, a) + alpha * ( r
-                             + q (s', a')
-                             - q (s,  a)
-                             )
-     else q (st, act)
+-- | Apply the matrix representation of an action-value function.
+appQ
+  :: (KnownNat m, KnownNat n)
+  => (s -> Finite m)             -- ^ state enumerator
+  -> (a -> Finite n)             -- ^ action enumerator
+  -> Vector m (Vector n Double)  -- ^ matrix representation of Q(s,a)
+  -> s                           -- ^ state
+  -> a                           -- ^ action
+  -> Double
+appQ sEnum aEnum q s a =
+  q `VS.index` (sEnum s) `VS.index` (aEnum a)
+
+-- | Apply the matrix representation of a policy.
+appP
+  :: KnownNat m
+  => (s -> Finite m)             -- ^ state enumerator
+  -> Vector m a                  -- ^ vector representation of A(s)
+  -> s                           -- ^ state
+  -> a
+appP sEnum p s = p `VS.index` (sEnum s)
+
+-- | Apply the matrix representation of a value function.
+appV
+  :: KnownNat m
+  => (s -> Finite m)             -- ^ state enumerator
+  -> Vector m Double             -- ^ vector representation of V(s)
+  -> s                           -- ^ state
+  -> Double
+appV sEnum v s = v `VS.index` (sEnum s)
+
+-- | Convert an action-value matrix to a value vector.
+--
+-- (i.e. - Q(s,a) -> V(s))
+qToV
+  :: (KnownNat m, KnownNat n, KnownNat k, n ~ (k + 1))
+  => Vector m (Vector n Double)  -- ^ matrix representation of Q(s,a)
+  -> Vector m Double             -- ^ matrix representation of V(s)
+qToV = VS.map VS.maximum
+
+-- | Convert an action-value matrix to a policy vector.
+--
+-- (i.e. - Q(s,a) -> A(s))
+qToP
+  :: (KnownNat m, KnownNat n, KnownNat k, n ~ (k + 1))
+  => (Finite n -> a)             -- ^ action generator
+  -> Vector m (Vector n Double)  -- ^ matrix representation of Q(s,a)
+  -> Vector m a                  -- ^ matrix representation of V(s)
+qToP aGen = VS.map (aGen . VS.maxIndex)
 
 {----------------------------------------------------------------------
   Misc.
