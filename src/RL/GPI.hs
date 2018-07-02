@@ -113,12 +113,12 @@ data RLType s a m n = RLType
 
   , stateVals  :: [(s, Double)]  -- ^ overides for terminal states
 
-  -- | Possible fixed initial state.
+  -- | Possible initial states.
   --
-  -- If list is non-empty
-  --   then use its head as the initial state;
-  --   else randomly select initial state from `states`.
-  , initState  :: [s]
+  -- If list is empty
+  --   then use `head states` as the initial state;
+  --   else randomly select initial state from `initStates`.
+  , initStates :: [s]
   }
 
 -- | A default value of type `RLType`, to use as a starting point.
@@ -128,12 +128,12 @@ data RLType s a m n = RLType
 -- completed for a particular MDP before use.
 rltDef :: RLType s a m n
 rltDef = RLType
-  { disc      = 1
-  , epsilon   = 0.1
-  , alpha     = 0.1
-  , maxIter   = 10
-  , stateVals = []
-  , initState = []
+  { disc       = 1
+  , epsilon    = 0.1
+  , alpha      = 0.1
+  , maxIter    = 10
+  , stateVals  = []
+  , initStates = []
   }
 
 -- | Yields a single policy improvment iteration.
@@ -205,7 +205,7 @@ runEpisode
   -> s              -- ^ Initial state
   -> [s]
 runEpisode n pol nxt terms init =
-  takeWhile (flip notElem terms) $
+  takeWhile (`notElem` terms) $
     take n $ iterate (\s -> nxt s (pol s)) init
 
 -- | Yields a single episodic action-value improvement iteration.
@@ -215,20 +215,19 @@ runEpisode n pol nxt terms init =
 -- - maxIter: max. # of state transitions allowed
 -- - states:  First in list is assumed to be the initial state.
 optQ
-  :: ( KnownNat m, KnownNat n, KnownNat k, m ~ (k + 1)
-     -- , Eq s, Eq a, RandomGen g
+  :: ( KnownNat m, KnownNat n, KnownNat k
+     , m ~ (k + 1), (1 + k) ~ m
      , Eq s, RandomGen g
      )
-  -- => RLType s a (1 + n)  -- ^ abstract type, to protect API
   => RLType s a m n                   -- ^ abstract type, to protect API
   -> (Vector m (Vector n Double), g)  -- ^ initial action-value matrix and random generator
   -> (Vector m (Vector n Double), g)  -- ^ updated action-value matrix and random generator
 optQ RLType{..} (q0, gen) = (q1, gen') where
   p s        = argmax (appQ sEnum aEnum q0 s) (actions s)
   termStates = map fst stateVals
-  s0         = case initState of
-                 [] -> P.head $ shuffle gen $ VS.toList states
-                 _  -> P.head initState
+  s0         = case initStates of
+                 [] -> VS.head states
+                 _  -> P.head $ shuffle gen initStates
   (_, q1, gen') = flip execState (s0, q0, gen) $ replicateM maxIter $ do
     (s, q, g) <- get
     let (x, g') = random g
@@ -241,7 +240,7 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
         rss   = map (rewards s a) s's
         p's   = map (sum . map snd) rss  -- next state probabilities
         s'p's = zip s's p's
-        s'    = fst . P.last . sortBy (compare `on` snd) $ s'p's
+        s'    = fst . maximumBy (compare `on` snd) $ s'p's
         -- Use expectation to handle (potentially) multiple rewards.
         r     = (/ ps') . sum . map (uncurry (*)) $
                   fromMaybe (P.error "optQ: Failed lookup of next state rewards!")
@@ -249,14 +248,15 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
         ps'   = fromMaybe (P.error "optQ: Failed lookup of next state probability!")
                           $ lookup s' s'p's
         a'    = p s'
-        -- q' :: Vector m (Vector n Double)
-        q'    = q VS.// [ ( sEnum s
-                          , q `VS.index` (sEnum s) VS.// [(aEnum a, newVal)]
+        q'    = q VS.// [ ( sNum
+                          , q `VS.index` sNum VS.// [(aEnum a, newVal)]
                           )
                         ]
+        sNum   = sEnum s
         -- temporary hard-wiring to SARSA
-        newVal = oldVal + alpha * (r + appQ sEnum aEnum q s' a' - oldVal)
-        oldVal = appQ sEnum aEnum q s a
+        newVal = oldVal + alpha * (r + qf s' a' - oldVal)
+        oldVal = qf s a
+        qf     = appQ sEnum aEnum q
     put (s', q', g')
     return $ if s' `elem` termStates
                 then Nothing
@@ -272,7 +272,7 @@ appQ
   -> a                           -- ^ action
   -> Double
 appQ sEnum aEnum q s a =
-  q `VS.index` (sEnum s) `VS.index` (aEnum a)
+  q `VS.index` sEnum s `VS.index` aEnum a
 
 -- | Apply the matrix representation of a policy.
 appP
@@ -281,7 +281,7 @@ appP
   -> Vector m a                  -- ^ vector representation of A(s)
   -> s                           -- ^ state
   -> a
-appP sEnum p s = p `VS.index` (sEnum s)
+appP sEnum p s = p `VS.index` sEnum s
 
 -- | Apply the matrix representation of a value function.
 appV
@@ -290,7 +290,7 @@ appV
   -> Vector m Double             -- ^ vector representation of V(s)
   -> s                           -- ^ state
   -> Double
-appV sEnum v s = v `VS.index` (sEnum s)
+appV sEnum v s = v `VS.index` sEnum s
 
 -- | Convert an action-value matrix to a value vector.
 --

@@ -154,7 +154,7 @@ sEnum' MyState{..} = finite . fromIntegral $ tot where
        else
          epoch +
          gLeadTime * (onHand + gMaxOnHand) +
-         (gLeadTime + 2 * gMaxOnHand + 1) * (sum onOrder)
+         (gLeadTime + 2 * gMaxOnHand + 1) * sum onOrder
 
 -- | A(s) - all possible actions from state `s`.
 actions' :: MyState -> [MyAction]
@@ -165,7 +165,6 @@ actions' MyState{..} =
      else [0..gMaxOrder]
 
 aEnum' :: MyAction -> Finite 6
--- aEnum' a = finite $ fromIntegral a
 aEnum' = finite . fromIntegral
 
 aGen' :: Finite 6 -> MyAction
@@ -174,15 +173,10 @@ aGen' = fromIntegral . getFinite
 -- | S'(s, a) - list of next possible states.
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  [ MyState onHand'
+  [ MyState (onHand + P.head onOrder - demand)
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
   | demand <- [0..gMaxDemand]
-  , let onHand' =
-          max (-gMaxOnHand)
-              ( min gMaxOnHand
-                    (onHand + P.head onOrder - demand)
-              )
   ]
 
 -- | R(s, a, s')
@@ -278,9 +272,7 @@ instance ParseRecord (Opts Wrapped)
 ----------------------------------------------------------------------}
 
 main :: IO ()
-main = mainTD
-
-mainTD = do
+main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A toy inventory optimizer."
@@ -293,36 +285,24 @@ mainTD = do
 
   -- Calculate and display optimum policy.
   writeFile "other/inventory.md" "\n### Policy optimization\n\n"
-  let (qs, _) = unzip $ take (nIters + 1) $
-        iterate
-         ( optQ
-             rltDef
-               { disc       = disc'
-               , epsilon    = eps'
-               , alpha      = alpha'
-               , maxIter    = nEvals
-               , states     = allStatesV
-               , actions    = actions'
-               , nextStates = nextStates'
-               , rewards    = rewards' pVal
-               , sEnum      = sEnum'
-               , aEnum      = aEnum'
-               , aGen       = aGen'
-               }
-         ) $ (VS.replicate (VS.replicate 0), mkStdGen 1)
-      ps    = map (qToP aGen') qs
-      acts  = map (\p -> VS.map (appP sEnum' p) allStatesV) ps
-      diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
-                  $ zip acts (P.tail acts)
-      ((_, p'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
-        runWriter $ withinOnM 0
-                              ( \ (da, _) ->
-                                  maxAndNonZero da
-                              ) $ zip diffs (P.tail ps)
-      vs    = map qToV qs
-      val   = appV sEnum' $ P.last vs
-      pol   = appP sEnum' p'
-      -- counts = map () $ zip vs $ tail vs
+  let myRLType =
+        rltDef
+          { disc       = disc'
+          , epsilon    = eps'
+          , alpha      = alpha'
+          , maxIter    = nEvals
+          , states     = allStatesV
+          , actions    = actions'
+          , nextStates = nextStates'
+          , rewards    = rewards' pVal
+          , sEnum      = sEnum'
+          , aEnum      = aEnum'
+          , aGen       = aGen'
+          , initStates = filter ((>= 0) . onHand) allStates
+          }
+      -- (val, pol, polChngCnts, valChngCnts) = doTD myRLType nIters
+      (val, pol, polChngCnts, valChngCnts) = doDP myRLType nIters
+
   appendFile "other/inventory.md" "\n### Final policy\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState pol
   appendFile "other/inventory.md" "\n### Final value function\n\n"
@@ -344,17 +324,17 @@ mainTD = do
                   | (x,y) <- zip ( map (* nEvals)
                                        [(0::Int)..]
                                  )
-                                 cnts
+                                 polChngCnts
                   ]
                 ]
          )
-    -- plot ( line "Value Changes"
-    --             [ [ (x,y)
-    --               | (x,y) <- zip [(0::Int)..]
-    --                              (concat counts)
-    --               ]
-    --             ]
-    --      )
+    plot ( line "Value Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 (concat valChngCnts)
+                  ]
+                ]
+         )
   appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
 
   -- Plot the pdfs.
@@ -406,39 +386,50 @@ mainTD = do
       pmfSums = map (sum . map snd) nxtStPMFs
   appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
                                                   (minimum pmfSums) (maximum pmfSums)
-mainDP = do
-  -- Process command line options.
-  o :: Opts Unwrapped <-
-    unwrapRecord "A toy inventory optimizer."
-  let nIters = fromMaybe  2 (nIter o)
-      nEvals = fromMaybe  1 (nEval o)
-      pVal   = fromMaybe 50 (p     o)
-      eps'   = fromMaybe  0.1 (eps o)
-      disc'  = fromMaybe  0.1 (dis o)
 
-  -- Calculate and display optimum policy.
-  writeFile "other/inventory.md" "\n### Policy optimization\n\n"
-  let (fs, counts') = P.unzip $ take (nIters + 1)
-                   $ iterate
-                       ( optPol
-                           rltDef
-                             { disc       = disc'
-                             , epsilon    = eps'
-                             , maxIter    = nEvals
-                             , states     = allStatesV
-                             , actions    = actions'
-                             , nextStates = nextStates'
-                             , rewards    = rewards' pVal
-                             , sEnum      = sEnum'
-                             , aEnum      = aEnum'
-                             , aGen       = aGen'
-                             }
-                       ) (const (0, 0), [])
-      counts = P.tail counts'
-      acts  = map (\f -> VS.map (fst . f) allStatesV) fs
+doTD
+  :: RLType MyState MyAction 378 6
+  -> Int
+  -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
+doTD rlt nIters =
+  let (qs, _) = P.unzip $ take (nIters + 1) $
+        iterate
+          (optQ rlt)
+          (VS.replicate (VS.replicate 0), mkStdGen 1)
+      ps    = map (qToP aGen') qs
+      acts  = map (\p -> VS.map (appP sEnum' p) allStatesV) ps
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
-      ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
+      ((_, p'), polChngCnts) = first (fromMaybe (P.error "main: Major failure!")) $
+        runWriter $ withinOnM 0
+                              ( \ (da, _) ->
+                                  maxAndNonZero da
+                              ) $ zip diffs (P.tail ps)
+      vs          = map qToV qs
+      val         = appV sEnum' $ P.last vs
+      pol         = appP sEnum' p'
+      valChngCnts = map ( length
+                        . filter (/= 0)
+                        . VS.toList
+                        . uncurry (-)
+                        ) $ zip vs $ P.tail vs
+   in (val, pol, polChngCnts, [valChngCnts])
+
+doDP
+  :: RLType MyState MyAction 378 6
+  -> Int
+  -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
+doDP rlt nIters =
+  let (fs, counts') = P.unzip $ take (nIters + 1) $
+        iterate
+          (optPol rlt)
+          (const (0, 0), [])
+      valChngCnts = P.tail counts'
+      acts        = map (\f -> VS.map (fst . f) allStatesV) fs
+      diffs       = map ( VS.map (fromIntegral . abs)
+                        . uncurry (-)
+                        ) $ zip acts $ P.tail acts
+      ((_, g'), polChngCnts) = first (fromMaybe (P.error "main: Major failure!")) $
         -- runWriter $ withinOnM eps'
         runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
                               ( \ (dv, _) ->
@@ -446,89 +437,8 @@ mainDP = do
                               ) $ zip diffs (P.tail fs)
       pol   = fst . g'
       val   = snd . g'
-  appendFile "other/inventory.md" "\n### Final policy\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState pol
-  appendFile "other/inventory.md" "\n### Final value function\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . val)
+   in (val, pol, polChngCnts, valChngCnts)
 
-  -- DEBUGGING
-  appendFile "other/inventory.md" "\n## debug\n\n"
-
-  -- Reward expectations
-  appendFile "other/inventory.md" "\n### E[reward]\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards pVal)
-
-  -- Value/Action changes vs. Iteration
-  toFile def "img/valueDiffs.png" $ do
-    layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
-    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
-    plot ( line "Policy Changes"
-                [ [ (x,y)
-                  | (x,y) <- zip ( map (* (length $ P.head counts))
-                                       [(0::Int)..]
-                                 )
-                                 cnts
-                  ]
-                ]
-         )
-    plot ( line "Value Changes"
-                [ [ (x,y)
-                  | (x,y) <- zip [(0::Int)..]
-                                 (concat counts)
-                  ]
-                ]
-         )
-  appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
-
-  -- Plot the pdfs.
-  appendFile  "other/inventory.md"
-             "\n### Demand Probability Distribution Functions\n\n"
-
-  -- - demand PDF
-  let pdf = [ (x, density (gammaDistr (1 + demandMean) 1) x)
-            | x <- [0.1 * n | n <- [0..100]]
-            ]
-  toFile def "img/pdf.png" $
-    do layout_title .= "Demand Probability Density Function (pdf)"
-       setColors $ map opaque [blue, green, red, yellow]
-       plot ( line "Demand Probability"
-                   [ pdf ]
-            )
-  appendFile "other/inventory.md" "![](img/pdf.png)\n"
-  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * sum (map snd pdf))
-
-  -- - demand PMF
-  let pmf = [ (x, gamma' (finite $ round demandMean) (finite x))
-            | x <- [0..10]
-            ]
-      titles = ["pmf"]
-      values :: [ (String,[Double]) ]
-      values = map (show *** (: [])) pmf
-  toFile def "img/demand.png" $
-    do layout_title .= "Demand Probability Mass Function (pmf)"
-       setColors $ map opaque [blue, green, red, yellow]
-       layout_x_axis . laxis_generate .= autoIndexAxis (map fst values)
-       plot $ plotBars <$> bars titles (addIndexes (map snd values))
-  appendFile "other/inventory.md" "\n![](img/demand.png)\n"
-  appendFile "other/inventory.md" $ pack $ printf "\n$\\sum pmf = %5.2f$\n" (sum $ map snd pmf)
-
-  -- - next state PMF
-  let nxtStPMFs :: [[(MyState, Double)]]
-      nxtStPMFs = map ( map (fst . P.head &&& sum . map snd)
-                      . groupBy ((==) `on` fst)
-                      . sortBy (compare `on` fst)
-                      . ( \ st ->
-                            [ (nxtSt, prob / fromIntegral (length (actions' st)))
-                            | act   <- actions' st
-                            , nxtSt <- nextStates' st act
-                            , let prob = (sum . map snd) $ rewards' pVal st act nxtSt
-                            ]
-                        )
-                      ) allStates
-      pmfSums :: [Double]
-      pmfSums = map (sum . map snd) nxtStPMFs
-  appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
-                                                  (minimum pmfSums) (maximum pmfSums)
 \end{code}
 
 output
