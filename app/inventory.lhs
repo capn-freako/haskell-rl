@@ -72,7 +72,6 @@ import Protolude  hiding (show, for, first, second)
 import Options.Generic
 
 import qualified Data.Vector.Sized   as VS
--- import Data.Vector.Sized                      (Vector)
 
 import Control.Arrow
 import Control.Monad.Writer
@@ -245,6 +244,46 @@ testRewards p s =
         pNorm = fromIntegral $ length acts
 
 {----------------------------------------------------------------------
+  DP reference, for TD comparison.
+
+    dca9047d694f:haskell-rl a594349$ time stack exec -- inventory --nIter 8 --nEval 4 --eps 1 --alph 0.5 --dis 0.9 --p 2
+
+    real	27m27.109s
+    user	26m0.135s
+    sys	48m38.034s
+----------------------------------------------------------------------}
+
+vDP = [ [-116.5, -99.7, -85.4, -73.9, -65.4, -59.6]
+      , [ -99.7, -85.4, -73.9, -65.4, -59.6, -56.3]
+      , [ -85.4, -73.9, -65.4, -59.6, -56.3, -55.3]
+      , [ -73.9, -65.4, -59.6, -56.3, -55.3, -55.9]
+      , [ -65.4, -59.6, -56.3, -55.3, -55.9, -57.9]
+      , [ -59.6, -56.3, -55.3, -55.9, -57.9, -60.4]
+      , [ -56.3, -55.3, -55.9, -57.9, -60.4, -63.0]
+      , [ -55.3, -55.9, -57.9, -60.4, -63.0, -65.6]
+      , [ -55.9, -57.9, -60.4, -63.0, -65.6, -68.3]
+      , [ -57.9, -60.4, -63.0, -65.6, -68.3, -70.9]
+      , [ -60.4, -63.0, -65.6, -68.3, -70.9, -74.1]
+      ]
+vDPMeanSqr :: Double
+vDPMeanSqr = arrMeanSqr vDP
+
+pDP = [ [5, 5, 5, 5, 5, 5]
+      , [5, 5, 5, 5, 5, 5]
+      , [5, 5, 5, 5, 5, 5]
+      , [5, 5, 5, 5, 5, 5]
+      , [5, 5, 5, 5, 5, 5]
+      , [5, 5, 5, 5, 5, 4]
+      , [5, 5, 5, 5, 4, 3]
+      , [5, 5, 5, 4, 3, 2]
+      , [5, 5, 4, 3, 2, 1]
+      , [5, 4, 3, 2, 1, 0]
+      , [4, 3, 2, 1, 0, 0]
+      ]
+pDPMeanSqr :: Double
+pDPMeanSqr = arrMeanSqr pDP
+
+{----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
 
@@ -298,10 +337,13 @@ main = do
           , sEnum      = sEnum'
           , aEnum      = aEnum'
           , aGen       = aGen'
-          , initStates = filter ((>= 0) . onHand) allStates
+          , initStates = initStates'
           }
-      -- (val, pol, polChngCnts, valChngCnts) = doTD myRLType nIters
-      (val, pol, polChngCnts, valChngCnts) = doDP myRLType nIters
+      initStates' = filter ((>= 0) . onHand) allStates
+      (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
+      -- (val, pol, polChngCnts, valChngCnts) = doDP myRLType nIters
+      val = appV sEnum' $ P.last vs
+      pol = appP sEnum' $ P.last ps
 
   appendFile "other/inventory.md" "\n### Final policy\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState pol
@@ -315,15 +357,13 @@ main = do
   appendFile "other/inventory.md" "\n### E[reward]\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards pVal)
 
-  -- Value/Action changes vs. Iteration
+  -- Policy/Value changes vs. Iteration
   toFile def "img/valueDiffs.png" $ do
     layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
     plot ( line "Policy Changes"
                 [ [ (x,y)
-                  | (x,y) <- zip ( map (* nEvals)
-                                       [(0::Int)..]
-                                 )
+                  | (x,y) <- zip [(0::Int)..]
                                  polChngCnts
                   ]
                 ]
@@ -331,11 +371,59 @@ main = do
     plot ( line "Value Changes"
                 [ [ (x,y)
                   | (x,y) <- zip [(0::Int)..]
-                                 (concat valChngCnts)
+                                 valChngCnts
                   ]
                 ]
          )
   appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
+
+  -- Policy/Value error vs. Iteration
+  toFile def "img/valueErrs.png" $ do
+    layout_title .= "Policy/Value Errors vs. Evaluation Iteration"
+    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
+    plot ( line "Policy Error"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 [ ((/ pDPMeanSqr) . mean) $
+                                     map (mean . map (^ 2))
+                                         $ zipWith
+                                             (zipWith (-))
+                                             pDP
+                                             $ map (map (fromIntegral . appP sEnum' p))
+                                                   [ [ MyState onHnd
+                                                               (onOrd : replicate (gLeadTime - 1) 0)
+                                                               0
+                                                     | onOrd <- [0..gMaxOrder]
+                                                     ]
+                                                   | onHnd <- [0..gMaxOnHand]
+                                                   ]
+                                 | p <- ps
+                                 ]
+                  ]
+                ]
+         )
+    plot ( line "Value Error"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 [ ((/ vDPMeanSqr) . mean) $
+                                     map (mean . map (^ 2))
+                                         $ zipWith
+                                             (zipWith (-))
+                                             vDP
+                                             $ map (map (appV sEnum' v))
+                                                   [ [ MyState onHnd
+                                                               (onOrd : replicate (gLeadTime - 1) 0)
+                                                               0
+                                                     | onOrd <- [0..gMaxOrder]
+                                                     ]
+                                                   | onHnd <- [0..gMaxOnHand]
+                                                   ]
+                                 | v <- vs
+                                 ]
+                  ]
+                ]
+         )
+  appendFile "other/inventory.md" "\n![](img/valueErrs.png)\n"
 
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
@@ -390,7 +478,8 @@ main = do
 doTD
   :: RLType MyState MyAction 378 6
   -> Int
-  -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
+  -- -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
+  -> ([VS.Vector 378 Double], [VS.Vector 378 MyAction], [Int], [Int])
 doTD rlt nIters =
   let (qs, _) = P.unzip $ take (nIters + 1) $
         iterate
@@ -400,20 +489,17 @@ doTD rlt nIters =
       acts  = map (\p -> VS.map (appP sEnum' p) allStatesV) ps
       diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
                   $ zip acts (P.tail acts)
-      ((_, p'), polChngCnts) = first (fromMaybe (P.error "main: Major failure!")) $
+      ((_, _), polChngCnts) = first (fromMaybe (P.error "main: Major failure!")) $
         runWriter $ withinOnM 0
                               ( \ (da, _) ->
                                   maxAndNonZero da
                               ) $ zip diffs (P.tail ps)
       vs          = map qToV qs
-      val         = appV sEnum' $ P.last vs
-      pol         = appP sEnum' p'
       valChngCnts = map ( length
                         . filter (/= 0)
                         . VS.toList
-                        . uncurry (-)
-                        ) $ zip vs $ P.tail vs
-   in (val, pol, polChngCnts, [valChngCnts])
+                        ) $ zipWith (-) vs $ P.tail vs
+   in (vs, ps, polChngCnts, valChngCnts)
 
 doDP
   :: RLType MyState MyAction 378 6

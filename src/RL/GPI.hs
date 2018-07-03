@@ -36,6 +36,7 @@ module RL.GPI
   , gamma
   , withinOnM
   , mean
+  , arrMeanSqr
   , qToV
   , qToP
   , appV
@@ -223,7 +224,7 @@ optQ
   -> (Vector m (Vector n Double), g)  -- ^ initial action-value matrix and random generator
   -> (Vector m (Vector n Double), g)  -- ^ updated action-value matrix and random generator
 optQ RLType{..} (q0, gen) = (q1, gen') where
-  p s        = argmax (appQ sEnum aEnum q0 s) (actions s)
+  p s        = argmax (appQ sEnum aEnum q0 s) (actions s)  -- purely greedy policy using initial Q(s,a)
   termStates = map fst stateVals
   s0         = case initStates of
                  [] -> VS.head states
@@ -231,7 +232,7 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
   (_, q1, gen') = flip execState (s0, q0, gen) $ replicateM maxIter $ do
     (s, q, g) <- get
     let (x, g') = random g
-        a       = if x > epsilon
+        a       = if x > epsilon  -- epsilon-greedy policy
                      then p s
                      else P.head $ shuffle g' $ actions s
         -- Use maximum likelihood to select from among, potentially,
@@ -441,4 +442,11 @@ vsFor = flip VS.map
 -- | Mean value of a collection
 mean :: (Foldable f, Fractional a) => f a -> a
 mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0::Integer)
+
+-- | Find the mean square of a list of lists.
+arrMeanSqr :: (Functor f, Foldable f, Functor g, Foldable g, Fractional a) => f (g a) -> a
+arrMeanSqr = mean . fmap mean . fmap (fmap sqr)
+
+sqr :: Num a => a -> a
+sqr x = x * x
 
