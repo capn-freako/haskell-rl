@@ -42,6 +42,7 @@ module RL.GPI
   , appV
   , appP
   , appQ
+  , toString
   ) where
 
 import qualified Prelude as P
@@ -229,12 +230,16 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
   s0         = case initStates of
                  [] -> VS.head states
                  _  -> P.head $ shuffle gen initStates
-  (_, q1, gen') = flip execState (s0, q0, gen) $ replicateM maxIter $ do
-    (s, q, g) <- get
-    let (x, g') = random g
-        a       = if x > epsilon  -- epsilon-greedy policy
-                     then p s
-                     else P.head $ shuffle g' $ actions s
+  (x, gen')  = random gen
+  a0         = if x > epsilon  -- epsilon-greedy policy
+                  then p s0
+                  else P.head $ shuffle gen' $ actions s0
+  -- Run the episode (i.e. - `maxIter` state transitions).
+  saPrs = flip execState [(s0, a0)] $ replicateM maxIter $ do
+    sas <- get
+    let sa    = P.head sas
+        s     = fst sa
+        a     = snd sa
         -- Use maximum likelihood to select from among, potentially,
         -- a list of next possible states.
         s's   = nextStates s a
@@ -242,26 +247,32 @@ optQ RLType{..} (q0, gen) = (q1, gen') where
         p's   = map (sum . map snd) rss  -- next state probabilities
         s'p's = zip s's p's
         s'    = fst . maximumBy (compare `on` snd) $ s'p's
-        -- Use expectation to handle (potentially) multiple rewards.
-        r     = (/ ps') . sum . map (uncurry (*)) $
-                  fromMaybe (P.error "optQ: Failed lookup of next state rewards!")
-                            $ lookup s' $ zip s's rss
-        ps'   = fromMaybe (P.error "optQ: Failed lookup of next state probability!")
-                          $ lookup s' s'p's
         a'    = p s'
-        q'    = q VS.// [ ( sNum
-                          , q `VS.index` sNum VS.// [(aEnum a, newVal)]
-                          )
-                        ]
-        sNum   = sEnum s
-        -- temporary hard-wiring to SARSA
-        newVal = oldVal + alpha * (r + qf s' a' - oldVal)
-        oldVal = qf s a
-        qf     = appQ sEnum aEnum q
-    put (s', q', g')
+    put $ (s', a') : sas
     return $ if s' `elem` termStates
                 then Nothing
-                else Just r
+                else Just ()
+  -- Run the backup value correction.
+  (q1, _) =
+    foldl' ( \ (q, (s', a')) (s, a) ->
+               let sNum = sEnum s
+                   -- Use expectation to handle (potentially) multiple rewards.
+                   rs = rewards s a s'
+                   r  = (/ ((sum . map snd) rs))
+                        . sum
+                        . map (uncurry (*))
+                        $ rs
+                   -- temporary hard-wiring to SARSA
+                   newVal = oldVal + alpha * (r + disc * qf s' a' - oldVal)
+                   oldVal = qf s a
+                   qf     = appQ sEnum aEnum q
+                   q' =
+                     q VS.// [ ( sNum
+                               , q `VS.index` sNum VS.// [(aEnum a, newVal)]
+                               )
+                             ]
+                in (q', (s, a))
+           ) (q0, (P.head saPrs)) (P.tail saPrs)
 
 -- | Apply the matrix representation of an action-value function.
 appQ
@@ -449,4 +460,7 @@ arrMeanSqr = mean . fmap mean . fmap (fmap sqr)
 
 sqr :: Num a => a -> a
 sqr x = x * x
+
+toString :: (Show a, Typeable a) => a -> String
+toString x = fromMaybe (show x) (cast x)
 

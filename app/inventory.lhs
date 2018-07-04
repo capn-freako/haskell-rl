@@ -29,6 +29,7 @@ code
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -cpp #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -112,7 +113,7 @@ gMaxDemand    = 10
 --
 -- TODO: Enforce limits, using sized vector / Finite instead of list / Int.
 data MyState  = MyState
-  { onHand  :: Int    -- Should lie in [-gMaxOnHand, gMaxOnHand].
+  { onHand  :: Int    -- Should lie in [-gMaxOnHand, 2*gMaxOnHand].
   , onOrder :: [Int]  -- Should have length `gLeadTime`. Elements should lie in [0, gMaxOrder].
   , epoch   :: Int    -- Needed, to determine if ordering is allowed.
   } deriving (Show, Eq, Ord, Generic)
@@ -132,7 +133,7 @@ type MyAction = Int
 allStates :: [MyState]
 allStates =
   [ MyState x (drop n ys ++ take n ys) n
-  | x <- [-gMaxOnHand..gMaxOnHand]
+  | x <- [-gMaxOnHand..(2 * gMaxOnHand)]
   , n <- [0..(gLeadTime - 1)]
   , y <- [0..gMaxOrder]
   , let ys = y : replicate (gLeadTime - 1) 0
@@ -141,19 +142,19 @@ allStates =
 -- Just a sized vector alternative to the list above.
 --
 -- TODO: Figure out how to determine the size from the constants above.
-allStatesV :: VS.Vector 378 MyState
+allStatesV :: VS.Vector 558 MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
 
-sEnum' :: MyState -> Finite 378
+sEnum' :: MyState -> Finite 558
 sEnum' MyState{..} = finite . fromIntegral $ tot where
   tot =
-    if onHand < (-gMaxOnHand)
+    if onHand < (-gMaxOnHand) || onHand > 2 * gMaxOnHand
        then P.error $ printf "sEnum': onHand out of bounds: %d" onHand
        else
-         epoch +
+         epoch `mod` gLeadTime +
          gLeadTime * (onHand + gMaxOnHand) +
-         (gLeadTime + 2 * gMaxOnHand + 1) * sum onOrder
+         (gLeadTime + 3 * gMaxOnHand + 1) * sum onOrder
 
 -- | A(s) - all possible actions from state `s`.
 actions' :: MyState -> [MyAction]
@@ -339,11 +340,11 @@ main = do
           , aGen       = aGen'
           , initStates = initStates'
           }
-      initStates' = filter ((>= 0) . onHand) allStates
+      initStates' = filter ((\x -> x >= 0 && x <= gMaxOnHand) . onHand) allStates
       (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
-      -- (val, pol, polChngCnts, valChngCnts) = doDP myRLType nIters
       val = appV sEnum' $ P.last vs
-      pol = appP sEnum' $ P.last ps
+      -- pol = appP sEnum' $ P.last ps
+      pol = appP sEnum' $ ps P.!! 750
 
   appendFile "other/inventory.md" "\n### Final policy\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState pol
@@ -357,6 +358,7 @@ main = do
   appendFile "other/inventory.md" "\n### E[reward]\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards pVal)
 
+#if 0
   -- Policy/Value changes vs. Iteration
   toFile def "img/valueDiffs.png" $ do
     layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
@@ -376,6 +378,7 @@ main = do
                 ]
          )
   appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
+#endif
 
   -- Policy/Value error vs. Iteration
   toFile def "img/valueErrs.png" $ do
@@ -476,10 +479,9 @@ main = do
                                                   (minimum pmfSums) (maximum pmfSums)
 
 doTD
-  :: RLType MyState MyAction 378 6
+  :: RLType MyState MyAction 558 6
   -> Int
-  -- -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
-  -> ([VS.Vector 378 Double], [VS.Vector 378 MyAction], [Int], [Int])
+  -> ([VS.Vector 558 Double], [VS.Vector 558 MyAction], [Int], [Int])
 doTD rlt nIters =
   let (qs, _) = P.unzip $ take (nIters + 1) $
         iterate

@@ -380,6 +380,7 @@ executable windygrid
     , Chart-cairo
     , haskell-rl
     , statistics
+    , random
 
 test-suite test
   default-language:

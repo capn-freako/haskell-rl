@@ -29,6 +29,7 @@ code
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -cpp #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -41,6 +42,7 @@ code
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -83,6 +85,7 @@ import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
 import Statistics.Distribution                (density)
 import Statistics.Distribution.Gamma          (gammaDistr)
+import System.Random
 import Text.Printf
 
 import RL.GPI
@@ -96,6 +99,8 @@ import RL.GPI
 ----------------------------------------------------------------------}
 
 gGamma   = 1  -- Specified by problem.
+gAlpha   = 0.5
+gEps     = 0.1
 gNumRows = 7
 gNumCols = 10
 gWind    = fromMaybe (P.error "gWind: Sized vector initialization from list failure!")
@@ -137,9 +142,26 @@ allStatesV :: VS.Vector 70 MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
 
+mySEnum :: MyState -> Finite 70
+mySEnum (r,c) = finite . fromIntegral $ r * gNumCols + c
+
 -- | A(s)
 myActions :: MyState -> [MyAction]
 myActions = const [Up, Dn, Rt, Lt]
+
+myAEnum :: MyAction -> Finite 4
+myAEnum = \case
+  Up -> 0
+  Dn -> 1
+  Rt -> 2
+  Lt -> 3
+
+myAGen :: Finite 4 -> MyAction
+myAGen = \case
+  0 -> Up
+  1 -> Dn
+  2 -> Rt
+  3 -> Lt
 
 -- | S'(s, a) - list of next possible states.
 myNextStates :: MyState -> MyAction -> [MyState]
@@ -159,7 +181,7 @@ myNextStates s@(r, c) act =
                Dn  ->  0
                Lt  -> -1
                Rt ->  1
-        wr = gWind `VS.index` (finite $ fromIntegral c)
+        wr = gWind `VS.index` finite (fromIntegral c)
 
 myTermStates :: [MyState]
 myTermStates = [(3,7)]
@@ -198,16 +220,10 @@ showFofState g = unlines
       ++ ["\\end{array}"]
     )
   )
-  where g' s = if s == myStartState
-               then "S"
-               else if s `elem` myTermStates
-                      then "G"
-                      else toString (g s)
-
-toString :: (Show a, Typeable a) => a -> String
-toString x = case cast x of
-   Just y  -> y
-   Nothing -> show x
+  where g' s
+          | s == myStartState = "S"
+          | s `elem` myTermStates = "G"
+          | otherwise = toString (g s)
 
 {----------------------------------------------------------------------
   Command line options defintions.
@@ -227,7 +243,6 @@ data Opts w = Opts
 
 instance ParseRecord (Opts Wrapped)
 
-
 {----------------------------------------------------------------------
   main()
 ----------------------------------------------------------------------}
@@ -235,8 +250,8 @@ instance ParseRecord (Opts Wrapped)
 mdFilename = "other/windygrid.md"
 
 boolToDouble :: Bool -> Double
-boolToDouble b | b == True = 1
-               | otherwise = 0
+boolToDouble True = 1
+boolToDouble _    = 0
 
 main :: IO ()
 main = do
@@ -250,33 +265,55 @@ main = do
 
   -- Calculate and display optimum policy.
   writeFile mdFilename "\n### Policy optimization\n\n"
-  let (fs, counts') = P.unzip $ take (nIters + 1)
-                   $ iterate
-                       ( optPol
-                           rltDef
-                             { disc       = gGamma
-                             , epsilon    = eps'
-                             , maxIter    = nEvals
-                             , states     = allStatesV
-                             , actions    = myActions
-                             , nextStates = myNextStates
-                             , rewards    = myRewards
-                             , stateVals  = zip myTermStates $ repeat 0
-                             }
-                       ) (const (Rt, 0), [])
-      counts = P.tail counts'
-      acts   = map (\f -> VS.map (fst . f) allStatesV) fs
-      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
-                  $ zip acts (P.tail acts)
-      ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
-        -- runWriter $ withinOnM eps'
-        runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
-                              ( \ (dv, _) ->
-                                  maxAndNonZero dv
-                              ) $ zip diffs (P.tail fs)
-      pol    = fst . g'
-      val    = snd . g'
-      visits = runEpoch 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
+  let myRLType =
+        rltDef
+          { disc       = gGamma
+          , epsilon    = gEps
+          , alpha      = gAlpha
+          , maxIter    = nEvals
+          , states     = allStatesV
+          , actions    = myActions
+          , nextStates = myNextStates
+          , rewards    = myRewards
+          , stateVals  = zip myTermStates $ repeat 0
+          , sEnum      = mySEnum
+          , aEnum      = myAEnum
+          , aGen       = myAGen
+          , initStates = [myStartState]
+          }
+      (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
+      val = appV mySEnum $ P.last vs
+      pol = appP mySEnum $ P.last ps
+      counts = polChngCnts
+      cnts   = valChngCnts
+
+  -- let (fs, counts') = P.unzip $ take (nIters + 1)
+  --                  $ iterate
+  --                      ( optPol
+  --                          rltDef
+  --                            { disc       = gGamma
+  --                            , epsilon    = eps'
+  --                            , maxIter    = nEvals
+  --                            , states     = allStatesV
+  --                            , actions    = myActions
+  --                            , nextStates = myNextStates
+  --                            , rewards    = myRewards
+  --                            , stateVals  = zip myTermStates $ repeat 0
+  --                            }
+  --                      ) (const (Rt, 0), [])
+  --     counts = P.tail counts'
+  --     acts   = map (\f -> VS.map (fst . f) allStatesV) fs
+  --     diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
+  --                 $ zip acts (P.tail acts)
+  --     ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
+  --       -- runWriter $ withinOnM eps'
+  --       runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
+  --                             ( \ (dv, _) ->
+  --                                 maxAndNonZero dv
+  --                             ) $ zip diffs (P.tail fs)
+  --     pol    = fst . g'
+  --     val    = snd . g'
+      visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
 
   appendFile mdFilename "\n### Final policy\n\n"
   appendFile mdFilename $ pack $ showFofState pol
@@ -290,15 +327,16 @@ main = do
   -- DEBUGGING
   appendFile mdFilename "\n## debug\n\n"
 
+#if 1
   -- Value/Action changes vs. Iteration
   toFile def "img/valueDiffs.png" $ do
     layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
     plot ( line "Policy Changes"
                 [ [ (x,y)
-                  | (x,y) <- zip ( map (* (length $ P.head counts))
-                                       [(0::Int)..]
-                                 )
+                  -- | (x,y) <- zip ( map (* (length $ P.head counts))
+                  --                      [(0::Int)..]
+                  | (x,y) <- zip [(0::Int)..]
                                  cnts
                   ]
                 ]
@@ -306,11 +344,38 @@ main = do
     plot ( line "Value Changes"
                 [ [ (x,y)
                   | (x,y) <- zip [(0::Int)..]
-                                 (concat counts)
+                                 -- (concat counts)
+                                 counts
                   ]
                 ]
          )
   appendFile mdFilename "\n![](img/valueDiffs.png)\n"
+#endif
+
+doTD
+  :: RLType MyState MyAction 70 4
+  -> Int
+  -> ([VS.Vector 70 Double], [VS.Vector 70 MyAction], [Int], [Int])
+doTD rlt nIters =
+  let (qs, _) = P.unzip $ take (nIters + 1) $
+        iterate
+          (optQ rlt)
+          (VS.replicate (VS.replicate 0), mkStdGen 1)
+      ps    = map (qToP myAGen) qs
+      acts  = map (\p -> VS.map (getFinite . myAEnum . appP mySEnum p) allStatesV) ps
+      diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
+                  $ zip acts (P.tail acts)
+      ((_, _), polChngCnts) = first (fromMaybe (P.error "doTD: Major failure!")) $
+        runWriter $ withinOnM 0
+                              ( \ (da, _) ->
+                                  maxAndNonZero da
+                              ) $ zip diffs (P.tail ps)
+      vs          = map qToV qs
+      valChngCnts = map ( length
+                        . filter (/= 0)
+                        . VS.toList
+                        ) $ zipWith (-) vs $ P.tail vs
+   in (vs, ps, polChngCnts, valChngCnts)
 
 \end{code}
 
