@@ -77,7 +77,7 @@ import Control.Arrow
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
-import Data.List                              (sortBy, groupBy)
+import Data.List                              (sortBy, groupBy, unzip3)
 import Data.MemoTrie
 import Data.Text                              (pack)
 import Data.Typeable
@@ -87,6 +87,7 @@ import Statistics.Distribution                (density)
 import Statistics.Distribution.Gamma          (gammaDistr)
 import System.Random
 import Text.Printf
+import ToolShed.System.Random                 (shuffle)
 
 import RL.GPI
 \end{code}
@@ -351,31 +352,6 @@ main = do
          )
   appendFile mdFilename "\n![](img/valueDiffs.png)\n"
 #endif
-
-doTD
-  :: RLType MyState MyAction 70 4
-  -> Int
-  -> ([VS.Vector 70 Double], [VS.Vector 70 MyAction], [Int], [Int])
-doTD rlt nIters =
-  let (qs, _) = P.unzip $ take (nIters + 1) $
-        iterate
-          (optQ rlt)
-          (VS.replicate (VS.replicate 0), mkStdGen 1)
-      ps    = map (qToP myAGen) qs
-      acts  = map (\p -> VS.map (getFinite . myAEnum . appP mySEnum p) allStatesV) ps
-      diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
-                  $ zip acts (P.tail acts)
-      ((_, _), polChngCnts) = first (fromMaybe (P.error "doTD: Major failure!")) $
-        runWriter $ withinOnM 0
-                              ( \ (da, _) ->
-                                  maxAndNonZero da
-                              ) $ zip diffs (P.tail ps)
-      vs          = map qToV qs
-      valChngCnts = map ( length
-                        . filter (/= 0)
-                        . VS.toList
-                        ) $ zipWith (-) vs $ P.tail vs
-   in (vs, ps, polChngCnts, valChngCnts)
 
 \end{code}
 

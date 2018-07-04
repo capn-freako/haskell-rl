@@ -381,6 +381,7 @@ executable windygrid
     , haskell-rl
     , statistics
     , random
+    , toolshed
 
 test-suite test
   default-language:

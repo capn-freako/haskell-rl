@@ -343,8 +343,7 @@ main = do
       initStates' = filter ((\x -> x >= 0 && x <= gMaxOnHand) . onHand) allStates
       (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
       val = appV sEnum' $ P.last vs
-      -- pol = appP sEnum' $ P.last ps
-      pol = appP sEnum' $ ps P.!! 750
+      pol = appP sEnum' $ P.last ps
 
   appendFile "other/inventory.md" "\n### Final policy\n\n"
   appendFile "other/inventory.md" $ pack $ showFofState pol
@@ -477,31 +476,6 @@ main = do
       pmfSums = map (sum . map snd) nxtStPMFs
   appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
                                                   (minimum pmfSums) (maximum pmfSums)
-
-doTD
-  :: RLType MyState MyAction 558 6
-  -> Int
-  -> ([VS.Vector 558 Double], [VS.Vector 558 MyAction], [Int], [Int])
-doTD rlt nIters =
-  let (qs, _) = P.unzip $ take (nIters + 1) $
-        iterate
-          (optQ rlt)
-          (VS.replicate (VS.replicate 0), mkStdGen 1)
-      ps    = map (qToP aGen') qs
-      acts  = map (\p -> VS.map (appP sEnum' p) allStatesV) ps
-      diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
-                  $ zip acts (P.tail acts)
-      ((_, _), polChngCnts) = first (fromMaybe (P.error "main: Major failure!")) $
-        runWriter $ withinOnM 0
-                              ( \ (da, _) ->
-                                  maxAndNonZero da
-                              ) $ zip diffs (P.tail ps)
-      vs          = map qToV qs
-      valChngCnts = map ( length
-                        . filter (/= 0)
-                        . VS.toList
-                        ) $ zipWith (-) vs $ P.tail vs
-   in (vs, ps, polChngCnts, valChngCnts)
 
 doDP
   :: RLType MyState MyAction 378 6

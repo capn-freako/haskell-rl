@@ -57,7 +57,7 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb3-8" data-line-number="8"><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></a>
 <a class="sourceLine" id="cb3-9" data-line-number="9"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
 <a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
-<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.List</span>                              (sortBy, groupBy)</a>
+<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.List</span>                              (sortBy, groupBy, unzip3)</a>
 <a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.MemoTrie</span></a>
 <a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.Text</span>                              (pack)</a>
 <a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Data.Typeable</span></a>
@@ -67,8 +67,9 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb3-18" data-line-number="18"><span class="kw">import</span> <span class="dt">Statistics.Distribution.Gamma</span>          (gammaDistr)</a>
 <a class="sourceLine" id="cb3-19" data-line-number="19"><span class="kw">import</span> <span class="dt">System.Random</span></a>
 <a class="sourceLine" id="cb3-20" data-line-number="20"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
-<a class="sourceLine" id="cb3-21" data-line-number="21"></a>
-<a class="sourceLine" id="cb3-22" data-line-number="22"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
+<a class="sourceLine" id="cb3-21" data-line-number="21"><span class="kw">import</span> <span class="dt">ToolShed.System.Random</span>                 (shuffle)</a>
+<a class="sourceLine" id="cb3-22" data-line-number="22"></a>
+<a class="sourceLine" id="cb3-23" data-line-number="23"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
 </ul>
@@ -328,32 +329,7 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb4-254" data-line-number="254">                ]</a>
 <a class="sourceLine" id="cb4-255" data-line-number="255">         )</a>
 <a class="sourceLine" id="cb4-256" data-line-number="256">  appendFile mdFilename <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-257" data-line-number="257"><span class="ot">#endif</span></a>
-<a class="sourceLine" id="cb4-258" data-line-number="258"></a>
-<a class="sourceLine" id="cb4-259" data-line-number="259">doTD</a>
-<a class="sourceLine" id="cb4-260" data-line-number="260"><span class="ot">  ::</span> <span class="dt">RLType</span> <span class="dt">MyState</span> <span class="dt">MyAction</span> <span class="dv">70</span> <span class="dv">4</span></a>
-<a class="sourceLine" id="cb4-261" data-line-number="261">  <span class="ot">-&gt;</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb4-262" data-line-number="262">  <span class="ot">-&gt;</span> ([<span class="dt">VS.Vector</span> <span class="dv">70</span> <span class="dt">Double</span>], [<span class="dt">VS.Vector</span> <span class="dv">70</span> <span class="dt">MyAction</span>], [<span class="dt">Int</span>], [<span class="dt">Int</span>])</a>
-<a class="sourceLine" id="cb4-263" data-line-number="263">doTD rlt nIters <span class="fu">=</span></a>
-<a class="sourceLine" id="cb4-264" data-line-number="264">  <span class="kw">let</span> (qs, _) <span class="fu">=</span> P.unzip <span class="fu">$</span> take (nIters <span class="fu">+</span> <span class="dv">1</span>) <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-265" data-line-number="265">        iterate</a>
-<a class="sourceLine" id="cb4-266" data-line-number="266">          (optQ rlt)</a>
-<a class="sourceLine" id="cb4-267" data-line-number="267">          (VS.replicate (VS.replicate <span class="dv">0</span>), mkStdGen <span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb4-268" data-line-number="268">      ps    <span class="fu">=</span> map (qToP myAGen) qs</a>
-<a class="sourceLine" id="cb4-269" data-line-number="269">      acts  <span class="fu">=</span> map (\p <span class="ot">-&gt;</span> VS.map (getFinite <span class="fu">.</span> myAEnum <span class="fu">.</span> appP mySEnum p) allStatesV) ps</a>
-<a class="sourceLine" id="cb4-270" data-line-number="270">      diffs <span class="fu">=</span> map (VS.map (fromIntegral <span class="fu">.</span> abs) <span class="fu">.</span> uncurry (<span class="fu">-</span>))</a>
-<a class="sourceLine" id="cb4-271" data-line-number="271">                  <span class="fu">$</span> zip acts (P.tail acts)</a>
-<a class="sourceLine" id="cb4-272" data-line-number="272">      ((_, _), polChngCnts) <span class="fu">=</span> first (fromMaybe (P.error <span class="st">&quot;doTD: Major failure!&quot;</span>)) <span class="fu">$</span></a>
-<a class="sourceLine" id="cb4-273" data-line-number="273">        runWriter <span class="fu">$</span> withinOnM <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-274" data-line-number="274">                              ( \ (da, _) <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb4-275" data-line-number="275">                                  maxAndNonZero da</a>
-<a class="sourceLine" id="cb4-276" data-line-number="276">                              ) <span class="fu">$</span> zip diffs (P.tail ps)</a>
-<a class="sourceLine" id="cb4-277" data-line-number="277">      vs          <span class="fu">=</span> map qToV qs</a>
-<a class="sourceLine" id="cb4-278" data-line-number="278">      valChngCnts <span class="fu">=</span> map ( length</a>
-<a class="sourceLine" id="cb4-279" data-line-number="279">                        <span class="fu">.</span> filter (<span class="fu">/=</span> <span class="dv">0</span>)</a>
-<a class="sourceLine" id="cb4-280" data-line-number="280">                        <span class="fu">.</span> VS.toList</a>
-<a class="sourceLine" id="cb4-281" data-line-number="281">                        ) <span class="fu">$</span> zipWith (<span class="fu">-</span>) vs <span class="fu">$</span> P.tail vs</a>
-<a class="sourceLine" id="cb4-282" data-line-number="282">   <span class="kw">in</span> (vs, ps, polChngCnts, valChngCnts)</a></code></pre></div>
+<a class="sourceLine" id="cb4-257" data-line-number="257"><span class="ot">#endif</span></a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="policy-optimization">Policy optimization</h3>
 <h3 id="final-policy">Final policy</h3>
@@ -361,19 +337,19 @@ Original date: June 28, 2018</p>
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- \leftarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \leftarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+ \uparrow  &amp;  \downarrow  &amp;  \uparrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \leftarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \uparrow  &amp;  \downarrow  \\
+ \uparrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
- \uparrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+ \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
-S &amp;  \downarrow  &amp;  \rightarrow  &amp;  \leftarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp; G &amp;  \leftarrow  &amp;  \downarrow  \\
+S &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp; G &amp;  \downarrow  &amp;  \downarrow  \\
 \hline
  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \downarrow  &amp;  \downarrow  \\
+ \downarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
 \hline
- \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \downarrow  \\
+ \leftarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
 \end{array}\]</span>
 <h3 id="final-value-function">Final value function</h3>
@@ -381,19 +357,19 @@ S &amp;  \downarrow  &amp;  \rightarrow  &amp;  \leftarrow  &amp;  \rightarrow  
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
--29.0 &amp; -27.2 &amp; -28.0 &amp; -28.8 &amp; -28.1 &amp; -18.2 &amp; -12.8 &amp; -7.0 &amp; -6.0 &amp; -5.0 \\
+-14.1 &amp; -13.6 &amp; -13.1 &amp; -12.4 &amp; -11.5 &amp; -10.4 &amp; -9.3 &amp; -8.2 &amp; -7.1 &amp; -5.9 \\
 \hline
--31.0 &amp; -28.5 &amp; -26.6 &amp; -26.7 &amp; -23.7 &amp; -19.8 &amp; -8.0 &amp; -5.6 &amp; -8.2 &amp; -4.0 \\
+-14.4 &amp; -13.8 &amp; -13.2 &amp; -12.4 &amp; -11.4 &amp; -10.4 &amp; -9.2 &amp; -7.7 &amp; -5.5 &amp; -4.8 \\
 \hline
--32.9 &amp; -32.5 &amp; -27.0 &amp; -26.5 &amp; -25.0 &amp; -9.0 &amp; -11.7 &amp;  0.0 &amp; -7.2 &amp; -3.0 \\
+-15.1 &amp; -14.2 &amp; -13.4 &amp; -12.4 &amp; -11.5 &amp; -10.2 &amp; -8.8 &amp; -3.5 &amp; -5.9 &amp; -3.6 \\
 \hline
-S &amp; -14.0 &amp; -28.7 &amp; -26.5 &amp; -10.0 &amp; -15.1 &amp; -3.8 &amp; G &amp; -3.0 &amp; -2.0 \\
+S &amp; -14.7 &amp; -13.6 &amp; -12.6 &amp; -11.2 &amp; -9.8 &amp; -8.3 &amp; G &amp; -2.2 &amp; -2.5 \\
 \hline
--23.6 &amp; -13.0 &amp; -12.0 &amp; -11.0 &amp; -19.2 &amp; -7.4 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.0 \\
+-14.9 &amp; -14.1 &amp; -13.1 &amp; -12.1 &amp; -10.7 &amp; -9.2 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.4 \\
 \hline
--20.4 &amp; -17.1 &amp; -14.2 &amp; -22.9 &amp; -10.8 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.8 \\
+-14.1 &amp; -13.3 &amp; -12.5 &amp; -11.6 &amp; -10.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -0.8 \\
 \hline
--25.5 &amp; -24.3 &amp; -12.0 &amp; -10.9 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 \\
+-13.5 &amp; -12.7 &amp; -11.9 &amp; -11.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -0.5 \\
 \hline
 \end{array}\]</span>
 <h3 id="trajectory-of-final-policy">Trajectory of final policy</h3>
@@ -401,15 +377,15 @@ S &amp; -14.0 &amp; -28.7 &amp; -26.5 &amp; -10.0 &amp; -15.1 &amp; -3.8 &amp; G
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  \\
-\hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  \cdot  \\
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  \\
 \hline
  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  \cdot  \\
 \hline
-S &amp;  \cdot  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp; G &amp;  &amp;  \cdot  \\
+ &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  \\
 \hline
- &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  \\
+S &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  &amp; G &amp;  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  \\
 \hline
  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline

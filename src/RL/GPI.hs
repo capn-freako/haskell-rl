@@ -28,6 +28,7 @@ module RL.GPI
   , rltDef
   , optPol
   , optQ
+  , doTD
   , runEpisode
   , maxAndNonZero
   , chooseAndCount
@@ -57,7 +58,7 @@ import Data.Vector.Sized             (Vector)
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List                     ((!!), lookup, groupBy)
+import Data.List                     ((!!), lookup, groupBy, unzip3)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import Statistics.Distribution       (density)
@@ -214,65 +215,96 @@ runEpisode n pol nxt terms init =
 --
 -- RLType field overrides:
 -- - epsilon: Used to form an "epsilon-greedy" policy.
--- - maxIter: max. # of state transitions allowed
--- - states:  First in list is assumed to be the initial state.
+-- - maxIter: (ignored)
+-- - states:  First in list is assumed to be the initial state,
+--            if `initStates` is empty.
 optQ
   :: ( KnownNat m, KnownNat n, KnownNat k
-     , m ~ (k + 1), (1 + k) ~ m
-     , Eq s, RandomGen g
+     , m ~ (k + 1)
+     , Eq s, Eq a, RandomGen g
      )
-  => RLType s a m n                   -- ^ abstract type, to protect API
-  -> (Vector m (Vector n Double), g)  -- ^ initial action-value matrix and random generator
-  -> (Vector m (Vector n Double), g)  -- ^ updated action-value matrix and random generator
-optQ RLType{..} (q0, gen) = (q1, gen') where
-  p s        = argmax (appQ sEnum aEnum q0 s) (actions s)  -- purely greedy policy using initial Q(s,a)
-  termStates = map fst stateVals
-  s0         = case initStates of
-                 [] -> VS.head states
-                 _  -> P.head $ shuffle gen initStates
-  (x, gen')  = random gen
-  a0         = if x > epsilon  -- epsilon-greedy policy
-                  then p s0
-                  else P.head $ shuffle gen' $ actions s0
-  -- Run the episode (i.e. - `maxIter` state transitions).
-  saPrs = flip execState [(s0, a0)] $ replicateM maxIter $ do
-    sas <- get
-    let sa    = P.head sas
-        s     = fst sa
-        a     = snd sa
-        -- Use maximum likelihood to select from among, potentially,
-        -- a list of next possible states.
-        s's   = nextStates s a
-        rss   = map (rewards s a) s's
-        p's   = map (sum . map snd) rss  -- next state probabilities
-        s'p's = zip s's p's
-        s'    = fst . maximumBy (compare `on` snd) $ s'p's
-        a'    = p s'
-    put $ (s', a') : sas
-    return $ if s' `elem` termStates
-                then Nothing
-                else Just ()
-  -- Run the backup value correction.
-  (q1, _) =
-    foldl' ( \ (q, (s', a')) (s, a) ->
-               let sNum = sEnum s
-                   -- Use expectation to handle (potentially) multiple rewards.
-                   rs = rewards s a s'
-                   r  = (/ ((sum . map snd) rs))
-                        . sum
-                        . map (uncurry (*))
-                        $ rs
-                   -- temporary hard-wiring to SARSA
-                   newVal = oldVal + alpha * (r + disc * qf s' a' - oldVal)
-                   oldVal = qf s a
-                   qf     = appQ sEnum aEnum q
-                   q' =
-                     q VS.// [ ( sNum
-                               , q `VS.index` sNum VS.// [(aEnum a, newVal)]
-                               )
-                             ]
-                in (q', (s, a))
-           ) (q0, (P.head saPrs)) (P.tail saPrs)
+  => RLType s a m n                      -- ^ abstract type, to protect API
+  -> (s, Vector m (Vector n Double), g)  -- ^ initial state, action-value matrix, and random generator
+  -> (s, Vector m (Vector n Double), g)  -- ^ updated state, action-value matrix, and random generator
+optQ RLType{..} (s, q, gen) = (s', q', gen') where
+  q' =
+    q VS.// [ ( sNum
+              , q `VS.index` sNum VS.// [(aEnum a, newVal)]
+              )
+            ]
+  sNum = sEnum s
+
+  -- purely greedy policy using initial Q(s,a)
+  pol st = argmax (qf st) (actions st)
+  qf     = appQ sEnum aEnum q
+
+  -- Use epsilon-greedy policy to choose action.
+  (x, gen') = random gen
+  a         = if x > epsilon
+                 then pol s
+                 else P.head $ shuffle gen' $ actions s
+
+  -- Produce a sample next state, obeying the actual distribution.
+  s' = P.head $ shuffle gen' $
+         concat [ replicate (round $ 100 * p) st
+                | (st, p) <- s'p's
+                ]
+  s'p's  = zip s's p's
+  s's    = nextStates s a
+  p's    = map (sum . map snd) rss  -- next state probabilities
+  rss    = map (rewards s a) s's
+
+  -- temporary hard-wiring to Expected SARSA
+  newVal = oldVal + alpha * (r + disc * eQs'a' - oldVal)
+  oldVal = qf s a
+  r      = sum . map (sum . map (uncurry (*))) $ rss  -- expected reward
+  eQs'a' =  -- E[Q(s', a')]
+    sum [ p * qf s' a'
+        | a' <- acts
+        , let p = if a' == pol s'
+                     then 1 - epsilon
+                     else epsilon / fromIntegral (lActs - 1)
+        ]
+  acts  = actions s'
+  lActs = length acts
+
+-- | Find optimum policy and value functions, using temporal difference.
+doTD
+  :: ( Eq s, Eq a
+     , KnownNat ns, KnownNat na, KnownNat k, KnownNat l
+     , ns ~ (1 + k) , (k + 1) ~ ns , na ~ (l + 1)
+     ) => RLType s a ns na
+       -> Int
+       -> ([VS.Vector ns Double], [VS.Vector ns a], [Int], [Int])
+doTD rlt@RLType{..} nIters = (vs, ps, polChngCnts, valChngCnts) where
+  gen = mkStdGen 1
+  qs  = flip evalState (VS.replicate (VS.replicate 0), gen) $
+    replicateM nIters $ do
+      (q, g) <- get
+      let s = case initStates of
+                [] -> VS.head states
+                _  -> P.head $ shuffle g initStates
+          (_, q's, gs) = unzip3 $ take (maxIter + 1) $
+            iterate
+              (optQ rlt)
+              (s, q, g)
+          q' = P.last q's
+      put (q', P.last gs)
+      return q'
+  ps    = map (qToP aGen) qs
+  acts  = map (\p -> VS.map (getFinite . aEnum . appP sEnum p) states) ps
+  diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
+              $ zip acts (P.tail acts)
+  ((_, _), polChngCnts) = first (fromMaybe (P.error "doTD: Major failure!")) $
+    runWriter $ withinOnM 0
+                          ( \ (da, _) ->
+                              maxAndNonZero da
+                          ) $ zip diffs (P.tail ps)
+  vs          = map qToV qs
+  valChngCnts = map ( length
+                    . filter (/= 0)
+                    . VS.toList
+                    ) $ zipWith (-) vs $ P.tail vs
 
 -- | Apply the matrix representation of an action-value function.
 appQ
@@ -461,6 +493,6 @@ arrMeanSqr = mean . fmap mean . fmap (fmap sqr)
 sqr :: Num a => a -> a
 sqr x = x * x
 
-toString :: (Show a, Typeable a) => a -> String
+toString :: (Show a, Typeable a) => a -> P.String
 toString x = fromMaybe (show x) (cast x)
 
