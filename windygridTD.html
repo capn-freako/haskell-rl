@@ -1,0 +1,402 @@
+<meta charset="utf-8"> <link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+<h1 id="haskell-rl-windy-gridworld">haskell-rl : Windy Gridworld</h1>
+<p>This <a href="https://wiki.haskell.org/Literate_programming">literate Haskell</a> document provides a solution to Example 6.5 - <em>Windy Gridworld</em>.</p>
+<p>Original author: <a href="mailto:David.Banas@target.com">David Banas</a><br />
+Original date: June 28, 2018</p>
+<p>Copyright © 2018 Target Corp.; all rights reserved World wide.</p>
+<h2 id="contents">Contents</h2>
+<ul class="incremental">
+<li><a href="#code">Code</a></li>
+<li><a href="#output">Output</a></li>
+<li><a href="#debug">Debug</a></li>
+</ul>
+<h2 id="code">code</h2>
+<h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" data-line-number="1"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span></a>
+<a class="sourceLine" id="cb1-2" data-line-number="2"><span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></a>
+<a class="sourceLine" id="cb1-3" data-line-number="3"><span class="ot">{-# OPTIONS_GHC -Wno-missing-signatures #-}</span></a>
+<a class="sourceLine" id="cb1-4" data-line-number="4"><span class="ot">{-# OPTIONS_GHC -cpp #-}</span></a></code></pre></div>
+<h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></a>
+<a class="sourceLine" id="cb2-2" data-line-number="2"><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></a>
+<a class="sourceLine" id="cb2-3" data-line-number="3"><span class="ot">{-# LANGUAGE DataKinds #-}</span></a>
+<a class="sourceLine" id="cb2-4" data-line-number="4"><span class="ot">{-# LANGUAGE DeriveGeneric #-}</span></a>
+<a class="sourceLine" id="cb2-5" data-line-number="5"><span class="ot">{-# LANGUAGE FlexibleContexts #-}</span></a>
+<a class="sourceLine" id="cb2-6" data-line-number="6"><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></a>
+<a class="sourceLine" id="cb2-7" data-line-number="7"><span class="ot">{-# LANGUAGE LambdaCase #-}</span></a>
+<a class="sourceLine" id="cb2-8" data-line-number="8"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></a>
+<a class="sourceLine" id="cb2-9" data-line-number="9"><span class="ot">{-# LANGUAGE RecordWildCards #-}</span></a>
+<a class="sourceLine" id="cb2-10" data-line-number="10"><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></a>
+<a class="sourceLine" id="cb2-11" data-line-number="11"><span class="ot">{-# LANGUAGE TupleSections #-}</span></a>
+<a class="sourceLine" id="cb2-12" data-line-number="12"><span class="ot">{-# LANGUAGE TypeFamilies #-}</span></a>
+<a class="sourceLine" id="cb2-13" data-line-number="13"><span class="ot">{-# LANGUAGE TypeOperators #-}</span></a></code></pre></div>
+<h2 id="libraries"><a href="https://www.stackage.org/">libraries</a></h2>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/protolude">protolude</a></li>
+<li><a href="https://www.stackage.org/package/optparse-generic">optparse-generic</a></li>
+<li><a href="https://www.stackage.org/package/vector-sized">vector-sized</a></li>
+<li><a href="https://www.stackage.org/package/finite-typelits">finite-typelits</a></li>
+<li><a href="https://www.stackage.org/package/extra">extra</a></li>
+<li><a href="https://www.stackage.org/package/text">text</a></li>
+<li><a href="https://www.stackage.org/package/random">random</a></li>
+<li><a href="https://www.stackage.org/package/random-shuffle">random-shuffle</a></li>
+<li><a href="https://www.stackage.org/package/Chart">Chart</a></li>
+<li><a href="https://www.stackage.org/package/Chart-cairo">Chart-cairo</a></li>
+<li><a href="https://hackage.haskell.org/package/MemoTrie">MemoTrie</a></li>
+</ul>
+<div class="sourceCode" id="cb3"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" data-line-number="1"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Prelude</span> <span class="kw">as</span> <span class="dt">P</span></a>
+<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="kw">import</span> <span class="dt">Prelude</span> (unlines, <span class="dt">Show</span>(..), <span class="dt">String</span>)</a>
+<a class="sourceLine" id="cb3-3" data-line-number="3"><span class="kw">import</span> <span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for, first, second)</a>
+<a class="sourceLine" id="cb3-4" data-line-number="4"></a>
+<a class="sourceLine" id="cb3-5" data-line-number="5"><span class="kw">import</span> <span class="dt">Options.Generic</span></a>
+<a class="sourceLine" id="cb3-6" data-line-number="6"></a>
+<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="kw">import</span> <span class="dt">Control.Arrow</span></a>
+<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></a>
+<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span>   <span class="kw">as</span> <span class="dt">VS</span></a>
+<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
+<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.List</span>                              (sortBy, groupBy, unzip3)</a>
+<a class="sourceLine" id="cb3-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.MemoTrie</span></a>
+<a class="sourceLine" id="cb3-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.Text</span>                              (pack)</a>
+<a class="sourceLine" id="cb3-14" data-line-number="14"><span class="kw">import</span> <span class="dt">Data.Typeable</span></a>
+<a class="sourceLine" id="cb3-15" data-line-number="15"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Easy</span> <span class="kw">hiding</span>   (<span class="dt">Wrapped</span>, <span class="dt">Unwrapped</span>, <span class="dt">Empty</span>)</a>
+<a class="sourceLine" id="cb3-16" data-line-number="16"><span class="kw">import</span> <span class="dt">Graphics.Rendering.Chart.Backend.Cairo</span></a>
+<a class="sourceLine" id="cb3-17" data-line-number="17"><span class="kw">import</span> <span class="dt">Statistics.Distribution</span>                (density)</a>
+<a class="sourceLine" id="cb3-18" data-line-number="18"><span class="kw">import</span> <span class="dt">Statistics.Distribution.Gamma</span>          (gammaDistr)</a>
+<a class="sourceLine" id="cb3-19" data-line-number="19"><span class="kw">import</span> <span class="dt">System.Random</span></a>
+<a class="sourceLine" id="cb3-20" data-line-number="20"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
+<a class="sourceLine" id="cb3-21" data-line-number="21"><span class="kw">import</span> <span class="dt">ToolShed.System.Random</span>                 (shuffle)</a>
+<a class="sourceLine" id="cb3-22" data-line-number="22"></a>
+<a class="sourceLine" id="cb3-23" data-line-number="23"><span class="kw">import</span> <span class="dt">RL.GPI</span></a></code></pre></div>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="co">  Problem specific definitions</span></a>
+<a class="sourceLine" id="cb4-3" data-line-number="3"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-4" data-line-number="4"></a>
+<a class="sourceLine" id="cb4-5" data-line-number="5">gGamma   <span class="fu">=</span> <span class="dv">1</span>  <span class="co">-- Specified by problem.</span></a>
+<a class="sourceLine" id="cb4-6" data-line-number="6">gAlpha   <span class="fu">=</span> <span class="fl">0.5</span></a>
+<a class="sourceLine" id="cb4-7" data-line-number="7">gEps     <span class="fu">=</span> <span class="fl">0.1</span></a>
+<a class="sourceLine" id="cb4-8" data-line-number="8">gNumRows <span class="fu">=</span> <span class="dv">7</span></a>
+<a class="sourceLine" id="cb4-9" data-line-number="9">gNumCols <span class="fu">=</span> <span class="dv">10</span></a>
+<a class="sourceLine" id="cb4-10" data-line-number="10">gWind    <span class="fu">=</span> fromMaybe (P.error <span class="st">&quot;gWind: Sized vector initialization from list failure!&quot;</span>)</a>
+<a class="sourceLine" id="cb4-11" data-line-number="11">                     (VS.fromList [<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">1</span>,<span class="dv">0</span>]<span class="ot"> ::</span> <span class="dt">Maybe</span> (<span class="dt">VS.Vector</span> <span class="dv">10</span> <span class="dt">Int</span>))</a>
+<a class="sourceLine" id="cb4-12" data-line-number="12"></a>
+<a class="sourceLine" id="cb4-13" data-line-number="13"><span class="kw">type</span> <span class="dt">MyState</span> <span class="fu">=</span> (<span class="dt">Int</span>, <span class="dt">Int</span>)</a>
+<a class="sourceLine" id="cb4-14" data-line-number="14"></a>
+<a class="sourceLine" id="cb4-15" data-line-number="15"><span class="kw">data</span> <span class="dt">MyAction</span> <span class="fu">=</span> <span class="dt">Up</span></a>
+<a class="sourceLine" id="cb4-16" data-line-number="16">              <span class="fu">|</span> <span class="dt">Dn</span></a>
+<a class="sourceLine" id="cb4-17" data-line-number="17">              <span class="fu">|</span> <span class="dt">Rt</span></a>
+<a class="sourceLine" id="cb4-18" data-line-number="18">              <span class="fu">|</span> <span class="dt">Lt</span></a>
+<a class="sourceLine" id="cb4-19" data-line-number="19">  <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Ord</span>, <span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb4-20" data-line-number="20"></a>
+<a class="sourceLine" id="cb4-21" data-line-number="21"><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">MyAction</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb4-22" data-line-number="22">  show x <span class="fu">=</span> <span class="kw">case</span> x <span class="kw">of</span></a>
+<a class="sourceLine" id="cb4-23" data-line-number="23">             <span class="dt">Up</span> <span class="ot">-&gt;</span> <span class="st">&quot; \\uparrow &quot;</span></a>
+<a class="sourceLine" id="cb4-24" data-line-number="24">             <span class="dt">Dn</span> <span class="ot">-&gt;</span> <span class="st">&quot; \\downarrow &quot;</span></a>
+<a class="sourceLine" id="cb4-25" data-line-number="25">             <span class="dt">Rt</span> <span class="ot">-&gt;</span> <span class="st">&quot; \\rightarrow &quot;</span></a>
+<a class="sourceLine" id="cb4-26" data-line-number="26">             <span class="dt">Lt</span> <span class="ot">-&gt;</span> <span class="st">&quot; \\leftarrow &quot;</span></a>
+<a class="sourceLine" id="cb4-27" data-line-number="27"></a>
+<a class="sourceLine" id="cb4-28" data-line-number="28"><span class="kw">instance</span> <span class="dt">HasTrie</span> <span class="dt">MyAction</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb4-29" data-line-number="29">  <span class="kw">newtype</span> (<span class="dt">MyAction</span> <span class="fu">:-&gt;:</span> b) <span class="fu">=</span> <span class="dt">MyActionTrie</span> {<span class="ot"> unMyActionTrie ::</span> <span class="dt">Reg</span> <span class="dt">MyAction</span> <span class="fu">:-&gt;:</span> b } </a>
+<a class="sourceLine" id="cb4-30" data-line-number="30">  trie      <span class="fu">=</span> trieGeneric      <span class="dt">MyActionTrie</span> </a>
+<a class="sourceLine" id="cb4-31" data-line-number="31">  untrie    <span class="fu">=</span> untrieGeneric    unMyActionTrie</a>
+<a class="sourceLine" id="cb4-32" data-line-number="32">  enumerate <span class="fu">=</span> enumerateGeneric unMyActionTrie</a>
+<a class="sourceLine" id="cb4-33" data-line-number="33"></a>
+<a class="sourceLine" id="cb4-34" data-line-number="34"><span class="co">-- | S</span></a>
+<a class="sourceLine" id="cb4-35" data-line-number="35"><span class="ot">allStates ::</span> [<span class="dt">MyState</span>]</a>
+<a class="sourceLine" id="cb4-36" data-line-number="36">allStates <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-37" data-line-number="37">  [ (r, c)</a>
+<a class="sourceLine" id="cb4-38" data-line-number="38">  <span class="fu">|</span> r <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gNumRows <span class="fu">-</span> <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-39" data-line-number="39">  , c <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gNumCols <span class="fu">-</span> <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-40" data-line-number="40">  ]</a>
+<a class="sourceLine" id="cb4-41" data-line-number="41"></a>
+<a class="sourceLine" id="cb4-42" data-line-number="42"><span class="co">-- Just a sized vector alternative to the list above.</span></a>
+<a class="sourceLine" id="cb4-43" data-line-number="43"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-44" data-line-number="44"><span class="co">-- TODO: Figure out how to determine the size from the constants above.</span></a>
+<a class="sourceLine" id="cb4-45" data-line-number="45"><span class="ot">allStatesV ::</span> <span class="dt">VS.Vector</span> <span class="dv">70</span> <span class="dt">MyState</span></a>
+<a class="sourceLine" id="cb4-46" data-line-number="46">allStatesV <span class="fu">=</span> fromMaybe (P.error <span class="st">&quot;main.allStatesV: Fatal error converting `allStates`!&quot;</span>)</a>
+<a class="sourceLine" id="cb4-47" data-line-number="47">                       <span class="fu">$</span> VS.fromList allStates</a>
+<a class="sourceLine" id="cb4-48" data-line-number="48"></a>
+<a class="sourceLine" id="cb4-49" data-line-number="49"><span class="ot">mySEnum ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">70</span></a>
+<a class="sourceLine" id="cb4-50" data-line-number="50">mySEnum (r,c) <span class="fu">=</span> finite <span class="fu">.</span> fromIntegral <span class="fu">$</span> r <span class="fu">*</span> gNumCols <span class="fu">+</span> c</a>
+<a class="sourceLine" id="cb4-51" data-line-number="51"></a>
+<a class="sourceLine" id="cb4-52" data-line-number="52"><span class="co">-- | A(s)</span></a>
+<a class="sourceLine" id="cb4-53" data-line-number="53"><span class="ot">myActions ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [<span class="dt">MyAction</span>]</a>
+<a class="sourceLine" id="cb4-54" data-line-number="54">myActions <span class="fu">=</span> const [<span class="dt">Up</span>, <span class="dt">Dn</span>, <span class="dt">Rt</span>, <span class="dt">Lt</span>]</a>
+<a class="sourceLine" id="cb4-55" data-line-number="55"></a>
+<a class="sourceLine" id="cb4-56" data-line-number="56"><span class="ot">myAEnum ::</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">4</span></a>
+<a class="sourceLine" id="cb4-57" data-line-number="57">myAEnum <span class="fu">=</span> \<span class="kw">case</span></a>
+<a class="sourceLine" id="cb4-58" data-line-number="58">  <span class="dt">Up</span> <span class="ot">-&gt;</span> <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-59" data-line-number="59">  <span class="dt">Dn</span> <span class="ot">-&gt;</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-60" data-line-number="60">  <span class="dt">Rt</span> <span class="ot">-&gt;</span> <span class="dv">2</span></a>
+<a class="sourceLine" id="cb4-61" data-line-number="61">  <span class="dt">Lt</span> <span class="ot">-&gt;</span> <span class="dv">3</span></a>
+<a class="sourceLine" id="cb4-62" data-line-number="62"></a>
+<a class="sourceLine" id="cb4-63" data-line-number="63"><span class="ot">myAGen ::</span> <span class="dt">Finite</span> <span class="dv">4</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span></a>
+<a class="sourceLine" id="cb4-64" data-line-number="64">myAGen <span class="fu">=</span> \<span class="kw">case</span></a>
+<a class="sourceLine" id="cb4-65" data-line-number="65">  <span class="dv">0</span> <span class="ot">-&gt;</span> <span class="dt">Up</span></a>
+<a class="sourceLine" id="cb4-66" data-line-number="66">  <span class="dv">1</span> <span class="ot">-&gt;</span> <span class="dt">Dn</span></a>
+<a class="sourceLine" id="cb4-67" data-line-number="67">  <span class="dv">2</span> <span class="ot">-&gt;</span> <span class="dt">Rt</span></a>
+<a class="sourceLine" id="cb4-68" data-line-number="68">  <span class="dv">3</span> <span class="ot">-&gt;</span> <span class="dt">Lt</span></a>
+<a class="sourceLine" id="cb4-69" data-line-number="69"></a>
+<a class="sourceLine" id="cb4-70" data-line-number="70"><span class="co">-- | S&#39;(s, a) - list of next possible states.</span></a>
+<a class="sourceLine" id="cb4-71" data-line-number="71"><span class="ot">myNextStates ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> [<span class="dt">MyState</span>]</a>
+<a class="sourceLine" id="cb4-72" data-line-number="72">myNextStates s<span class="fu">@</span>(r, c) act <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-73" data-line-number="73">  <span class="kw">if</span> s <span class="ot">`elem`</span> myTermStates</a>
+<a class="sourceLine" id="cb4-74" data-line-number="74">    <span class="kw">then</span> [s]</a>
+<a class="sourceLine" id="cb4-75" data-line-number="75">    <span class="kw">else</span> [(r&#39;, c&#39;)]</a>
+<a class="sourceLine" id="cb4-76" data-line-number="76">  <span class="kw">where</span> r&#39; <span class="fu">=</span> min (gNumRows <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (r <span class="fu">+</span> dr <span class="fu">+</span> wr))</a>
+<a class="sourceLine" id="cb4-77" data-line-number="77">        c&#39; <span class="fu">=</span> min (gNumCols <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (c <span class="fu">+</span> dc))</a>
+<a class="sourceLine" id="cb4-78" data-line-number="78">        dr <span class="fu">=</span> <span class="kw">case</span> act <span class="kw">of</span></a>
+<a class="sourceLine" id="cb4-79" data-line-number="79">               <span class="dt">Up</span>    <span class="ot">-&gt;</span>  <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-80" data-line-number="80">               <span class="dt">Dn</span>  <span class="ot">-&gt;</span> <span class="fu">-</span><span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-81" data-line-number="81">               <span class="dt">Lt</span>  <span class="ot">-&gt;</span>  <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-82" data-line-number="82">               <span class="dt">Rt</span> <span class="ot">-&gt;</span>  <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-83" data-line-number="83">        dc <span class="fu">=</span> <span class="kw">case</span> act <span class="kw">of</span></a>
+<a class="sourceLine" id="cb4-84" data-line-number="84">               <span class="dt">Up</span>    <span class="ot">-&gt;</span>  <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-85" data-line-number="85">               <span class="dt">Dn</span>  <span class="ot">-&gt;</span>  <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-86" data-line-number="86">               <span class="dt">Lt</span>  <span class="ot">-&gt;</span> <span class="fu">-</span><span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-87" data-line-number="87">               <span class="dt">Rt</span> <span class="ot">-&gt;</span>  <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-88" data-line-number="88">        wr <span class="fu">=</span> gWind <span class="ot">`VS.index`</span> finite (fromIntegral c)</a>
+<a class="sourceLine" id="cb4-89" data-line-number="89"></a>
+<a class="sourceLine" id="cb4-90" data-line-number="90"><span class="ot">myTermStates ::</span> [<span class="dt">MyState</span>]</a>
+<a class="sourceLine" id="cb4-91" data-line-number="91">myTermStates <span class="fu">=</span> [(<span class="dv">3</span>,<span class="dv">7</span>)]</a>
+<a class="sourceLine" id="cb4-92" data-line-number="92"></a>
+<a class="sourceLine" id="cb4-93" data-line-number="93"><span class="ot">myStartState ::</span> <span class="dt">MyState</span></a>
+<a class="sourceLine" id="cb4-94" data-line-number="94">myStartState <span class="fu">=</span> (<span class="dv">3</span>,<span class="dv">0</span>)</a>
+<a class="sourceLine" id="cb4-95" data-line-number="95"></a>
+<a class="sourceLine" id="cb4-96" data-line-number="96"><span class="co">-- | R(s, a, s&#39;)</span></a>
+<a class="sourceLine" id="cb4-97" data-line-number="97"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-98" data-line-number="98"><span class="co">-- Returns a list of pairs, each containing:</span></a>
+<a class="sourceLine" id="cb4-99" data-line-number="99"><span class="co">-- - a reward value, and</span></a>
+<a class="sourceLine" id="cb4-100" data-line-number="100"><span class="co">-- - the probability of occurence for that value.</span></a>
+<a class="sourceLine" id="cb4-101" data-line-number="101"><span class="co">--</span></a>
+<a class="sourceLine" id="cb4-102" data-line-number="102"><span class="co">-- Note: Previous requirement that reward values be unique eliminated,</span></a>
+<a class="sourceLine" id="cb4-103" data-line-number="103"><span class="co">--       for coding convenience and runtime performance improvement.</span></a>
+<a class="sourceLine" id="cb4-104" data-line-number="104"><span class="ot">myRewards ::</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> <span class="dt">MyAction</span> <span class="ot">-&gt;</span> <span class="dt">MyState</span> <span class="ot">-&gt;</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)]</a>
+<a class="sourceLine" id="cb4-105" data-line-number="105">myRewards _ _ s&#39; <span class="fu">|</span> s&#39; <span class="ot">`elem`</span> myTermStates <span class="fu">=</span> [( <span class="dv">0</span>, <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-106" data-line-number="106">                 <span class="fu">|</span> otherwise              <span class="fu">=</span> [(<span class="fu">-</span><span class="dv">1</span>, <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-107" data-line-number="107"></a>
+<a class="sourceLine" id="cb4-108" data-line-number="108"><span class="co">-- | Show a function from `MyState` to `Bool`.</span></a>
+<a class="sourceLine" id="cb4-109" data-line-number="109"><span class="ot">showFofState ::</span> (<span class="dt">Show</span> a, <span class="dt">Typeable</span> a) <span class="ot">=&gt;</span> (<span class="dt">MyState</span> <span class="ot">-&gt;</span> a) <span class="ot">-&gt;</span> <span class="dt">String</span></a>
+<a class="sourceLine" id="cb4-110" data-line-number="110">showFofState g <span class="fu">=</span> unlines</a>
+<a class="sourceLine" id="cb4-111" data-line-number="111">  ( <span class="st">&quot;\\begin{array}{|&quot;</span> <span class="fu">:</span> intersperse <span class="ch">&#39;|&#39;</span> (replicate gNumCols <span class="ch">&#39;c&#39;</span>) <span class="fu">:</span> <span class="st">&quot;|}&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-112" data-line-number="112">    ( <span class="st">&quot;\\hline&quot;</span> <span class="fu">:</span></a>
+<a class="sourceLine" id="cb4-113" data-line-number="113">      intersperse <span class="st">&quot;\\hline&quot;</span></a>
+<a class="sourceLine" id="cb4-114" data-line-number="114">        ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
+<a class="sourceLine" id="cb4-115" data-line-number="115">              [ map g&#39;</a>
+<a class="sourceLine" id="cb4-116" data-line-number="116">                [ (r&#39;, c)</a>
+<a class="sourceLine" id="cb4-117" data-line-number="117">                <span class="fu">|</span> c <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gNumCols <span class="fu">-</span> <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-118" data-line-number="118">                ]</a>
+<a class="sourceLine" id="cb4-119" data-line-number="119">              <span class="fu">|</span> r <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gNumRows <span class="fu">-</span> <span class="dv">1</span>)]</a>
+<a class="sourceLine" id="cb4-120" data-line-number="120">              , <span class="kw">let</span> r&#39; <span class="fu">=</span> gNumRows <span class="fu">-</span> <span class="dv">1</span> <span class="fu">-</span> r</a>
+<a class="sourceLine" id="cb4-121" data-line-number="121">              ]</a>
+<a class="sourceLine" id="cb4-122" data-line-number="122">        )</a>
+<a class="sourceLine" id="cb4-123" data-line-number="123">      <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]</a>
+<a class="sourceLine" id="cb4-124" data-line-number="124">      <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
+<a class="sourceLine" id="cb4-125" data-line-number="125">    )</a>
+<a class="sourceLine" id="cb4-126" data-line-number="126">  )</a>
+<a class="sourceLine" id="cb4-127" data-line-number="127">  <span class="kw">where</span> g&#39; s</a>
+<a class="sourceLine" id="cb4-128" data-line-number="128">          <span class="fu">|</span> s <span class="fu">==</span> myStartState <span class="fu">=</span> <span class="st">&quot;S&quot;</span></a>
+<a class="sourceLine" id="cb4-129" data-line-number="129">          <span class="fu">|</span> s <span class="ot">`elem`</span> myTermStates <span class="fu">=</span> <span class="st">&quot;G&quot;</span></a>
+<a class="sourceLine" id="cb4-130" data-line-number="130">          <span class="fu">|</span> otherwise <span class="fu">=</span> toString (g s)</a>
+<a class="sourceLine" id="cb4-131" data-line-number="131"></a>
+<a class="sourceLine" id="cb4-132" data-line-number="132"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-133" data-line-number="133"><span class="co">  Command line options defintions.</span></a>
+<a class="sourceLine" id="cb4-134" data-line-number="134"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-135" data-line-number="135"></a>
+<a class="sourceLine" id="cb4-136" data-line-number="136"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
+<a class="sourceLine" id="cb4-137" data-line-number="137">    {<span class="ot"> nIter ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-138" data-line-number="138">        <span class="st">&quot;The number of policy improvement iterations&quot;</span></a>
+<a class="sourceLine" id="cb4-139" data-line-number="139">    ,<span class="ot"> nEval ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-140" data-line-number="140">        <span class="st">&quot;The number of policy evaluation iterations per policy improvement iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-141" data-line-number="141">    ,<span class="ot"> p     ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-142" data-line-number="142">        <span class="st">&quot;The ratio of stock-out to holding costs&quot;</span></a>
+<a class="sourceLine" id="cb4-143" data-line-number="143">    ,<span class="ot"> eps   ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Double</span> <span class="fu">&lt;?&gt;</span></a>
+<a class="sourceLine" id="cb4-144" data-line-number="144">        <span class="st">&quot;The convergence tolerance for iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-145" data-line-number="145">    }</a>
+<a class="sourceLine" id="cb4-146" data-line-number="146">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb4-147" data-line-number="147"></a>
+<a class="sourceLine" id="cb4-148" data-line-number="148"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb4-149" data-line-number="149"></a>
+<a class="sourceLine" id="cb4-150" data-line-number="150"><span class="co">{----------------------------------------------------------------------</span></a>
+<a class="sourceLine" id="cb4-151" data-line-number="151"><span class="co">  main()</span></a>
+<a class="sourceLine" id="cb4-152" data-line-number="152"><span class="co">----------------------------------------------------------------------}</span></a>
+<a class="sourceLine" id="cb4-153" data-line-number="153"></a>
+<a class="sourceLine" id="cb4-154" data-line-number="154">mdFilename <span class="fu">=</span> <span class="st">&quot;other/windygrid.md&quot;</span></a>
+<a class="sourceLine" id="cb4-155" data-line-number="155"></a>
+<a class="sourceLine" id="cb4-156" data-line-number="156"><span class="ot">boolToDouble ::</span> <span class="dt">Bool</span> <span class="ot">-&gt;</span> <span class="dt">Double</span></a>
+<a class="sourceLine" id="cb4-157" data-line-number="157">boolToDouble <span class="dt">True</span> <span class="fu">=</span> <span class="dv">1</span></a>
+<a class="sourceLine" id="cb4-158" data-line-number="158">boolToDouble _    <span class="fu">=</span> <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-159" data-line-number="159"></a>
+<a class="sourceLine" id="cb4-160" data-line-number="160"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb4-161" data-line-number="161">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-162" data-line-number="162">  <span class="co">-- Process command line options.</span></a>
+<a class="sourceLine" id="cb4-163" data-line-number="163"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
+<a class="sourceLine" id="cb4-164" data-line-number="164">    unwrapRecord <span class="st">&quot;A solution to Example 6.5 - Windy Gridworld.&quot;</span></a>
+<a class="sourceLine" id="cb4-165" data-line-number="165">  <span class="kw">let</span> nIters <span class="fu">=</span> fromMaybe  <span class="dv">2</span> (nIter o)</a>
+<a class="sourceLine" id="cb4-166" data-line-number="166">      nEvals <span class="fu">=</span> fromMaybe  <span class="dv">1</span> (nEval o)</a>
+<a class="sourceLine" id="cb4-167" data-line-number="167">      pVal   <span class="fu">=</span> fromMaybe <span class="dv">50</span> (p     o)</a>
+<a class="sourceLine" id="cb4-168" data-line-number="168">      eps&#39;   <span class="fu">=</span> fromMaybe  <span class="fl">0.1</span> (eps o)</a>
+<a class="sourceLine" id="cb4-169" data-line-number="169"></a>
+<a class="sourceLine" id="cb4-170" data-line-number="170">  <span class="co">-- Calculate and display optimum policy.</span></a>
+<a class="sourceLine" id="cb4-171" data-line-number="171">  writeFile mdFilename <span class="st">&quot;\n### Policy optimization\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-172" data-line-number="172">  <span class="kw">let</span> myRLType <span class="fu">=</span></a>
+<a class="sourceLine" id="cb4-173" data-line-number="173">        rltDef</a>
+<a class="sourceLine" id="cb4-174" data-line-number="174">          { disc       <span class="fu">=</span> gGamma</a>
+<a class="sourceLine" id="cb4-175" data-line-number="175">          , epsilon    <span class="fu">=</span> gEps</a>
+<a class="sourceLine" id="cb4-176" data-line-number="176">          , alpha      <span class="fu">=</span> gAlpha</a>
+<a class="sourceLine" id="cb4-177" data-line-number="177">          , maxIter    <span class="fu">=</span> nEvals</a>
+<a class="sourceLine" id="cb4-178" data-line-number="178">          , states     <span class="fu">=</span> allStatesV</a>
+<a class="sourceLine" id="cb4-179" data-line-number="179">          , actions    <span class="fu">=</span> myActions</a>
+<a class="sourceLine" id="cb4-180" data-line-number="180">          , nextStates <span class="fu">=</span> myNextStates</a>
+<a class="sourceLine" id="cb4-181" data-line-number="181">          , rewards    <span class="fu">=</span> myRewards</a>
+<a class="sourceLine" id="cb4-182" data-line-number="182">          , stateVals  <span class="fu">=</span> zip myTermStates <span class="fu">$</span> repeat <span class="dv">0</span></a>
+<a class="sourceLine" id="cb4-183" data-line-number="183">          , sEnum      <span class="fu">=</span> mySEnum</a>
+<a class="sourceLine" id="cb4-184" data-line-number="184">          , aEnum      <span class="fu">=</span> myAEnum</a>
+<a class="sourceLine" id="cb4-185" data-line-number="185">          , aGen       <span class="fu">=</span> myAGen</a>
+<a class="sourceLine" id="cb4-186" data-line-number="186">          , initStates <span class="fu">=</span> [myStartState]</a>
+<a class="sourceLine" id="cb4-187" data-line-number="187">          }</a>
+<a class="sourceLine" id="cb4-188" data-line-number="188">      (vs, ps, polChngCnts, valChngCnts) <span class="fu">=</span> doTD myRLType nIters</a>
+<a class="sourceLine" id="cb4-189" data-line-number="189">      val <span class="fu">=</span> appV mySEnum <span class="fu">$</span> P.last vs</a>
+<a class="sourceLine" id="cb4-190" data-line-number="190">      pol <span class="fu">=</span> appP mySEnum <span class="fu">$</span> P.last ps</a>
+<a class="sourceLine" id="cb4-191" data-line-number="191">      counts <span class="fu">=</span> polChngCnts</a>
+<a class="sourceLine" id="cb4-192" data-line-number="192">      cnts   <span class="fu">=</span> valChngCnts</a>
+<a class="sourceLine" id="cb4-193" data-line-number="193"></a>
+<a class="sourceLine" id="cb4-194" data-line-number="194">  <span class="co">-- let (fs, counts&#39;) = P.unzip $ take (nIters + 1)</span></a>
+<a class="sourceLine" id="cb4-195" data-line-number="195">  <span class="co">--                  $ iterate</span></a>
+<a class="sourceLine" id="cb4-196" data-line-number="196">  <span class="co">--                      ( optPol</span></a>
+<a class="sourceLine" id="cb4-197" data-line-number="197">  <span class="co">--                          rltDef</span></a>
+<a class="sourceLine" id="cb4-198" data-line-number="198">  <span class="co">--                            { disc       = gGamma</span></a>
+<a class="sourceLine" id="cb4-199" data-line-number="199">  <span class="co">--                            , epsilon    = eps&#39;</span></a>
+<a class="sourceLine" id="cb4-200" data-line-number="200">  <span class="co">--                            , maxIter    = nEvals</span></a>
+<a class="sourceLine" id="cb4-201" data-line-number="201">  <span class="co">--                            , states     = allStatesV</span></a>
+<a class="sourceLine" id="cb4-202" data-line-number="202">  <span class="co">--                            , actions    = myActions</span></a>
+<a class="sourceLine" id="cb4-203" data-line-number="203">  <span class="co">--                            , nextStates = myNextStates</span></a>
+<a class="sourceLine" id="cb4-204" data-line-number="204">  <span class="co">--                            , rewards    = myRewards</span></a>
+<a class="sourceLine" id="cb4-205" data-line-number="205">  <span class="co">--                            , stateVals  = zip myTermStates $ repeat 0</span></a>
+<a class="sourceLine" id="cb4-206" data-line-number="206">  <span class="co">--                            }</span></a>
+<a class="sourceLine" id="cb4-207" data-line-number="207">  <span class="co">--                      ) (const (Rt, 0), [])</span></a>
+<a class="sourceLine" id="cb4-208" data-line-number="208">  <span class="co">--     counts = P.tail counts&#39;</span></a>
+<a class="sourceLine" id="cb4-209" data-line-number="209">  <span class="co">--     acts   = map (\f -&gt; VS.map (fst . f) allStatesV) fs</span></a>
+<a class="sourceLine" id="cb4-210" data-line-number="210">  <span class="co">--     diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))</span></a>
+<a class="sourceLine" id="cb4-211" data-line-number="211">  <span class="co">--                 $ zip acts (P.tail acts)</span></a>
+<a class="sourceLine" id="cb4-212" data-line-number="212">  <span class="co">--     ((_, g&#39;), cnts) = first (fromMaybe (P.error &quot;main: Major failure!&quot;)) $</span></a>
+<a class="sourceLine" id="cb4-213" data-line-number="213">  <span class="co">--       -- runWriter $ withinOnM eps&#39;</span></a>
+<a class="sourceLine" id="cb4-214" data-line-number="214">  <span class="co">--       runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.</span></a>
+<a class="sourceLine" id="cb4-215" data-line-number="215">  <span class="co">--                             ( \ (dv, _) -&gt;</span></a>
+<a class="sourceLine" id="cb4-216" data-line-number="216">  <span class="co">--                                 maxAndNonZero dv</span></a>
+<a class="sourceLine" id="cb4-217" data-line-number="217">  <span class="co">--                             ) $ zip diffs (P.tail fs)</span></a>
+<a class="sourceLine" id="cb4-218" data-line-number="218">  <span class="co">--     pol    = fst . g&#39;</span></a>
+<a class="sourceLine" id="cb4-219" data-line-number="219">  <span class="co">--     val    = snd . g&#39;</span></a>
+<a class="sourceLine" id="cb4-220" data-line-number="220">      visits <span class="fu">=</span> runEpisode <span class="dv">20</span> pol (((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>)) P.head myNextStates) myTermStates myStartState</a>
+<a class="sourceLine" id="cb4-221" data-line-number="221"></a>
+<a class="sourceLine" id="cb4-222" data-line-number="222">  appendFile mdFilename <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-223" data-line-number="223">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-224" data-line-number="224">  appendFile mdFilename <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-225" data-line-number="225">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-226" data-line-number="226">  appendFile mdFilename <span class="st">&quot;\n### Trajectory of final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-227" data-line-number="227">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> \s <span class="ot">-&gt;</span> <span class="kw">if</span> s <span class="ot">`elem`</span> visits</a>
+<a class="sourceLine" id="cb4-228" data-line-number="228">                                                        <span class="kw">then</span> (<span class="st">&quot; \\cdot &quot;</span><span class="ot"> ::</span> <span class="dt">String</span>)</a>
+<a class="sourceLine" id="cb4-229" data-line-number="229">                                                        <span class="kw">else</span> <span class="st">&quot;&quot;</span></a>
+<a class="sourceLine" id="cb4-230" data-line-number="230"></a>
+<a class="sourceLine" id="cb4-231" data-line-number="231">  <span class="co">-- DEBUGGING</span></a>
+<a class="sourceLine" id="cb4-232" data-line-number="232">  appendFile mdFilename <span class="st">&quot;\n## debug\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-233" data-line-number="233"></a>
+<a class="sourceLine" id="cb4-234" data-line-number="234"><span class="ot">#if 1</span></a>
+<a class="sourceLine" id="cb4-235" data-line-number="235">  <span class="co">-- Value/Action changes vs. Iteration</span></a>
+<a class="sourceLine" id="cb4-236" data-line-number="236">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-237" data-line-number="237">    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Changes vs. Evaluation Iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-238" data-line-number="238">    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]</a>
+<a class="sourceLine" id="cb4-239" data-line-number="239">    plot ( line <span class="st">&quot;Policy Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-240" data-line-number="240">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-241" data-line-number="241">                  <span class="co">-- | (x,y) &lt;- zip ( map (* (length $ P.head counts))</span></a>
+<a class="sourceLine" id="cb4-242" data-line-number="242">                  <span class="co">--                      [(0::Int)..]</span></a>
+<a class="sourceLine" id="cb4-243" data-line-number="243">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-244" data-line-number="244">                                 cnts</a>
+<a class="sourceLine" id="cb4-245" data-line-number="245">                  ]</a>
+<a class="sourceLine" id="cb4-246" data-line-number="246">                ]</a>
+<a class="sourceLine" id="cb4-247" data-line-number="247">         )</a>
+<a class="sourceLine" id="cb4-248" data-line-number="248">    plot ( line <span class="st">&quot;Value Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-249" data-line-number="249">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-250" data-line-number="250">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-251" data-line-number="251">                                 <span class="co">-- (concat counts)</span></a>
+<a class="sourceLine" id="cb4-252" data-line-number="252">                                 counts</a>
+<a class="sourceLine" id="cb4-253" data-line-number="253">                  ]</a>
+<a class="sourceLine" id="cb4-254" data-line-number="254">                ]</a>
+<a class="sourceLine" id="cb4-255" data-line-number="255">         )</a>
+<a class="sourceLine" id="cb4-256" data-line-number="256">  appendFile mdFilename <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-257" data-line-number="257"><span class="ot">#endif</span></a></code></pre></div>
+<h2 id="output">output</h2>
+<h3 id="policy-optimization">Policy optimization</h3>
+<h3 id="final-policy">Final policy</h3>
+<span class="math display">\[\begin{array}{|
+c|c|c|c|c|c|c|c|c|c
+|}
+\hline
+ \uparrow  &amp;  \downarrow  &amp;  \uparrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+\hline
+ \uparrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+\hline
+ \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+\hline
+S &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp; G &amp;  \downarrow  &amp;  \downarrow  \\
+\hline
+ \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
+\hline
+ \downarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
+\hline
+ \leftarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+\hline
+\end{array}\]</span>
+<h3 id="final-value-function">Final value function</h3>
+<span class="math display">\[\begin{array}{|
+c|c|c|c|c|c|c|c|c|c
+|}
+\hline
+-14.1 &amp; -13.6 &amp; -13.1 &amp; -12.4 &amp; -11.5 &amp; -10.4 &amp; -9.3 &amp; -8.2 &amp; -7.1 &amp; -5.9 \\
+\hline
+-14.4 &amp; -13.8 &amp; -13.2 &amp; -12.4 &amp; -11.4 &amp; -10.4 &amp; -9.2 &amp; -7.7 &amp; -5.5 &amp; -4.8 \\
+\hline
+-15.1 &amp; -14.2 &amp; -13.4 &amp; -12.4 &amp; -11.5 &amp; -10.2 &amp; -8.8 &amp; -3.5 &amp; -5.9 &amp; -3.6 \\
+\hline
+S &amp; -14.7 &amp; -13.6 &amp; -12.6 &amp; -11.2 &amp; -9.8 &amp; -8.3 &amp; G &amp; -2.2 &amp; -2.5 \\
+\hline
+-14.9 &amp; -14.1 &amp; -13.1 &amp; -12.1 &amp; -10.7 &amp; -9.2 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.4 \\
+\hline
+-14.1 &amp; -13.3 &amp; -12.5 &amp; -11.6 &amp; -10.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -0.8 \\
+\hline
+-13.5 &amp; -12.7 &amp; -11.9 &amp; -11.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -0.5 \\
+\hline
+\end{array}\]</span>
+<h3 id="trajectory-of-final-policy">Trajectory of final policy</h3>
+<span class="math display">\[\begin{array}{|
+c|c|c|c|c|c|c|c|c|c
+|}
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  \\
+\hline
+S &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  &amp; G &amp;  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
+\hline
+\end{array}\]</span>
+<h2 id="debug">debug</h2>
+<figure>
+<img src="img/valueDiffs.png" />
+</figure>
+<hr />
+<div class="footer">
+<p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
+</div>

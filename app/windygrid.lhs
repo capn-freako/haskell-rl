@@ -169,20 +169,24 @@ myNextStates :: MyState -> MyAction -> [MyState]
 myNextStates s@(r, c) act =
   if s `elem` myTermStates
     then [s]
-    else [(r', c')]
-  where r' = min (gNumRows - 1) (max 0 (r + dr + wr))
-        c' = min (gNumCols - 1) (max 0 (c + dc))
-        dr = case act of
-               Up    ->  1
-               Dn  -> -1
-               Lt  ->  0
-               Rt ->  0
-        dc = case act of
-               Up    ->  0
-               Dn  ->  0
-               Lt  -> -1
-               Rt ->  1
-        wr = gWind `VS.index` finite (fromIntegral c)
+    else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
+         | wr <- if wind /= 0
+                    -- then [wind - 1, wind, wind + 1]
+                    then [wind]  -- , wind, wind]
+                    else [0]
+         ]
+ where
+  dr = case act of
+         Up    ->  1
+         Dn  -> -1
+         Lt  ->  0
+         Rt ->  0
+  dc = case act of
+         Up    ->  0
+         Dn  ->  0
+         Lt  -> -1
+         Rt ->  1
+  wind = gWind `VS.index` finite (fromIntegral c)
 
 myTermStates :: [MyState]
 myTermStates = [(3,7)]
@@ -282,11 +286,16 @@ main = do
           , aGen       = myAGen
           , initStates = [myStartState]
           }
-      (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
+      -- (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
+      res = doTD myRLType nIters
+      vs     = valFuncs res
+      ps     = polFuncs res
+      counts = polXCnts res
+      cnts   = valXCnts res
+      dbgss  = debugs   res
+
       val = appV mySEnum $ P.last vs
       pol = appP mySEnum $ P.last ps
-      counts = polChngCnts
-      cnts   = valChngCnts
 
   -- let (fs, counts') = P.unzip $ take (nIters + 1)
   --                  $ iterate
@@ -330,6 +339,7 @@ main = do
 
 #if 1
   -- Value/Action changes vs. Iteration
+  appendFile mdFilename "\n### Policy/Value Changes\n\n"
   toFile def "img/valueDiffs.png" $ do
     layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
@@ -351,6 +361,28 @@ main = do
                 ]
          )
   appendFile mdFilename "\n![](img/valueDiffs.png)\n"
+#endif
+
+#if 1
+  -- Debugging info from `doTD`
+  -- data Dbg s = Dbg
+  --   { nxtStPrbs :: [(s, Double)]
+  --   , nxtSt     :: s
+  --   , rwd       :: Double
+  --   , eNxtVal   :: Double
+  --   } deriving (Show)
+  appendFile mdFilename "\n### Debugging info from doTD\n\n"
+  appendFile mdFilename $ pack $ printf "Length dbgss: %d  \n" (length dbgss)
+  appendFile mdFilename $ pack $ printf "Length dbgss[0]: %d  \n" (length $ P.head dbgss)
+  let dbgs       = concat dbgss
+      nxtStPrbss = map nxtStPrbs dbgs
+      nxtStTots  = map (sum . map snd) nxtStPrbss
+      rwds       = map rwd dbgs
+      eNxtVals   = map eNxtVal dbgs
+  appendFile mdFilename $ pack $ printf "Next state total probabilities: min. = %f, max. = %f  \n" (minimum nxtStTots) (maximum nxtStTots)
+  appendFile mdFilename $ pack $ printf "Rewards: min. = %f, max. = %f  \n" (minimum rwds) (maximum rwds)
+  appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
+
 #endif
 
 \end{code}

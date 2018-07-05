@@ -310,6 +310,7 @@ instance ParseRecord (Opts Wrapped)
 {----------------------------------------------------------------------
   main()
 ----------------------------------------------------------------------}
+mdFilename = "other/inventory.md"
 
 main :: IO ()
 main = do
@@ -341,7 +342,13 @@ main = do
           , initStates = initStates'
           }
       initStates' = filter ((\x -> x >= 0 && x <= gMaxOnHand) . onHand) allStates
-      (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
+      res = doTD myRLType nIters
+      vs     = valFuncs res
+      ps     = polFuncs res
+      counts = polXCnts res
+      cnts   = valXCnts res
+      dbgss  = debugs   res
+
       val = appV sEnum' $ P.last vs
       pol = appP sEnum' $ P.last ps
 
@@ -476,6 +483,28 @@ main = do
       pmfSums = map (sum . map snd) nxtStPMFs
   appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
                                                   (minimum pmfSums) (maximum pmfSums)
+
+#if 1
+  -- Debugging info from `doTD`
+  -- data Dbg s = Dbg
+  --   { nxtStPrbs :: [(s, Double)]
+  --   , nxtSt     :: s
+  --   , rwd       :: Double
+  --   , eNxtVal   :: Double
+  --   } deriving (Show)
+  appendFile mdFilename "\n### Debugging info from doTD\n\n"
+  appendFile mdFilename $ pack $ printf "Length dbgss: %d  \n" (length dbgss)
+  appendFile mdFilename $ pack $ printf "Length dbgss[0]: %d  \n" (length $ P.head dbgss)
+  let dbgs       = concat dbgss
+      nxtStPrbss = map nxtStPrbs dbgs
+      nxtStTots  = map (sum . map snd) nxtStPrbss
+      rwds       = map rwd dbgs
+      eNxtVals   = map eNxtVal dbgs
+  appendFile mdFilename $ pack $ printf "Next state total probabilities: min. = %f, max. = %f  \n" (minimum nxtStTots) (maximum nxtStTots)
+  appendFile mdFilename $ pack $ printf "Rewards: min. = %f, max. = %f  \n" (minimum rwds) (maximum rwds)
+  appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
+
+#endif
 
 doDP
   :: RLType MyState MyAction 378 6

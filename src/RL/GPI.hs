@@ -21,30 +21,30 @@
 {-# OPTIONS_GHC -Wno-missing-fields #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 
-module RL.GPI
-  ( Pfloat (..)
-  , Pdouble (..)
-  , RLType (..)
-  , rltDef
-  , optPol
-  , optQ
-  , doTD
-  , runEpisode
-  , maxAndNonZero
-  , chooseAndCount
-  , poisson'
-  , gamma'
-  , gamma
-  , withinOnM
-  , mean
-  , arrMeanSqr
-  , qToV
-  , qToP
-  , appV
-  , appP
-  , appQ
-  , toString
-  ) where
+module RL.GPI where
+  -- ( Pfloat (..)
+  -- , Pdouble (..)
+  -- , RLType (..)
+  -- , rltDef
+  -- , optPol
+  -- , optQ
+  -- , doTD
+  -- , runEpisode
+  -- , maxAndNonZero
+  -- , chooseAndCount
+  -- , poisson'
+  -- , gamma'
+  -- , gamma
+  -- , withinOnM
+  -- , mean
+  -- , arrMeanSqr
+  -- , qToV
+  -- , qToP
+  -- , appV
+  -- , appP
+  -- , appQ
+  -- , toString
+  -- ) where
 
 import qualified Prelude as P
 import Prelude (Show(..))
@@ -58,7 +58,7 @@ import Data.Vector.Sized             (Vector)
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List                     ((!!), lookup, groupBy, unzip3)
+import Data.List                     ((!!), lookup, groupBy, unzip4)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import Statistics.Distribution       (density)
@@ -211,6 +211,13 @@ runEpisode n pol nxt terms init =
   takeWhile (`notElem` terms) $
     take n $ iterate (\s -> nxt s (pol s)) init
 
+data Dbg s = Dbg
+  { nxtStPrbs :: [(s, Double)]
+  , nxtSt     :: s
+  , rwd       :: Double
+  , eNxtVal   :: Double
+  } deriving (Show)
+
 -- | Yields a single episodic action-value improvement iteration.
 --
 -- RLType field overrides:
@@ -223,10 +230,10 @@ optQ
      , m ~ (k + 1)
      , Eq s, Eq a, RandomGen g
      )
-  => RLType s a m n                      -- ^ abstract type, to protect API
-  -> (s, Vector m (Vector n Double), g)  -- ^ initial state, action-value matrix, and random generator
-  -> (s, Vector m (Vector n Double), g)  -- ^ updated state, action-value matrix, and random generator
-optQ RLType{..} (s, q, gen) = (s', q', gen') where
+  => RLType s a m n                               -- ^ abstract type, to protect API
+  -> (s, Vector m (Vector n Double), g, Dbg s)  -- ^ initial state, action-value matrix, and random generator
+  -> (s, Vector m (Vector n Double), g, Dbg s)  -- ^ updated state, action-value matrix, and random generator
+optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
   q' =
     q VS.// [ ( sNum
               , q `VS.index` sNum VS.// [(aEnum a, newVal)]
@@ -251,13 +258,14 @@ optQ RLType{..} (s, q, gen) = (s', q', gen') where
                 ]
   s'p's  = zip s's p's
   s's    = nextStates s a
-  p's    = map (sum . map snd) rss  -- next state probabilities
+  p's    = map ((/ rssTot) . sum . map snd) rss  -- next state probabilities
   rss    = map (rewards s a) s's
+  rssTot = (sum . map snd) $ concat rss
 
   -- temporary hard-wiring to Expected SARSA
   newVal = oldVal + alpha * (r + disc * eQs'a' - oldVal)
   oldVal = qf s a
-  r      = sum . map (sum . map (uncurry (*))) $ rss  -- expected reward
+  r      = (/ rssTot) . sum . map (sum . map (uncurry (*))) $ rss  -- expected reward
   eQs'a' =  -- E[Q(s', a')]
     sum [ p * qf s' a'
         | a' <- acts
@@ -267,6 +275,15 @@ optQ RLType{..} (s, q, gen) = (s', q', gen') where
         ]
   acts  = actions s'
   lActs = length acts
+  dbgs  = Dbg s'p's s' r eQs'a'
+
+data TDRetT n a s = TDRetT
+  { valFuncs :: [VS.Vector n Double]
+  , polFuncs :: [VS.Vector n a]
+  , polXCnts :: [Int]
+  , valXCnts :: [Int]
+  , debugs   :: [[Dbg s]]
+  } deriving (Show)
 
 -- | Find optimum policy and value functions, using temporal difference.
 doTD
@@ -275,22 +292,22 @@ doTD
      , ns ~ (1 + k) , (k + 1) ~ ns , na ~ (l + 1)
      ) => RLType s a ns na
        -> Int
-       -> ([VS.Vector ns Double], [VS.Vector ns a], [Int], [Int])
-doTD rlt@RLType{..} nIters = (vs, ps, polChngCnts, valChngCnts) where
+       -> TDRetT ns a s
+doTD rlt@RLType{..} nIters = TDRetT vs ps polChngCnts valChngCnts dbgss where
   gen = mkStdGen 1
-  qs  = flip evalState (VS.replicate (VS.replicate 0), gen) $
+  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen) $
     replicateM nIters $ do
       (q, g) <- get
       let s = case initStates of
                 [] -> VS.head states
                 _  -> P.head $ shuffle g initStates
-          (_, q's, gs) = unzip3 $ take (maxIter + 1) $
+          (_, q's, gs, dbgs) = unzip4 $ take (maxIter + 1) $
             iterate
               (optQ rlt)
-              (s, q, g)
+              (s, q, g, Dbg [] (VS.head states) 0 0)
           q' = P.last q's
       put (q', P.last gs)
-      return q'
+      return (q', dbgs)
   ps    = map (qToP aGen) qs
   acts  = map (\p -> VS.map (getFinite . aEnum . appP sEnum p) states) ps
   diffs = map (VS.map (fromIntegral . abs) . uncurry (-))

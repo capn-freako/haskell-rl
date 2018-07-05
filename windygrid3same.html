@@ -150,7 +150,7 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb4-75" data-line-number="75">    <span class="kw">else</span> [ (min (gNumRows <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (r <span class="fu">+</span> dr <span class="fu">+</span> wr)), min (gNumCols <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (c <span class="fu">+</span> dc)))</a>
 <a class="sourceLine" id="cb4-76" data-line-number="76">         <span class="fu">|</span> wr <span class="ot">&lt;-</span> <span class="kw">if</span> wind <span class="fu">/=</span> <span class="dv">0</span></a>
 <a class="sourceLine" id="cb4-77" data-line-number="77">                    <span class="co">-- then [wind - 1, wind, wind + 1]</span></a>
-<a class="sourceLine" id="cb4-78" data-line-number="78">                    <span class="kw">then</span> [wind]  <span class="co">-- , wind, wind]</span></a>
+<a class="sourceLine" id="cb4-78" data-line-number="78">                    <span class="kw">then</span> [wind, wind, wind]</a>
 <a class="sourceLine" id="cb4-79" data-line-number="79">                    <span class="kw">else</span> [<span class="dv">0</span>]</a>
 <a class="sourceLine" id="cb4-80" data-line-number="80">         ]</a>
 <a class="sourceLine" id="cb4-81" data-line-number="81"> <span class="kw">where</span></a>
