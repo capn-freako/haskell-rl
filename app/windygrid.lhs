@@ -171,8 +171,8 @@ myNextStates s@(r, c) act =
     then [s]
     else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
          | wr <- if wind /= 0
-                    -- then [wind - 1, wind, wind + 1]
-                    then [wind]  -- , wind, wind]
+                    then [wind - 1, wind, wind + 1]
+                    -- then [wind]  -- , wind, wind]
                     else [0]
          ]
  where

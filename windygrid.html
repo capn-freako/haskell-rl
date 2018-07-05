@@ -149,8 +149,8 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb4-74" data-line-number="74">    <span class="kw">then</span> [s]</a>
 <a class="sourceLine" id="cb4-75" data-line-number="75">    <span class="kw">else</span> [ (min (gNumRows <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (r <span class="fu">+</span> dr <span class="fu">+</span> wr)), min (gNumCols <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (c <span class="fu">+</span> dc)))</a>
 <a class="sourceLine" id="cb4-76" data-line-number="76">         <span class="fu">|</span> wr <span class="ot">&lt;-</span> <span class="kw">if</span> wind <span class="fu">/=</span> <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-77" data-line-number="77">                    <span class="co">-- then [wind - 1, wind, wind + 1]</span></a>
-<a class="sourceLine" id="cb4-78" data-line-number="78">                    <span class="kw">then</span> [wind]  <span class="co">-- , wind, wind]</span></a>
+<a class="sourceLine" id="cb4-77" data-line-number="77">                    <span class="kw">then</span> [wind <span class="fu">-</span> <span class="dv">1</span>, wind, wind <span class="fu">+</span> <span class="dv">1</span>]</a>
+<a class="sourceLine" id="cb4-78" data-line-number="78">                    <span class="co">-- then [wind]  -- , wind, wind]</span></a>
 <a class="sourceLine" id="cb4-79" data-line-number="79">                    <span class="kw">else</span> [<span class="dv">0</span>]</a>
 <a class="sourceLine" id="cb4-80" data-line-number="80">         ]</a>
 <a class="sourceLine" id="cb4-81" data-line-number="81"> <span class="kw">where</span></a>
@@ -369,19 +369,19 @@ Original date: June 28, 2018</p>
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
-\hline
  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+ \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+\hline
+ \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
 S &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp; G &amp;  \rightarrow  &amp;  \downarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
+ \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \downarrow  \\
 \hline
- \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \uparrow  \\
+ \uparrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \leftarrow  \\
 \hline
- \downarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \leftarrow  \\
+ \leftarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \uparrow  \\
 \hline
 \end{array}\]</span>
 <h3 id="final-value-function">Final value function</h3>
@@ -389,19 +389,19 @@ S &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
--15.8 &amp; -15.4 &amp; -14.4 &amp; -13.3 &amp; -12.1 &amp; -11.0 &amp; -9.8 &amp; -8.7 &amp; -7.5 &amp; -6.4 \\
+-50.9 &amp; -50.5 &amp; -40.4 &amp; -36.2 &amp; -34.1 &amp; -31.8 &amp; -31.0 &amp; -30.2 &amp; -29.5 &amp; -29.1 \\
 \hline
--16.3 &amp; -15.5 &amp; -14.4 &amp; -13.3 &amp; -12.1 &amp; -11.0 &amp; -9.8 &amp; -8.7 &amp; -7.5 &amp; -5.1 \\
+-43.4 &amp; -41.1 &amp; -39.6 &amp; -36.4 &amp; -32.9 &amp; -31.3 &amp; -30.2 &amp; -28.3 &amp; -27.8 &amp; -28.2 \\
 \hline
--16.7 &amp; -15.6 &amp; -14.4 &amp; -13.3 &amp; -12.1 &amp; -11.0 &amp; -9.8 &amp; -8.6 &amp; -6.4 &amp; -3.9 \\
+-40.7 &amp; -39.9 &amp; -36.9 &amp; -35.2 &amp; -32.9 &amp; -31.6 &amp; -29.3 &amp; -29.3 &amp; -27.9 &amp; -27.4 \\
 \hline
-S &amp; -15.6 &amp; -14.4 &amp; -13.3 &amp; -12.1 &amp; -10.9 &amp; -9.7 &amp; G &amp; -5.1 &amp; -2.6 \\
+S &amp; -37.3 &amp; -35.8 &amp; -34.2 &amp; -32.9 &amp; -32.8 &amp; -32.7 &amp; G &amp; -22.5 &amp; -26.4 \\
 \hline
--16.7 &amp; -15.6 &amp; -14.4 &amp; -13.3 &amp; -12.0 &amp; -10.7 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.4 \\
+-42.0 &amp; -39.8 &amp; -37.3 &amp; -35.0 &amp; -34.5 &amp; -35.0 &amp; -16.7 &amp; -14.9 &amp; -25.6 &amp; -24.7 \\
 \hline
--16.0 &amp; -15.2 &amp; -14.1 &amp; -13.0 &amp; -11.6 &amp;  0.0 &amp;  0.0 &amp; -0.6 &amp; -1.5 &amp; -2.6 \\
+-42.9 &amp; -41.4 &amp; -40.7 &amp; -39.4 &amp; -35.9 &amp; -31.4 &amp; -14.5 &amp; -23.2 &amp; -24.4 &amp; -23.9 \\
 \hline
--15.3 &amp; -14.5 &amp; -13.5 &amp; -12.6 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.2 &amp; -2.2 \\
+-49.6 &amp; -42.9 &amp; -42.5 &amp; -38.4 &amp; -29.0 &amp; -25.9 &amp; -8.2 &amp; -17.5 &amp; -23.3 &amp; -23.4 \\
 \hline
 \end{array}\]</span>
 <h3 id="trajectory-of-final-policy">Trajectory of final policy</h3>
@@ -409,17 +409,17 @@ S &amp; -15.6 &amp; -14.4 &amp; -13.3 &amp; -12.1 &amp; -10.9 &amp; -9.7 &amp; G
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  \\
-\hline
- &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  \cdot  \\
-\hline
- &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  \\
-\hline
-S &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  &amp; G &amp;  &amp;  \cdot  \\
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  \\
 \hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  \cdot  \\
+\hline
+S &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp; G &amp;  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  \\
+\hline
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  \\
 \hline
  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
@@ -434,7 +434,7 @@ S &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  &amp; G &amp;  
 Length dbgss[0]: 21<br />
 Next state total probabilities: min. = 0.0, max. = 1.0<br />
 Rewards: min. = -1.0, max. = 0.0<br />
-E[Q(s', a')]: min. = -16.851475417676784, max. = 0.0</p>
+E[Q(s', a')]: min. = -51.28883291346858, max. = 0.0</p>
 <hr />
 <div class="footer">
 <p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
