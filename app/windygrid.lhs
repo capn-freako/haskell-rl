@@ -107,12 +107,20 @@ gNumCols = 10
 gWind    = fromMaybe (P.error "gWind: Sized vector initialization from list failure!")
                      (VS.fromList [0,0,0,1,1,1,2,2,1,0] :: Maybe (VS.Vector 10 Int))
 
+type Ns = 70
+type Na =  9
+
 type MyState = (Int, Int)
 
 data MyAction = Up
               | Dn
               | Rt
               | Lt
+              | UL
+              | UR
+              | DL
+              | DR
+              | NM  -- no move
   deriving (Eq, Ord, Generic)
 
 instance Show MyAction where
@@ -121,6 +129,11 @@ instance Show MyAction where
              Dn -> " \\downarrow "
              Rt -> " \\rightarrow "
              Lt -> " \\leftarrow "
+             UL -> " \\nwarrow "
+             UR -> " \\nearrow "
+             DL -> " \\swarrow "
+             DR -> " \\searrow "
+             NM -> " \\cdot "
 
 instance HasTrie MyAction where
   newtype (MyAction :->: b) = MyActionTrie { unMyActionTrie :: Reg MyAction :->: b } 
@@ -139,53 +152,73 @@ allStates =
 -- Just a sized vector alternative to the list above.
 --
 -- TODO: Figure out how to determine the size from the constants above.
-allStatesV :: VS.Vector 70 MyState
+allStatesV :: VS.Vector Ns MyState
 allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
                        $ VS.fromList allStates
 
-mySEnum :: MyState -> Finite 70
+mySEnum :: MyState -> Finite Ns
 mySEnum (r,c) = finite . fromIntegral $ r * gNumCols + c
 
 -- | A(s)
 myActions :: MyState -> [MyAction]
-myActions = const [Up, Dn, Rt, Lt]
+myActions = const [Up, Dn, Rt, Lt, UL, UR, DL, DR, NM]
 
-myAEnum :: MyAction -> Finite 4
+myAEnum :: MyAction -> Finite Na
 myAEnum = \case
   Up -> 0
   Dn -> 1
   Rt -> 2
   Lt -> 3
+  UL -> 4
+  UR -> 5
+  DL -> 6
+  DR -> 7
+  NM -> 8
 
-myAGen :: Finite 4 -> MyAction
+myAGen :: Finite Na -> MyAction
 myAGen = \case
   0 -> Up
   1 -> Dn
   2 -> Rt
   3 -> Lt
+  4 -> UL
+  5 -> UR
+  6 -> DL
+  7 -> DR
+  8 -> NM
 
 -- | S'(s, a) - list of next possible states.
 myNextStates :: MyState -> MyAction -> [MyState]
 myNextStates s@(r, c) act =
   if s `elem` myTermStates
-    then [s]
+    then [s, s, s]
     else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
          | wr <- if wind /= 0
                     then [wind - 1, wind, wind + 1]
                     -- then [wind]  -- , wind, wind]
-                    else [0]
+                    else [0, 0, 0]
          ]
  where
   dr = case act of
-         Up    ->  1
-         Dn  -> -1
-         Lt  ->  0
+         Up ->  1
+         Dn -> -1
+         Lt ->  0
          Rt ->  0
+         UL ->  1
+         UR ->  1
+         DL -> -1
+         DR -> -1
+         NM ->  0
   dc = case act of
-         Up    ->  0
-         Dn  ->  0
-         Lt  -> -1
+         Up ->  0
+         Dn ->  0
+         Lt -> -1
          Rt ->  1
+         UL -> -1
+         UR ->  1
+         DL -> -1
+         DR ->  1
+         NM ->  0
   wind = gWind `VS.index` finite (fromIntegral c)
 
 myTermStates :: [MyState]
@@ -203,8 +236,8 @@ myStartState = (3,0)
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
 myRewards :: MyState -> MyAction -> MyState -> [(Double, Double)]
-myRewards _ _ s' | s' `elem` myTermStates = [( 0, 1)]
-                 | otherwise              = [(-1, 1)]
+myRewards _ _ s' | s' `elem` myTermStates = [( 0, 0.3333)]
+                 | otherwise              = [(-1, 0.3333)]
 
 -- | Show a function from `MyState` to `Bool`.
 showFofState :: (Show a, Typeable a) => (MyState -> a) -> String
@@ -285,8 +318,8 @@ main = do
           , aEnum      = myAEnum
           , aGen       = myAGen
           , initStates = [myStartState]
+          , tdStepType = Qlearn
           }
-      -- (vs, ps, polChngCnts, valChngCnts) = doTD myRLType nIters
       res = doTD myRLType nIters
       vs     = valFuncs res
       ps     = polFuncs res
@@ -323,7 +356,8 @@ main = do
   --                             ) $ zip diffs (P.tail fs)
   --     pol    = fst . g'
   --     val    = snd . g'
-      visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
+      -- visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
+      visits = runEpisode 20 pol (((.) . (.)) (P.!! 1) myNextStates) myTermStates myStartState
 
   appendFile mdFilename "\n### Final policy\n\n"
   appendFile mdFilename $ pack $ showFofState pol

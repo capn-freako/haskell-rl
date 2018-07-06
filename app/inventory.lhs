@@ -152,9 +152,9 @@ sEnum' MyState{..} = finite . fromIntegral $ tot where
     if onHand < (-gMaxOnHand) || onHand > 2 * gMaxOnHand
        then P.error $ printf "sEnum': onHand out of bounds: %d" onHand
        else
-         epoch `mod` gLeadTime +
-         gLeadTime * (onHand + gMaxOnHand) +
-         (gLeadTime + 3 * gMaxOnHand + 1) * sum onOrder
+         epoch `mod` gLeadTime   +
+         gLeadTime * sum onOrder +
+         (gLeadTime * (gMaxOrder + 1)) * (onHand + gMaxOnHand)
 
 -- | A(s) - all possible actions from state `s`.
 actions' :: MyState -> [MyAction]
@@ -173,10 +173,13 @@ aGen' = fromIntegral . getFinite
 -- | S'(s, a) - list of next possible states.
 nextStates' :: MyState -> MyAction -> [MyState]
 nextStates' MyState{..} toOrder =
-  [ MyState (onHand + P.head onOrder - demand)
+  [ MyState onHand'
             (P.tail onOrder ++ [toOrder])
             (epoch + 1)
   | demand <- [0..gMaxDemand]
+  , let onHand' = onHand + P.head onOrder - demand
+  -- , let onHand' = max (-gMaxOnHand) $ min (2 * gMaxOnHand) $ onHand + P.head onOrder - demand
+  -- , onHand' >= -gMaxOnHand && onHand' <= 2 * gMaxOnHand
   ]
 
 -- | R(s, a, s')
@@ -339,9 +342,10 @@ main = do
           , sEnum      = sEnum'
           , aEnum      = aEnum'
           , aGen       = aGen'
-          , initStates = initStates'
+          -- , initStates = filter ((\x -> x >= 0 && x <= gMaxOnHand) . onHand) allStates
+          , initStates = filter ((\x -> x >= (-gMaxOnHand `div` 4) && x <= (5 * gMaxOnHand `div` 4)) . onHand) allStates
+          -- , initStates = allStates
           }
-      initStates' = filter ((\x -> x >= 0 && x <= gMaxOnHand) . onHand) allStates
       res = doTD myRLType nIters
       vs     = valFuncs res
       ps     = polFuncs res
@@ -488,9 +492,11 @@ main = do
   -- Debugging info from `doTD`
   -- data Dbg s = Dbg
   --   { nxtStPrbs :: [(s, Double)]
+  --   , curSt     :: s
   --   , nxtSt     :: s
   --   , rwd       :: Double
   --   , eNxtVal   :: Double
+  --   , randGen   :: g
   --   } deriving (Show)
   appendFile mdFilename "\n### Debugging info from doTD\n\n"
   appendFile mdFilename $ pack $ printf "Length dbgss: %d  \n" (length dbgss)
@@ -500,9 +506,37 @@ main = do
       nxtStTots  = map (sum . map snd) nxtStPrbss
       rwds       = map rwd dbgs
       eNxtVals   = map eNxtVal dbgs
+      curSts     = map curSt dbgs
+      randGens   = map randGen dbgs
   appendFile mdFilename $ pack $ printf "Next state total probabilities: min. = %f, max. = %f  \n" (minimum nxtStTots) (maximum nxtStTots)
   appendFile mdFilename $ pack $ printf "Rewards: min. = %f, max. = %f  \n" (minimum rwds) (maximum rwds)
   appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
+
+  -- Initial state histogram
+  let titles' = ["First state visits"]
+      values' = map (show *** (: [])) $
+                    map (P.head &&& length) $
+                        group . sort $ map (getFinite . sEnum') curSts
+  toFile def "img/stHist.png" $
+    do layout_title .= "First State Histogram"
+       setColors $ map opaque [blue, green, red, yellow]
+       layout_x_axis . laxis_generate .= autoIndexAxis (map fst values')
+       plot $ plotBars <$> bars titles' (addIndexes (map snd values'))
+  appendFile "other/inventory.md" "\n![First state histogram](img/stHist.png)\n"
+
+  -- Random number generator checking
+  let rns = map (fst . random) randGens :: [Integer]
+  let titles'' = ["Random Numbers"]
+      values'' = map (show *** (: [])) $
+                    map (P.head &&& length) $
+                        group . sort $ rns
+  toFile def "img/randNums.png" $
+    do layout_title .= "Random Numbers"
+       setColors $ map opaque [blue, green, red, yellow]
+       layout_x_axis . laxis_generate .= autoIndexAxis (map fst values'')
+       plot $ plotBars <$> bars titles'' (addIndexes (map snd values''))
+  appendFile "other/inventory.md" "\n![Random numbers](img/randNums.png)\n"
+
 
 #endif
 

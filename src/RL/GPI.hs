@@ -10,7 +10,7 @@
 --
 -- A general policy iterator for reinforcement learning.
 --
--- Developed while doing the exercises in Ch. 4 of the book
+-- Developed while doing the exercises in Ch. 4-6 of the book
 -- /Reinforcement Learning: an Introduction/,
 --   Richard S. Sutton and Andrew G. Barto
 --     The MIT Press
@@ -81,6 +81,30 @@ instance (KnownNat n) => HasTrie (Finite n) where
   General policy iterator
 ----------------------------------------------------------------------}
 
+-- | Type of temporal difference (TD) step.
+data TDStep = Sarsa
+            | Qlearn
+            | ExpSarsa
+
+-- | Abstract type for capturing debugging information.
+data Dbg s g = Dbg
+  { nxtStPrbs :: [(s, Double)]
+  , curSt     :: s
+  , nxtSt     :: s
+  , rwd       :: Double
+  , eNxtVal   :: Double
+  , randGen   :: g
+  } deriving (Show)
+
+-- | Abstract type of return value from `doTD` function.
+data TDRetT n a s g = TDRetT
+  { valFuncs :: [VS.Vector n Double]
+  , polFuncs :: [VS.Vector n a]
+  , polXCnts :: [Int]
+  , valXCnts :: [Int]
+  , debugs   :: [[Dbg s g]]
+  } deriving (Show)
+
 -- | Abstract data type, to future-proof API.
 --
 -- Note: Some fields have overloaded meanings/uses, depending upon
@@ -109,12 +133,15 @@ data RLType s a m n = RLType
   -- of occurence, given current state-action pair and next state
   , rewards    :: s -> a -> s -> [(Double,Double)]
 
+  -- | Helper functions to support vectorization of value functions,
+  -- for runtime performance improvement.
   , sEnum      :: s -> Finite m  -- ^ state enumeration function
   , aEnum      :: a -> Finite n  -- ^ action enumeration function
   , sGen       :: Finite m -> s  -- ^ state generation function
   , aGen       :: Finite n -> a  -- ^ action generation function
 
-  , stateVals  :: [(s, Double)]  -- ^ overides for terminal states
+  -- | Identification of, and value overides for, terminal states.
+  , stateVals  :: [(s, Double)]
 
   -- | Possible initial states.
   --
@@ -122,13 +149,15 @@ data RLType s a m n = RLType
   --   then use `head states` as the initial state;
   --   else randomly select initial state from `initStates`.
   , initStates :: [s]
+
+  , tdStepType :: TDStep
   }
 
 -- | A default value of type `RLType`, to use as a starting point.
 --
 -- Note that this value is virtual, leaving fields: `states`, `actions`,
--- `nextStates`, `rewards`, `sEnum`, and `aEnum` undefined, and must be
--- completed for a particular MDP before use.
+-- `nextStates`, `rewards`, `sEnum`, `aEnum`, `sGen`, and `aGen`
+-- undefined, and must be completed for a particular MDP before use.
 rltDef :: RLType s a m n
 rltDef = RLType
   { disc       = 1
@@ -137,7 +166,46 @@ rltDef = RLType
   , maxIter    = 10
   , stateVals  = []
   , initStates = []
+  , tdStepType = Qlearn
   }
+
+-- | Find optimum policy and value functions, using temporal difference.
+doTD
+  :: ( Eq s, Eq a  -- , RandomGen g
+     , KnownNat ns, KnownNat na, KnownNat k, KnownNat l
+     , ns ~ (1 + k) , (k + 1) ~ ns , na ~ (l + 1)
+     ) => RLType s a ns na  -- ^ Abstract type to protect API.
+       -> Int               -- ^ Number of iterations to run.
+       -> TDRetT ns a s StdGen
+doTD rlt@RLType{..} nIters = TDRetT vs ps polChngCnts valChngCnts dbgss where
+  gen = mkStdGen 1
+  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen) $
+    replicateM nIters $ do
+      (q, g) <- get
+      let s = case initStates of
+                [] -> VS.head states
+                _  -> P.head $ shuffle g initStates
+          (_, q's, gs, dbgs) = unzip4 $ take maxIter $ P.tail $
+            iterate
+              (optQ rlt)
+              (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g)
+          q' = P.last q's
+      put (q', P.last gs)
+      return (q', dbgs)
+  ps    = map (qToP aGen) qs
+  acts  = map (\p -> VS.map (getFinite . aEnum . appP sEnum p) states) ps
+  diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
+              $ zip acts (P.tail acts)
+  ((_, _), polChngCnts) = first (fromMaybe (P.error "doTD: Major failure!")) $
+    runWriter $ withinOnM 0
+                          ( \ (da, _) ->
+                              maxAndNonZero da
+                          ) $ zip diffs (P.tail ps)
+  vs          = map qToV qs
+  valChngCnts = map ( length
+                    . filter (/= 0)
+                    . VS.toList
+                    ) $ zipWith (-) vs $ P.tail vs
 
 -- | Yields a single policy improvment iteration.
 --
@@ -211,13 +279,6 @@ runEpisode n pol nxt terms init =
   takeWhile (`notElem` terms) $
     take n $ iterate (\s -> nxt s (pol s)) init
 
-data Dbg s = Dbg
-  { nxtStPrbs :: [(s, Double)]
-  , nxtSt     :: s
-  , rwd       :: Double
-  , eNxtVal   :: Double
-  } deriving (Show)
-
 -- | Yields a single episodic action-value improvement iteration.
 --
 -- RLType field overrides:
@@ -231,25 +292,28 @@ optQ
      , Eq s, Eq a, RandomGen g
      )
   => RLType s a m n                               -- ^ abstract type, to protect API
-  -> (s, Vector m (Vector n Double), g, Dbg s)  -- ^ initial state, action-value matrix, and random generator
-  -> (s, Vector m (Vector n Double), g, Dbg s)  -- ^ updated state, action-value matrix, and random generator
+  -> (s, Vector m (Vector n Double), g, Dbg s g)  -- ^ initial state, action-value matrix, and random generator
+  -> (s, Vector m (Vector n Double), g, Dbg s g)  -- ^ updated state, action-value matrix, and random generator
 optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
   q' =
     q VS.// [ ( sNum
               , q `VS.index` sNum VS.// [(aEnum a, newVal)]
               )
             ]
-  sNum = sEnum s
 
-  -- purely greedy policy using initial Q(s,a)
-  pol st = argmax (qf st) (actions st)
-  qf     = appQ sEnum aEnum q
+  -- Helpful abbreviations
+  sNum = sEnum s
+  qf   = appQ sEnum aEnum q
+
+  -- Policy definitions
+  (x, gen') = random gen
+  pol' st   = argmax (qf st) (actions st)  -- greedy
+  pol  st   = if x > epsilon               -- epsilon-greedy
+                 then pol' st
+                 else P.head $ shuffle gen $ filter (/= (pol' st)) $ actions st
 
   -- Use epsilon-greedy policy to choose action.
-  (x, gen') = random gen
-  a         = if x > epsilon
-                 then pol s
-                 else P.head $ shuffle gen' $ actions s
+  a = pol s
 
   -- Produce a sample next state, obeying the actual distribution.
   s' = P.head $ shuffle gen' $
@@ -258,70 +322,32 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
                 ]
   s'p's  = zip s's p's
   s's    = nextStates s a
-  p's    = map ((/ rssTot) . sum . map snd) rss  -- next state probabilities
+  -- p's    = map ((/ rssTot) . sum . map snd) rss  -- next state probabilities
+  p's    = map (sum . map snd) rss  -- next state probabilities
   rss    = map (rewards s a) s's
-  rssTot = (sum . map snd) $ concat rss
+  -- rssTot = (sum . map snd) $ concat rss
 
-  -- temporary hard-wiring to Expected SARSA
+  -- Do the update.
   newVal = oldVal + alpha * (r + disc * eQs'a' - oldVal)
   oldVal = qf s a
-  r      = (/ rssTot) . sum . map (sum . map (uncurry (*))) $ rss  -- expected reward
-  eQs'a' =  -- E[Q(s', a')]
-    sum [ p * qf s' a'
-        | a' <- acts
-        , let p = if a' == pol s'
-                     then 1 - epsilon
-                     else epsilon / fromIntegral (lActs - 1)
-        ]
+  -- r      = (/ rssTot) . sum . map (sum . map (uncurry (*))) $ rss  -- expected reward
+  r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
+  ps'    = fromMaybe (P.error "RL.GPI.optQ: Lookup failure at line 334!")
+                     (lookup s' s'p's)
+  eQs'a' =
+    case tdStepType of
+      Sarsa    -> qf s' $ pol  s'  -- Uses epsilon-greedy policy.
+      Qlearn   -> qf s' $ pol' s'  -- Uses greedy policy.
+      ExpSarsa ->  -- E[Q(s', a')]
+        sum [ p * qf s' a'
+            | a' <- acts
+            , let p = if a' == pol' s'
+                         then 1 - epsilon
+                         else epsilon / fromIntegral (lActs - 1)
+            ]
   acts  = actions s'
   lActs = length acts
-  dbgs  = Dbg s'p's s' r eQs'a'
-
-data TDRetT n a s = TDRetT
-  { valFuncs :: [VS.Vector n Double]
-  , polFuncs :: [VS.Vector n a]
-  , polXCnts :: [Int]
-  , valXCnts :: [Int]
-  , debugs   :: [[Dbg s]]
-  } deriving (Show)
-
--- | Find optimum policy and value functions, using temporal difference.
-doTD
-  :: ( Eq s, Eq a
-     , KnownNat ns, KnownNat na, KnownNat k, KnownNat l
-     , ns ~ (1 + k) , (k + 1) ~ ns , na ~ (l + 1)
-     ) => RLType s a ns na
-       -> Int
-       -> TDRetT ns a s
-doTD rlt@RLType{..} nIters = TDRetT vs ps polChngCnts valChngCnts dbgss where
-  gen = mkStdGen 1
-  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen) $
-    replicateM nIters $ do
-      (q, g) <- get
-      let s = case initStates of
-                [] -> VS.head states
-                _  -> P.head $ shuffle g initStates
-          (_, q's, gs, dbgs) = unzip4 $ take (maxIter + 1) $
-            iterate
-              (optQ rlt)
-              (s, q, g, Dbg [] (VS.head states) 0 0)
-          q' = P.last q's
-      put (q', P.last gs)
-      return (q', dbgs)
-  ps    = map (qToP aGen) qs
-  acts  = map (\p -> VS.map (getFinite . aEnum . appP sEnum p) states) ps
-  diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
-              $ zip acts (P.tail acts)
-  ((_, _), polChngCnts) = first (fromMaybe (P.error "doTD: Major failure!")) $
-    runWriter $ withinOnM 0
-                          ( \ (da, _) ->
-                              maxAndNonZero da
-                          ) $ zip diffs (P.tail ps)
-  vs          = map qToV qs
-  valChngCnts = map ( length
-                    . filter (/= 0)
-                    . VS.toList
-                    ) $ zipWith (-) vs $ P.tail vs
+  dbgs  = Dbg s'p's s s' r eQs'a' gen
 
 -- | Apply the matrix representation of an action-value function.
 appQ
@@ -510,6 +536,8 @@ arrMeanSqr = mean . fmap mean . fmap (fmap sqr)
 sqr :: Num a => a -> a
 sqr x = x * x
 
+-- | Convert any showable type to a string, avoiding the introduction
+-- of extra quotation marks when that type is a string to begin with.
 toString :: (Show a, Typeable a) => a -> P.String
 toString x = fromMaybe (show x) (cast x)
 

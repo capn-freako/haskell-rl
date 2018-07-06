@@ -334,68 +334,67 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb4-259" data-line-number="259">  <span class="co">--                             ) $ zip diffs (P.tail fs)</span></a>
 <a class="sourceLine" id="cb4-260" data-line-number="260">  <span class="co">--     pol    = fst . g&#39;</span></a>
 <a class="sourceLine" id="cb4-261" data-line-number="261">  <span class="co">--     val    = snd . g&#39;</span></a>
-<a class="sourceLine" id="cb4-262" data-line-number="262">      <span class="co">-- visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState</span></a>
-<a class="sourceLine" id="cb4-263" data-line-number="263">      visits <span class="fu">=</span> runEpisode <span class="dv">20</span> pol (((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>)) (<span class="fu">P.!!</span> <span class="dv">1</span>) myNextStates) myTermStates myStartState</a>
-<a class="sourceLine" id="cb4-264" data-line-number="264"></a>
-<a class="sourceLine" id="cb4-265" data-line-number="265">  appendFile mdFilename <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-266" data-line-number="266">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
-<a class="sourceLine" id="cb4-267" data-line-number="267">  appendFile mdFilename <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-268" data-line-number="268">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
-<a class="sourceLine" id="cb4-269" data-line-number="269">  appendFile mdFilename <span class="st">&quot;\n### Trajectory of final policy\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-270" data-line-number="270">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> \s <span class="ot">-&gt;</span> <span class="kw">if</span> s <span class="ot">`elem`</span> visits</a>
-<a class="sourceLine" id="cb4-271" data-line-number="271">                                                        <span class="kw">then</span> (<span class="st">&quot; \\cdot &quot;</span><span class="ot"> ::</span> <span class="dt">String</span>)</a>
-<a class="sourceLine" id="cb4-272" data-line-number="272">                                                        <span class="kw">else</span> <span class="st">&quot;&quot;</span></a>
-<a class="sourceLine" id="cb4-273" data-line-number="273"></a>
-<a class="sourceLine" id="cb4-274" data-line-number="274">  <span class="co">-- DEBUGGING</span></a>
-<a class="sourceLine" id="cb4-275" data-line-number="275">  appendFile mdFilename <span class="st">&quot;\n## debug\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-276" data-line-number="276"></a>
-<a class="sourceLine" id="cb4-277" data-line-number="277"><span class="ot">#if 1</span></a>
-<a class="sourceLine" id="cb4-278" data-line-number="278">  <span class="co">-- Value/Action changes vs. Iteration</span></a>
-<a class="sourceLine" id="cb4-279" data-line-number="279">  appendFile mdFilename <span class="st">&quot;\n### Policy/Value Changes\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-280" data-line-number="280">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb4-281" data-line-number="281">    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Changes vs. Evaluation Iteration&quot;</span></a>
-<a class="sourceLine" id="cb4-282" data-line-number="282">    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]</a>
-<a class="sourceLine" id="cb4-283" data-line-number="283">    plot ( line <span class="st">&quot;Policy Changes&quot;</span></a>
-<a class="sourceLine" id="cb4-284" data-line-number="284">                [ [ (x,y)</a>
-<a class="sourceLine" id="cb4-285" data-line-number="285">                  <span class="co">-- | (x,y) &lt;- zip ( map (* (length $ P.head counts))</span></a>
-<a class="sourceLine" id="cb4-286" data-line-number="286">                  <span class="co">--                      [(0::Int)..]</span></a>
-<a class="sourceLine" id="cb4-287" data-line-number="287">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
-<a class="sourceLine" id="cb4-288" data-line-number="288">                                 cnts</a>
-<a class="sourceLine" id="cb4-289" data-line-number="289">                  ]</a>
-<a class="sourceLine" id="cb4-290" data-line-number="290">                ]</a>
-<a class="sourceLine" id="cb4-291" data-line-number="291">         )</a>
-<a class="sourceLine" id="cb4-292" data-line-number="292">    plot ( line <span class="st">&quot;Value Changes&quot;</span></a>
-<a class="sourceLine" id="cb4-293" data-line-number="293">                [ [ (x,y)</a>
-<a class="sourceLine" id="cb4-294" data-line-number="294">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
-<a class="sourceLine" id="cb4-295" data-line-number="295">                                 <span class="co">-- (concat counts)</span></a>
-<a class="sourceLine" id="cb4-296" data-line-number="296">                                 counts</a>
-<a class="sourceLine" id="cb4-297" data-line-number="297">                  ]</a>
-<a class="sourceLine" id="cb4-298" data-line-number="298">                ]</a>
-<a class="sourceLine" id="cb4-299" data-line-number="299">         )</a>
-<a class="sourceLine" id="cb4-300" data-line-number="300">  appendFile mdFilename <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
-<a class="sourceLine" id="cb4-301" data-line-number="301"><span class="ot">#endif</span></a>
-<a class="sourceLine" id="cb4-302" data-line-number="302"></a>
-<a class="sourceLine" id="cb4-303" data-line-number="303"><span class="ot">#if 1</span></a>
-<a class="sourceLine" id="cb4-304" data-line-number="304">  <span class="co">-- Debugging info from `doTD`</span></a>
-<a class="sourceLine" id="cb4-305" data-line-number="305">  <span class="co">-- data Dbg s = Dbg</span></a>
-<a class="sourceLine" id="cb4-306" data-line-number="306">  <span class="co">--   { nxtStPrbs :: [(s, Double)]</span></a>
-<a class="sourceLine" id="cb4-307" data-line-number="307">  <span class="co">--   , nxtSt     :: s</span></a>
-<a class="sourceLine" id="cb4-308" data-line-number="308">  <span class="co">--   , rwd       :: Double</span></a>
-<a class="sourceLine" id="cb4-309" data-line-number="309">  <span class="co">--   , eNxtVal   :: Double</span></a>
-<a class="sourceLine" id="cb4-310" data-line-number="310">  <span class="co">--   } deriving (Show)</span></a>
-<a class="sourceLine" id="cb4-311" data-line-number="311">  appendFile mdFilename <span class="st">&quot;\n### Debugging info from doTD\n\n&quot;</span></a>
-<a class="sourceLine" id="cb4-312" data-line-number="312">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Length dbgss: %d  \n&quot;</span> (length dbgss)</a>
-<a class="sourceLine" id="cb4-313" data-line-number="313">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Length dbgss[0]: %d  \n&quot;</span> (length <span class="fu">$</span> P.head dbgss)</a>
-<a class="sourceLine" id="cb4-314" data-line-number="314">  <span class="kw">let</span> dbgs       <span class="fu">=</span> concat dbgss</a>
-<a class="sourceLine" id="cb4-315" data-line-number="315">      nxtStPrbss <span class="fu">=</span> map nxtStPrbs dbgs</a>
-<a class="sourceLine" id="cb4-316" data-line-number="316">      nxtStTots  <span class="fu">=</span> map (sum <span class="fu">.</span> map snd) nxtStPrbss</a>
-<a class="sourceLine" id="cb4-317" data-line-number="317">      rwds       <span class="fu">=</span> map rwd dbgs</a>
-<a class="sourceLine" id="cb4-318" data-line-number="318">      eNxtVals   <span class="fu">=</span> map eNxtVal dbgs</a>
-<a class="sourceLine" id="cb4-319" data-line-number="319">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Next state total probabilities: min. = %f, max. = %f  \n&quot;</span> (minimum nxtStTots) (maximum nxtStTots)</a>
-<a class="sourceLine" id="cb4-320" data-line-number="320">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Rewards: min. = %f, max. = %f  \n&quot;</span> (minimum rwds) (maximum rwds)</a>
-<a class="sourceLine" id="cb4-321" data-line-number="321">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;E[Q(s&#39;, a&#39;)]: min. = %f, max. = %f  \n&quot;</span> (minimum eNxtVals) (maximum eNxtVals)</a>
-<a class="sourceLine" id="cb4-322" data-line-number="322"></a>
-<a class="sourceLine" id="cb4-323" data-line-number="323"><span class="ot">#endif</span></a></code></pre></div>
+<a class="sourceLine" id="cb4-262" data-line-number="262">      visits <span class="fu">=</span> runEpisode <span class="dv">20</span> pol (((<span class="fu">.</span>) <span class="fu">.</span> (<span class="fu">.</span>)) P.head myNextStates) myTermStates myStartState</a>
+<a class="sourceLine" id="cb4-263" data-line-number="263"></a>
+<a class="sourceLine" id="cb4-264" data-line-number="264">  appendFile mdFilename <span class="st">&quot;\n### Final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-265" data-line-number="265">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState pol</a>
+<a class="sourceLine" id="cb4-266" data-line-number="266">  appendFile mdFilename <span class="st">&quot;\n### Final value function\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-267" data-line-number="267">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState (<span class="dt">Pdouble</span> <span class="fu">.</span> val)</a>
+<a class="sourceLine" id="cb4-268" data-line-number="268">  appendFile mdFilename <span class="st">&quot;\n### Trajectory of final policy\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-269" data-line-number="269">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> \s <span class="ot">-&gt;</span> <span class="kw">if</span> s <span class="ot">`elem`</span> visits</a>
+<a class="sourceLine" id="cb4-270" data-line-number="270">                                                        <span class="kw">then</span> (<span class="st">&quot; \\cdot &quot;</span><span class="ot"> ::</span> <span class="dt">String</span>)</a>
+<a class="sourceLine" id="cb4-271" data-line-number="271">                                                        <span class="kw">else</span> <span class="st">&quot;&quot;</span></a>
+<a class="sourceLine" id="cb4-272" data-line-number="272"></a>
+<a class="sourceLine" id="cb4-273" data-line-number="273">  <span class="co">-- DEBUGGING</span></a>
+<a class="sourceLine" id="cb4-274" data-line-number="274">  appendFile mdFilename <span class="st">&quot;\n## debug\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-275" data-line-number="275"></a>
+<a class="sourceLine" id="cb4-276" data-line-number="276"><span class="ot">#if 1</span></a>
+<a class="sourceLine" id="cb4-277" data-line-number="277">  <span class="co">-- Value/Action changes vs. Iteration</span></a>
+<a class="sourceLine" id="cb4-278" data-line-number="278">  appendFile mdFilename <span class="st">&quot;\n### Policy/Value Changes\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-279" data-line-number="279">  toFile def <span class="st">&quot;img/valueDiffs.png&quot;</span> <span class="fu">$</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb4-280" data-line-number="280">    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Changes vs. Evaluation Iteration&quot;</span></a>
+<a class="sourceLine" id="cb4-281" data-line-number="281">    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]</a>
+<a class="sourceLine" id="cb4-282" data-line-number="282">    plot ( line <span class="st">&quot;Policy Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-283" data-line-number="283">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-284" data-line-number="284">                  <span class="co">-- | (x,y) &lt;- zip ( map (* (length $ P.head counts))</span></a>
+<a class="sourceLine" id="cb4-285" data-line-number="285">                  <span class="co">--                      [(0::Int)..]</span></a>
+<a class="sourceLine" id="cb4-286" data-line-number="286">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-287" data-line-number="287">                                 cnts</a>
+<a class="sourceLine" id="cb4-288" data-line-number="288">                  ]</a>
+<a class="sourceLine" id="cb4-289" data-line-number="289">                ]</a>
+<a class="sourceLine" id="cb4-290" data-line-number="290">         )</a>
+<a class="sourceLine" id="cb4-291" data-line-number="291">    plot ( line <span class="st">&quot;Value Changes&quot;</span></a>
+<a class="sourceLine" id="cb4-292" data-line-number="292">                [ [ (x,y)</a>
+<a class="sourceLine" id="cb4-293" data-line-number="293">                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]</a>
+<a class="sourceLine" id="cb4-294" data-line-number="294">                                 <span class="co">-- (concat counts)</span></a>
+<a class="sourceLine" id="cb4-295" data-line-number="295">                                 counts</a>
+<a class="sourceLine" id="cb4-296" data-line-number="296">                  ]</a>
+<a class="sourceLine" id="cb4-297" data-line-number="297">                ]</a>
+<a class="sourceLine" id="cb4-298" data-line-number="298">         )</a>
+<a class="sourceLine" id="cb4-299" data-line-number="299">  appendFile mdFilename <span class="st">&quot;\n![](img/valueDiffs.png)\n&quot;</span></a>
+<a class="sourceLine" id="cb4-300" data-line-number="300"><span class="ot">#endif</span></a>
+<a class="sourceLine" id="cb4-301" data-line-number="301"></a>
+<a class="sourceLine" id="cb4-302" data-line-number="302"><span class="ot">#if 1</span></a>
+<a class="sourceLine" id="cb4-303" data-line-number="303">  <span class="co">-- Debugging info from `doTD`</span></a>
+<a class="sourceLine" id="cb4-304" data-line-number="304">  <span class="co">-- data Dbg s = Dbg</span></a>
+<a class="sourceLine" id="cb4-305" data-line-number="305">  <span class="co">--   { nxtStPrbs :: [(s, Double)]</span></a>
+<a class="sourceLine" id="cb4-306" data-line-number="306">  <span class="co">--   , nxtSt     :: s</span></a>
+<a class="sourceLine" id="cb4-307" data-line-number="307">  <span class="co">--   , rwd       :: Double</span></a>
+<a class="sourceLine" id="cb4-308" data-line-number="308">  <span class="co">--   , eNxtVal   :: Double</span></a>
+<a class="sourceLine" id="cb4-309" data-line-number="309">  <span class="co">--   } deriving (Show)</span></a>
+<a class="sourceLine" id="cb4-310" data-line-number="310">  appendFile mdFilename <span class="st">&quot;\n### Debugging info from doTD\n\n&quot;</span></a>
+<a class="sourceLine" id="cb4-311" data-line-number="311">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Length dbgss: %d  \n&quot;</span> (length dbgss)</a>
+<a class="sourceLine" id="cb4-312" data-line-number="312">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Length dbgss[0]: %d  \n&quot;</span> (length <span class="fu">$</span> P.head dbgss)</a>
+<a class="sourceLine" id="cb4-313" data-line-number="313">  <span class="kw">let</span> dbgs       <span class="fu">=</span> concat dbgss</a>
+<a class="sourceLine" id="cb4-314" data-line-number="314">      nxtStPrbss <span class="fu">=</span> map nxtStPrbs dbgs</a>
+<a class="sourceLine" id="cb4-315" data-line-number="315">      nxtStTots  <span class="fu">=</span> map (sum <span class="fu">.</span> map snd) nxtStPrbss</a>
+<a class="sourceLine" id="cb4-316" data-line-number="316">      rwds       <span class="fu">=</span> map rwd dbgs</a>
+<a class="sourceLine" id="cb4-317" data-line-number="317">      eNxtVals   <span class="fu">=</span> map eNxtVal dbgs</a>
+<a class="sourceLine" id="cb4-318" data-line-number="318">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Next state total probabilities: min. = %f, max. = %f  \n&quot;</span> (minimum nxtStTots) (maximum nxtStTots)</a>
+<a class="sourceLine" id="cb4-319" data-line-number="319">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;Rewards: min. = %f, max. = %f  \n&quot;</span> (minimum rwds) (maximum rwds)</a>
+<a class="sourceLine" id="cb4-320" data-line-number="320">  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;E[Q(s&#39;, a&#39;)]: min. = %f, max. = %f  \n&quot;</span> (minimum eNxtVals) (maximum eNxtVals)</a>
+<a class="sourceLine" id="cb4-321" data-line-number="321"></a>
+<a class="sourceLine" id="cb4-322" data-line-number="322"><span class="ot">#endif</span></a></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="policy-optimization">Policy optimization</h3>
 <h3 id="final-policy">Final policy</h3>
@@ -403,19 +402,19 @@ Original date: June 28, 2018</p>
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- \nwarrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \uparrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  \\
+ \searrow  &amp;  \downarrow  &amp;  \swarrow  &amp;  \swarrow  &amp;  \nwarrow  &amp;  \cdot  &amp;  \nearrow  &amp;  \cdot  &amp;  \nearrow  &amp;  \downarrow  \\
 \hline
- \uparrow  &amp;  \searrow  &amp;  \swarrow  &amp;  \uparrow  &amp;  \searrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \swarrow  \\
+ \downarrow  &amp;  \swarrow  &amp;  \downarrow  &amp;  \searrow  &amp;  \nearrow  &amp;  \searrow  &amp;  \leftarrow  &amp;  \nwarrow  &amp;  \nearrow  &amp;  \searrow  \\
 \hline
- \downarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \swarrow  &amp;  \searrow  &amp;  \nearrow  &amp;  \downarrow  \\
+ \swarrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \leftarrow  &amp;  \nearrow  &amp;  \cdot  &amp;  \nearrow  \\
 \hline
-S &amp;  \searrow  &amp;  \leftarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \searrow  &amp; G &amp;  \rightarrow  &amp;  \swarrow  \\
+S &amp;  \leftarrow  &amp;  \downarrow  &amp;  \swarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \rightarrow  &amp; G &amp;  \downarrow  &amp;  \uparrow  \\
 \hline
- \rightarrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \swarrow  &amp;  \uparrow  \\
+ \searrow  &amp;  \nearrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \uparrow  &amp;  \swarrow  \\
 \hline
- \nearrow  &amp;  \uparrow  &amp;  \searrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \leftarrow  &amp;  \leftarrow  &amp;  \swarrow  \\
+ \rightarrow  &amp;  \nearrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \cdot  &amp;  \nwarrow  \\
 \hline
- \nearrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
+ \nearrow  &amp;  \nearrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \nwarrow  &amp;  \swarrow  &amp;  \searrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \swarrow  \\
 \hline
 \end{array}\]</span>
 <h3 id="final-value-function">Final value function</h3>
@@ -423,19 +422,19 @@ S &amp;  \searrow  &amp;  \leftarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
--25.2 &amp; -25.4 &amp; -25.5 &amp; -25.7 &amp; -16.3 &amp; -12.6 &amp; -11.6 &amp; -10.9 &amp; -10.0 &amp; -10.4 \\
+-21.3 &amp; -21.1 &amp; -17.1 &amp; -18.0 &amp; -19.1 &amp; -19.4 &amp; -18.9 &amp; -18.0 &amp; -17.3 &amp; -16.8 \\
 \hline
--25.2 &amp; -23.2 &amp; -23.8 &amp; -25.3 &amp; -15.6 &amp; -12.8 &amp; -11.4 &amp; -10.9 &amp; -10.4 &amp; -10.0 \\
+-19.1 &amp; -16.0 &amp; -16.8 &amp; -17.6 &amp; -17.9 &amp; -19.1 &amp; -17.4 &amp; -17.2 &amp; -16.4 &amp; -15.9 \\
 \hline
--15.1 &amp; -18.9 &amp; -17.7 &amp; -18.2 &amp; -12.3 &amp; -6.5 &amp; -13.7 &amp; -11.5 &amp; -10.4 &amp; -9.0 \\
+-18.8 &amp; -18.7 &amp; -18.1 &amp; -17.5 &amp; -18.7 &amp; -18.6 &amp; -18.2 &amp; -17.1 &amp; -15.4 &amp; -15.0 \\
 \hline
-S &amp; -14.2 &amp; -15.7 &amp; -14.8 &amp; -13.1 &amp; -12.2 &amp; -10.5 &amp; G &amp; -9.5 &amp; -7.7 \\
+S &amp; -18.8 &amp; -18.0 &amp; -18.1 &amp; -17.3 &amp; -15.8 &amp; -16.5 &amp; G &amp; -14.8 &amp; -14.4 \\
 \hline
--13.5 &amp; -12.7 &amp; -13.1 &amp; -12.9 &amp; -12.3 &amp; -11.3 &amp; -1.3 &amp; -6.6 &amp; -3.4 &amp; -8.8 \\
+-18.0 &amp; -17.6 &amp; -17.0 &amp; -17.1 &amp; -15.6 &amp; -14.2 &amp; -15.0 &amp; -14.1 &amp; -13.7 &amp; -13.7 \\
 \hline
--14.1 &amp; -12.7 &amp; -11.5 &amp; -9.8 &amp; -11.4 &amp; -7.0 &amp; -7.7 &amp; -6.7 &amp; -7.9 &amp; -10.3 \\
+-17.8 &amp; -17.2 &amp; -16.8 &amp; -15.5 &amp; -14.2 &amp; -11.5 &amp; -9.2 &amp; -12.9 &amp; -13.7 &amp; -14.5 \\
 \hline
--22.3 &amp; -14.5 &amp; -11.4 &amp; -10.3 &amp; -9.9 &amp; -9.8 &amp; -8.1 &amp; -8.6 &amp; -8.2 &amp; -12.6 \\
+-17.5 &amp; -17.1 &amp; -16.5 &amp; -15.1 &amp; -14.8 &amp; -13.2 &amp; -13.2 &amp; -12.8 &amp; -15.5 &amp; -15.9 \\
 \hline
 \end{array}\]</span>
 <h3 id="trajectory-of-final-policy">Trajectory of final policy</h3>
@@ -443,19 +442,19 @@ S &amp; -14.2 &amp; -15.7 &amp; -14.8 &amp; -13.1 &amp; -12.2 &amp; -10.5 &amp; 
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  \\
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  \\
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \\
+ &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
-S &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp; G &amp;  &amp;  \\
+S &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp; G &amp;  &amp;  \\
 \hline
- &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
+ \cdot  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
- &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  \\
+ &amp;  \cdot  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
- &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  \\
+ &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
 \end{array}\]</span>
 <h2 id="debug">debug</h2>
@@ -465,10 +464,10 @@ S &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp; G &amp;  &amp;  \\
 </figure>
 <h3 id="debugging-info-from-dotd">Debugging info from doTD</h3>
 <p>Length dbgss: 10000<br />
-Length dbgss[0]: 25<br />
+Length dbgss[0]: 20<br />
 Next state total probabilities: min. = 0.9999, max. = 0.9999<br />
 Rewards: min. = -1.0, max. = 0.0<br />
-E[Q(s', a')]: min. = -25.93610594635338, max. = 0.0</p>
+E[Q(s', a')]: min. = -23.718701976621595, max. = 0.0</p>
 <hr />
 <div class="footer">
 <p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
