@@ -194,8 +194,8 @@ myNextStates s@(r, c) act =
     then [s, s, s]
     else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
          | wr <- if wind /= 0
-                    then [wind - 1, wind, wind + 1]
-                    -- then [wind]  -- , wind, wind]
+                    -- then [wind - 1, wind, wind + 1]
+                    then [wind, wind, wind]
                     else [0, 0, 0]
          ]
  where
@@ -302,7 +302,76 @@ main = do
       eps'   = fromMaybe  0.1 (eps o)
 
   -- Calculate and display optimum policy.
-  writeFile mdFilename "\n### Policy optimization\n\n"
+  writeFile mdFilename "\n### DP Results\n\n"
+
+  -- Run DP, to generate reference values.
+  -- let (fs, counts') = P.unzip $ take (nIters + 1)
+  let (fs, counts') = P.unzip $ take 11
+                   $ iterate
+                       ( optPol
+                           rltDef
+                             { disc       = gGamma
+                             , epsilon    = eps'
+                             -- , maxIter    = nEvals
+                             , maxIter    = 10
+                             , states     = allStatesV
+                             , actions    = myActions
+                             , nextStates = myNextStates
+                             , rewards    = myRewards
+                             , stateVals  = zip myTermStates $ repeat 0
+                             , sEnum      = mySEnum
+                             , aEnum      = myAEnum
+                             , aGen       = myAGen
+                             }
+                       ) (const (Rt, 0), [])
+      counts = P.tail counts'
+      acts   = map (\f -> VS.map (fst . f) allStatesV) fs
+      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
+                  $ zip acts (P.tail acts)
+      ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
+      -- ((_, g'), _) = first (fromMaybe (P.error "main: Major failure!")) $
+        -- runWriter $ withinOnM eps'
+        runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
+                              ( \ (dv, _) ->
+                                  maxAndNonZero dv
+                              ) $ zip diffs (P.tail fs)
+      pol    = fst . g'
+      val    = snd . g'
+      cnts   = cnts'
+      visits = runEpisode 20 pol (((.) . (.)) (P.!! 1) myNextStates) myTermStates myStartState
+
+  appendFile mdFilename "\n#### Final policy\n\n"
+  appendFile mdFilename $ pack $ showFofState pol
+  appendFile mdFilename "\n#### Final value function\n\n"
+  appendFile mdFilename $ pack $ showFofState (Pdouble . val)
+  appendFile mdFilename "\n#### Trajectory of final policy\n\n"
+  appendFile mdFilename $ pack $ showFofState $ \s -> if s `elem` visits
+                                                        then (" \\cdot " :: String)
+                                                        else ""
+  -- Value/Action changes vs. Iteration
+  appendFile mdFilename "\n#### Policy/Value Function Changes vs. Iteration\n\n"
+  toFile def "img/valueDiffs.png" $ do
+    layout_title .= "Policy/Value Function Changes vs. Iteration"
+    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
+    plot ( line "Policy Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip (map (* (length $ P.head counts)) [(0::Int)..])
+                                 cnts
+                  ]
+                ]
+         )
+    plot ( line "Value Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 (concat counts)
+                  ]
+                ]
+         )
+  appendFile mdFilename "\n![](img/valueDiffs.png)\n"
+
+  -- Run all 3 flavors of TD, comparing results to DP.
+  appendFile mdFilename "\n### TD Results\n\n"
+
   let myRLType =
         rltDef
           { disc       = gGamma
@@ -320,84 +389,49 @@ main = do
           , initStates = [myStartState]
           , tdStepType = Qlearn
           }
-      res = doTD myRLType nIters
-      vs     = valFuncs res
-      ps     = polFuncs res
-      counts = polXCnts res
-      cnts   = valXCnts res
-      dbgss  = debugs   res
+      -- res = doTD myRLType nIters
+      ress = for [Sarsa, Qlearn, ExpSarsa] $
+                 \ stepT ->
+                   doTD myRLType{tdStepType = stepT} nIters
+      vss    = map (map (appV mySEnum) . valFuncs) ress
+      ers  = map ( map ( \ v -> (/ dpNorm) . mean $
+                                  [ sqr (v s - val s)
+                                  | s <- allStates
+                                  ]
+                       )
+                 ) vss
+      dpNorm = mean [ sqr (val s)
+                    | s <- allStates
+                    ]
+      -- ps     = polFuncs res
+      -- counts = polXCnts res
+      -- cnts   = valXCnts res
+      -- dbgss  = debugs   res
 
-      val = appV mySEnum $ P.last vs
-      pol = appP mySEnum $ P.last ps
+      -- val = appV mySEnum $ P.last vs
+      -- pol = appP mySEnum $ P.last ps
+      -- -- visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
 
-  -- let (fs, counts') = P.unzip $ take (nIters + 1)
-  --                  $ iterate
-  --                      ( optPol
-  --                          rltDef
-  --                            { disc       = gGamma
-  --                            , epsilon    = eps'
-  --                            , maxIter    = nEvals
-  --                            , states     = allStatesV
-  --                            , actions    = myActions
-  --                            , nextStates = myNextStates
-  --                            , rewards    = myRewards
-  --                            , stateVals  = zip myTermStates $ repeat 0
-  --                            }
-  --                      ) (const (Rt, 0), [])
-  --     counts = P.tail counts'
-  --     acts   = map (\f -> VS.map (fst . f) allStatesV) fs
-  --     diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
-  --                 $ zip acts (P.tail acts)
-  --     ((_, g'), cnts) = first (fromMaybe (P.error "main: Major failure!")) $
-  --       -- runWriter $ withinOnM eps'
-  --       runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
-  --                             ( \ (dv, _) ->
-  --                                 maxAndNonZero dv
-  --                             ) $ zip diffs (P.tail fs)
-  --     pol    = fst . g'
-  --     val    = snd . g'
-      -- visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
-      visits = runEpisode 20 pol (((.) . (.)) (P.!! 1) myNextStates) myTermStates myStartState
 
-  appendFile mdFilename "\n### Final policy\n\n"
-  appendFile mdFilename $ pack $ showFofState pol
-  appendFile mdFilename "\n### Final value function\n\n"
-  appendFile mdFilename $ pack $ showFofState (Pdouble . val)
-  appendFile mdFilename "\n### Trajectory of final policy\n\n"
-  appendFile mdFilename $ pack $ showFofState $ \s -> if s `elem` visits
-                                                        then (" \\cdot " :: String)
-                                                        else ""
+  -- Value function error vs. Iteration
+  appendFile mdFilename "\n#### Mean Square Value Function Error vs. DP\n\n"
+  toFile def "img/vFuncErr.png" $ do
+    layout_title .= "Mean Square Value Function Error vs. Iteration"
+    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
+    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] ers) $ \ (lbl, er) ->
+         plot ( line lbl
+                     [ [ (x,y)
+                       | (x,y) <- zip [(0::Int)..]
+                                      er
+                       ]
+                     ]
+              )
+  appendFile mdFilename "\n![](img/vFuncErr.png)\n"
 
   -- DEBUGGING
   appendFile mdFilename "\n## debug\n\n"
 
-#if 1
-  -- Value/Action changes vs. Iteration
-  appendFile mdFilename "\n### Policy/Value Changes\n\n"
-  toFile def "img/valueDiffs.png" $ do
-    layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
-    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
-    plot ( line "Policy Changes"
-                [ [ (x,y)
-                  -- | (x,y) <- zip ( map (* (length $ P.head counts))
-                  --                      [(0::Int)..]
-                  | (x,y) <- zip [(0::Int)..]
-                                 cnts
-                  ]
-                ]
-         )
-    plot ( line "Value Changes"
-                [ [ (x,y)
-                  | (x,y) <- zip [(0::Int)..]
-                                 -- (concat counts)
-                                 counts
-                  ]
-                ]
-         )
-  appendFile mdFilename "\n![](img/valueDiffs.png)\n"
-#endif
-
-#if 1
+#if 0
   -- Debugging info from `doTD`
   -- data Dbg s = Dbg
   --   { nxtStPrbs :: [(s, Double)]
@@ -418,6 +452,8 @@ main = do
   appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
 
 #endif
+
+for = flip map
 
 \end{code}
 
