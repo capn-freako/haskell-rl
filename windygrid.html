@@ -172,8 +172,8 @@ Original date: June 28, 2018</p>
 <a class="sourceLine" id="cb4-95" data-line-number="95">    <span class="kw">then</span> [s, s, s]</a>
 <a class="sourceLine" id="cb4-96" data-line-number="96">    <span class="kw">else</span> [ (min (gNumRows <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (r <span class="fu">+</span> dr <span class="fu">+</span> wr)), min (gNumCols <span class="fu">-</span> <span class="dv">1</span>) (max <span class="dv">0</span> (c <span class="fu">+</span> dc)))</a>
 <a class="sourceLine" id="cb4-97" data-line-number="97">         <span class="fu">|</span> wr <span class="ot">&lt;-</span> <span class="kw">if</span> wind <span class="fu">/=</span> <span class="dv">0</span></a>
-<a class="sourceLine" id="cb4-98" data-line-number="98">                    <span class="kw">then</span> [wind, wind, wind]</a>
-<a class="sourceLine" id="cb4-99" data-line-number="99">                    <span class="co">-- then [wind - 1, wind, wind + 1]</span></a>
+<a class="sourceLine" id="cb4-98" data-line-number="98">                    <span class="co">-- then [wind, wind, wind]</span></a>
+<a class="sourceLine" id="cb4-99" data-line-number="99">                    <span class="kw">then</span> [wind <span class="fu">-</span> <span class="dv">1</span>, wind, wind <span class="fu">+</span> <span class="dv">1</span>]</a>
 <a class="sourceLine" id="cb4-100" data-line-number="100">                    <span class="kw">else</span> [<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>]  <span class="co">-- Duplication is to keep probabilities correct.</span></a>
 <a class="sourceLine" id="cb4-101" data-line-number="101">         ]</a>
 <a class="sourceLine" id="cb4-102" data-line-number="102"> <span class="kw">where</span></a>
@@ -456,19 +456,19 @@ Original date: June 28, 2018</p>
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
- \downarrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \downarrow  \\
+ \downarrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \downarrow  \\
 \hline
- \searrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \swarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \downarrow  \\
+ \downarrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \swarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \downarrow  \\
 \hline
- \rightarrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \swarrow  &amp;  \swarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \swarrow  \\
+ \searrow  &amp;  \downarrow  &amp;  \downarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \swarrow  &amp;  \downarrow  \\
 \hline
-S &amp;  \rightarrow  &amp;  \searrow  &amp;  \swarrow  &amp;  \swarrow  &amp;  \searrow  &amp;  \searrow  &amp; G &amp;  \swarrow  &amp;  \leftarrow  \\
+S &amp;  \searrow  &amp;  \downarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp; G &amp;  \swarrow  &amp;  \swarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
+ \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \swarrow  &amp;  \leftarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \cdot  &amp;  \nwarrow  &amp;  \leftarrow  \\
+ \rightarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \downarrow  &amp;  \leftarrow  &amp;  \leftarrow  \\
 \hline
- \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \nearrow  &amp;  \uparrow  &amp;  \uparrow  &amp;  \nwarrow  \\
+ \rightarrow  &amp;  \rightarrow  &amp;  \rightarrow  &amp;  \searrow  &amp;  \searrow  &amp;  \searrow  &amp;  \rightarrow  &amp;  \cdot  &amp;  \nwarrow  &amp;  \leftarrow  \\
 \hline
 \end{array}\]</span>
 <h4 id="final-value-function">Final value function</h4>
@@ -476,19 +476,19 @@ S &amp;  \rightarrow  &amp;  \searrow  &amp;  \swarrow  &amp;  \swarrow  &amp;  
 c|c|c|c|c|c|c|c|c|c
 |}
 \hline
--7.0 &amp; -7.0 &amp; -7.0 &amp; -8.0 &amp; -8.0 &amp; -7.0 &amp; -6.0 &amp; -5.0 &amp; -4.0 &amp; -3.0 \\
+-12.6 &amp; -12.6 &amp; -12.6 &amp; -13.1 &amp; -12.3 &amp; -11.3 &amp; -10.3 &amp; -9.3 &amp; -8.3 &amp; -7.6 \\
 \hline
--6.0 &amp; -6.0 &amp; -6.0 &amp; -7.0 &amp; -8.0 &amp; -7.0 &amp; -6.0 &amp; -5.0 &amp; -3.0 &amp; -2.0 \\
+-11.6 &amp; -11.6 &amp; -11.6 &amp; -12.6 &amp; -11.8 &amp; -11.2 &amp; -10.2 &amp; -9.1 &amp; -7.6 &amp; -6.6 \\
 \hline
--6.0 &amp; -5.0 &amp; -5.0 &amp; -6.0 &amp; -7.0 &amp; -7.0 &amp; -6.0 &amp; -4.0 &amp; -2.0 &amp; -1.0 \\
+-10.6 &amp; -10.6 &amp; -10.6 &amp; -11.6 &amp; -10.8 &amp; -9.9 &amp; -10.0 &amp; -8.5 &amp; -6.5 &amp; -5.6 \\
 \hline
-S &amp; -5.0 &amp; -4.0 &amp; -5.0 &amp; -6.0 &amp; -6.0 &amp; -5.0 &amp; G &amp;  0.0 &amp; -1.0 \\
+S &amp; -9.6 &amp; -9.6 &amp; -10.1 &amp; -9.1 &amp; -8.3 &amp; -6.5 &amp; G &amp; -5.2 &amp; -4.6 \\
 \hline
--6.0 &amp; -5.0 &amp; -4.0 &amp; -3.0 &amp; -2.0 &amp; -1.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.0 \\
+-10.0 &amp; -9.0 &amp; -8.6 &amp; -8.7 &amp; -7.5 &amp; -6.1 &amp; -5.2 &amp; -5.2 &amp; -3.6 &amp; -4.6 \\
 \hline
--6.0 &amp; -5.0 &amp; -4.0 &amp; -3.0 &amp; -2.0 &amp; -1.0 &amp;  0.0 &amp;  0.0 &amp;  0.0 &amp; -1.0 \\
+-10.0 &amp; -9.0 &amp; -8.0 &amp; -7.6 &amp; -6.3 &amp; -5.2 &amp; -3.6 &amp; -3.6 &amp; -3.6 &amp; -4.6 \\
 \hline
--6.0 &amp; -5.0 &amp; -4.0 &amp; -3.0 &amp; -2.0 &amp; -1.0 &amp;  0.0 &amp;  0.0 &amp; -1.0 &amp; -1.0 \\
+-10.0 &amp; -9.0 &amp; -8.0 &amp; -7.0 &amp; -5.8 &amp; -4.6 &amp; -3.6 &amp; -3.6 &amp; -3.6 &amp; -4.6 \\
 \hline
 \end{array}\]</span>
 <h4 id="trajectory-of-final-policy">Trajectory of final policy</h4>
@@ -502,13 +502,13 @@ c|c|c|c|c|c|c|c|c|c
 \hline
  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
-S &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp; G &amp;  &amp;  \\
+S &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp; G &amp;  &amp;  \\
+\hline
+ &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \cdot  &amp;  &amp;  \\
+\hline
+ &amp;  &amp;  \cdot  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
  &amp;  &amp;  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  \cdot  &amp;  &amp;  &amp;  \\
-\hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
-\hline
- &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  &amp;  \\
 \hline
 \end{array}\]</span>
 <h4 id="policyvalue-function-changes-vs.-iteration">Policy/Value Function Changes vs. Iteration</h4>
