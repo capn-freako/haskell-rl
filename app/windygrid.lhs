@@ -2,10 +2,10 @@
 other/header.md
 ```
 
-haskell-rl : Windy Gridworld
+haskell-rl : Stochastically Windy Gridworld
 ===
 
-This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides a solution to Example 6.5 - _Windy Gridworld_.
+This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides a solution to Ex. 6.10 - _Windy Gridworld w/ King's Moves and Stochastic Wind_.
 
 Original author: [David Banas](mailto:David.Banas@target.com)  
 Original date:   June 28, 2018
@@ -17,6 +17,8 @@ Contents
 
 - [Code](#code)
 - [Output](#output)
+- => [DP Results](#dp-results)
+- => [TD Results](#td-results)
 - [Debug](#debug)
 
 code
@@ -100,8 +102,6 @@ import RL.GPI
 ----------------------------------------------------------------------}
 
 gGamma   = 1  -- Specified by problem.
-gAlpha   = 0.5
-gEps     = 0.1
 gNumRows = 7
 gNumCols = 10
 gWind    = fromMaybe (P.error "gWind: Sized vector initialization from list failure!")
@@ -194,9 +194,9 @@ myNextStates s@(r, c) act =
     then [s, s, s]
     else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
          | wr <- if wind /= 0
-                    -- then [wind - 1, wind, wind + 1]
                     then [wind, wind, wind]
-                    else [0, 0, 0]
+                    -- then [wind - 1, wind, wind + 1]
+                    else [0, 0, 0]  -- Duplication is to keep probabilities correct.
          ]
  where
   dr = case act of
@@ -269,13 +269,13 @@ showFofState g = unlines
 
 data Opts w = Opts
     { nIter :: w ::: Maybe Int <?>
-        "The number of policy improvement iterations"
+        "The number of TD episodes"
     , nEval :: w ::: Maybe Int <?>
-        "The number of policy evaluation iterations per policy improvement iteration"
-    , p     :: w ::: Maybe Int <?>
-        "The ratio of stock-out to holding costs"
+        "The maximum number of state transitions allowed in each episode"
     , eps   :: w ::: Maybe Double <?>
-        "The convergence tolerance for iteration"
+        "Probability of chosing initial action randomly"
+    -- , alph  :: w ::: Maybe Double <?>
+    --     "Learning gain (step size)"
     }
     deriving (Generic)
 
@@ -296,10 +296,10 @@ main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A solution to Example 6.5 - Windy Gridworld."
-  let nIters = fromMaybe  2 (nIter o)
-      nEvals = fromMaybe  1 (nEval o)
-      pVal   = fromMaybe 50 (p     o)
-      eps'   = fromMaybe  0.1 (eps o)
+  let nIters = fromMaybe  10000 (nIter o)
+      nEvals = fromMaybe     20 (nEval o)
+      eps'   = fromMaybe    0.1 (eps   o)
+      -- alph'  = fromMaybe    0.5 (alph  o)
 
   -- Calculate and display optimum policy.
   writeFile mdFilename "\n### DP Results\n\n"
@@ -311,8 +311,7 @@ main = do
                        ( optPol
                            rltDef
                              { disc       = gGamma
-                             , epsilon    = eps'
-                             -- , maxIter    = nEvals
+                             , epsilon    = 0.1
                              , maxIter    = 10
                              , states     = allStatesV
                              , actions    = myActions
@@ -329,7 +328,6 @@ main = do
       diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
                   $ zip acts (P.tail acts)
       ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
-      -- ((_, g'), _) = first (fromMaybe (P.error "main: Major failure!")) $
         -- runWriter $ withinOnM eps'
         runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
                               ( \ (dv, _) ->
@@ -372,37 +370,44 @@ main = do
   -- Run all 3 flavors of TD, comparing results to DP.
   appendFile mdFilename "\n### TD Results\n\n"
 
-  let myRLType =
-        rltDef
-          { disc       = gGamma
-          , epsilon    = gEps
-          , alpha      = gAlpha
-          , maxIter    = nEvals
-          , states     = allStatesV
-          , actions    = myActions
-          , nextStates = myNextStates
-          , rewards    = myRewards
-          , stateVals  = zip myTermStates $ repeat 0
-          , sEnum      = mySEnum
-          , aEnum      = myAEnum
-          , aGen       = myAGen
-          , initStates = [myStartState]
-          , tdStepType = Qlearn
-          }
-      -- res = doTD myRLType nIters
-      ress = for [Sarsa, Qlearn, ExpSarsa] $
-                 \ stepT ->
-                   doTD myRLType{tdStepType = stepT} nIters
-      vss    = map (map (appV mySEnum) . valFuncs) ress
-      ers  = map ( map ( \ v -> (/ dpNorm) . mean $
-                                  [ sqr (v s - val s)
-                                  | s <- allStates
-                                  ]
-                       )
-                 ) vss
+  appendFile mdFilename $ pack $ printf "epsilon = %3.1f  \n" eps'
+  -- appendFile mdFilename $ pack $ printf "alpha = %3.1f  \n" alph'
+
+  let erss = for [0.1, 0.2, 0.5] $ \ alp ->
+        let myRLType =
+              rltDef
+                { disc       = gGamma
+                , epsilon    = eps'
+                -- , alpha      = alph'
+                , alpha      = alp
+                , maxIter    = nEvals
+                , states     = allStatesV
+                , actions    = myActions
+                , nextStates = myNextStates
+                , rewards    = myRewards
+                , stateVals  = zip myTermStates $ repeat 0
+                , sEnum      = mySEnum
+                , aEnum      = myAEnum
+                , aGen       = myAGen
+                , initStates = [myStartState]
+                , tdStepType = Qlearn
+                }
+            -- res = doTD myRLType nIters
+            ress = for [Sarsa, Qlearn, ExpSarsa] $
+                       \ stepT ->
+                         doTD myRLType{tdStepType = stepT} nIters
+            vss  = map (map (appV mySEnum) . valFuncs) ress
+            ers  = map ( map ( \ v -> (/ dpNorm) . mean $
+                                        [ sqr (v s - val s)
+                                        | s <- allStates
+                                        ]
+                             )
+                       ) vss
+         in ers
       dpNorm = mean [ sqr (val s)
                     | s <- allStates
                     ]
+      nPts   = nIters * nEvals
       -- ps     = polFuncs res
       -- counts = polXCnts res
       -- cnts   = valXCnts res
@@ -417,16 +422,25 @@ main = do
   appendFile mdFilename "\n#### Mean Square Value Function Error vs. DP\n\n"
   toFile def "img/vFuncErr.png" $ do
     layout_title .= "Mean Square Value Function Error vs. Iteration"
-    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
-    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] ers) $ \ (lbl, er) ->
+    forM_ (zip (P.init erss) [PointShapeCircle, PointShapePlus]) $ \ (ers, ptShape) -> do
+      setColors $ map opaque [blue, green, red]
+      setShapes [ptShape]
+      forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] ers) $ \ (lbl, er) ->
+           plot ( points lbl
+                         [ (x,y)
+                         | (x,y) <- takeEvery (nIters `div` 100) $ zip [(0::Int)..] er
+                         ]
+                )
+    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] (P.last erss)) $ \ (lbl, er) ->
          plot ( line lbl
-                     [ [ (x,y)
-                       | (x,y) <- zip [(0::Int)..]
-                                      er
-                       ]
-                     ]
+                       [[ (x,y)
+                        | (x,y) <- zip [(0::Int)..] er
+                       ]]
               )
-  appendFile mdFilename "\n![](img/vFuncErr.png)\n"
+  appendFile mdFilename "\n![](img/vFuncErr.png)  \n"
+  appendFile mdFilename "circle: alpha=0.1  \n"
+  appendFile mdFilename "plus: alpha=0.2  \n"
+  appendFile mdFilename "line: alpha=0.5  \n"
 
   -- DEBUGGING
   appendFile mdFilename "\n## debug\n\n"
@@ -454,6 +468,9 @@ main = do
 #endif
 
 for = flip map
+
+takeEvery _ [] = []
+takeEvery n xs = P.head xs : (takeEvery n $ drop n xs)
 
 \end{code}
 
