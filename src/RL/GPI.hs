@@ -94,6 +94,7 @@ data Dbg s g = Dbg
   , rwd       :: Double
   , eNxtVal   :: Double
   , randGen   :: g
+  , termQs    :: [[Double]]
   } deriving (Show)
 
 -- | Abstract type of return value from `doTD` function.
@@ -188,7 +189,7 @@ doTD rlt@RLType{..} nIters = TDRetT vs ps polChngCnts valChngCnts dbgss where
           (_, q's, gs, dbgs) = unzip4 $ take maxIter $ P.tail $
             iterate
               (optQ rlt)
-              (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g)
+              (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g [])
           q' = P.last q's
       put (q', P.last gs)
       return (q', dbgs)
@@ -310,7 +311,10 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
   pol' st   = argmax (qf st) (actions st)  -- greedy
   pol  st   = if x > epsilon               -- epsilon-greedy
                  then pol' st
-                 else P.head $ shuffle gen $ filter (/= (pol' st)) $ actions st
+                 else case otherActs of
+                        [] -> pol' st
+                        xs -> P.head $ shuffle gen $ xs
+   where otherActs = filter (/= (pol' st)) $ actions st
 
   -- Use epsilon-greedy policy to choose action.
   a = pol s
@@ -322,15 +326,15 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
                 ]
   s'p's  = zip s's p's
   s's    = nextStates s a
-  -- p's    = map ((/ rssTot) . sum . map snd) rss  -- next state probabilities
   p's    = map (sum . map snd) rss  -- next state probabilities
   rss    = map (rewards s a) s's
-  -- rssTot = (sum . map snd) $ concat rss
 
   -- Do the update.
-  newVal = oldVal + alpha * (r + disc * eQs'a' - oldVal)
+  newVal =
+    fromMaybe
+      (oldVal + alpha * (r + disc * eQs'a' - oldVal)) $
+      lookup s stateVals
   oldVal = qf s a
-  -- r      = (/ rssTot) . sum . map (sum . map (uncurry (*))) $ rss  -- expected reward
   r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
   ps'    = fromMaybe (P.error "RL.GPI.optQ: Lookup failure at line 334!")
                      (lookup s' s'p's)
@@ -347,7 +351,12 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
             ]
   acts  = actions s'
   lActs = length acts
-  dbgs  = Dbg s'p's s s' r eQs'a' gen
+  dbgs  = Dbg s'p's s s' r eQs'a' gen $
+            [ [ qf st act
+              | act <- actions st
+              ]
+            | (st, _) <- stateVals
+            ]
 
 -- | Apply the matrix representation of an action-value function.
 appQ

@@ -194,8 +194,8 @@ myNextStates s@(r, c) act =
     then [s, s, s]
     else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
          | wr <- if wind /= 0
-                    then [wind, wind, wind]
-                    -- then [wind - 1, wind, wind + 1]
+                    -- then [wind, wind, wind]
+                    then [wind - 1, wind, wind + 1]
                     else [0, 0, 0]  -- Duplication is to keep probabilities correct.
          ]
  where
@@ -370,10 +370,10 @@ main = do
   -- Run all 3 flavors of TD, comparing results to DP.
   appendFile mdFilename "\n### TD Results\n\n"
 
-  appendFile mdFilename $ pack $ printf "epsilon = %3.1f  \n" eps'
+  appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
   -- appendFile mdFilename $ pack $ printf "alpha = %3.1f  \n" alph'
 
-  let erss = for [0.1, 0.2, 0.5] $ \ alp ->
+  let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
         let myRLType =
               rltDef
                 { disc       = gGamma
@@ -403,7 +403,15 @@ main = do
                                         ]
                              )
                        ) vss
-         in ers
+            termVals :: [[Double]]
+            termVals = map (map (maximum . map maximum . termQs) . concat . debugs) ress
+            -- ress :: [TDRetT]
+            -- debugs (x :: TDRet) :: [[Dbg]]
+            -- concat [[Dbg]] :: [Dbg]
+            -- termQs (x :: Dbg) :: [[Double]]
+            -- map maximum [[Double]] :: [Double]
+            -- maximum [Double] :: Double
+         in (ers, termVals)
       dpNorm = mean [ sqr (val s)
                     | s <- allStates
                     ]
@@ -444,6 +452,30 @@ main = do
 
   -- DEBUGGING
   appendFile mdFilename "\n## debug\n\n"
+
+  -- Terminal states values vs. Iteration
+  appendFile mdFilename "\n#### Terminal States - Values vs. Iteration\n\n"
+  toFile def "img/termVals.png" $ do
+    layout_title .= "Terminal States - Values vs. Iteration"
+    forM_ (zip (P.init termValss) [PointShapeCircle, PointShapePlus]) $ \ (termVals, ptShape) -> do
+      setColors $ map opaque [blue, green, red]
+      setShapes [ptShape]
+      forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] termVals) $ \ (lbl, er) ->
+           plot ( points lbl
+                         [ (x,y)
+                         | (x,y) <- takeEvery (nIters `div` 100) $ zip [(0::Int)..] er
+                         ]
+                )
+    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] (P.last termValss)) $ \ (lbl, er) ->
+         plot ( line lbl
+                       [[ (x,y)
+                        | (x,y) <- zip [(0::Int)..] er
+                       ]]
+              )
+  appendFile mdFilename "\n![](img/termVals.png)  \n"
+  appendFile mdFilename "circle: alpha=0.1  \n"
+  appendFile mdFilename "plus: alpha=0.2  \n"
+  appendFile mdFilename "line: alpha=0.5  \n"
 
 #if 0
   -- Debugging info from `doTD`
