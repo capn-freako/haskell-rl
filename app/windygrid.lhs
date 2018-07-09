@@ -276,6 +276,8 @@ data Opts w = Opts
         "Probability of chosing initial action randomly"
     -- , alph  :: w ::: Maybe Double <?>
     --     "Learning gain (step size)"
+    , dcy   :: w ::: Maybe Double <?>
+        "The decay rate for epsilon/alpha"
     }
     deriving (Generic)
 
@@ -300,6 +302,7 @@ main = do
       nEvals = fromMaybe     20 (nEval o)
       eps'   = fromMaybe    0.1 (eps   o)
       -- alph'  = fromMaybe    0.5 (alph  o)
+      beta'  = fromMaybe    0   (dcy   o)
 
   -- Calculate and display optimum policy.
   writeFile mdFilename "\n### DP Results\n\n"
@@ -372,6 +375,7 @@ main = do
 
   appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
   -- appendFile mdFilename $ pack $ printf "alpha = %3.1f  \n" alph'
+  appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
 
   let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
         let myRLType =
@@ -380,6 +384,7 @@ main = do
                 , epsilon    = eps'
                 -- , alpha      = alph'
                 , alpha      = alp
+                , beta       = beta'
                 , maxIter    = nEvals
                 , states     = allStatesV
                 , actions    = myActions

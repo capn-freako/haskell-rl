@@ -58,7 +58,7 @@ import Data.Vector.Sized             (Vector)
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List                     ((!!), lookup, groupBy, unzip4)
+import Data.List                     ((!!), lookup, groupBy, unzip5)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import Statistics.Distribution       (density)
@@ -119,6 +119,7 @@ data RLType s a m n = RLType
   { disc       :: Double  -- ^ discount rate
   , epsilon    :: Double  -- ^ convergence tolerance
   , alpha      :: Double  -- ^ error correction gain
+  , beta       :: Double  -- ^ epsilon/alpha decay factor
   , maxIter    :: Int     -- ^ max. iterations of ?
 
   -- | S - all possible states
@@ -161,9 +162,10 @@ data RLType s a m n = RLType
 -- undefined, and must be completed for a particular MDP before use.
 rltDef :: RLType s a m n
 rltDef = RLType
-  { disc       = 1
-  , epsilon    = 0.1
-  , alpha      = 0.1
+  { disc       =  1
+  , epsilon    =  0.1
+  , alpha      =  0.1
+  , beta       =  0    -- No decay by default.
   , maxIter    = 10
   , stateVals  = []
   , initStates = []
@@ -180,18 +182,18 @@ doTD
        -> TDRetT ns a s StdGen
 doTD rlt@RLType{..} nIters = TDRetT vs ps polChngCnts valChngCnts dbgss where
   gen = mkStdGen 1
-  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen) $
+  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen, 0) $
     replicateM nIters $ do
-      (q, g) <- get
+      (q, g, t) <- get
       let s = case initStates of
                 [] -> VS.head states
                 _  -> P.head $ shuffle g initStates
-          (_, q's, gs, dbgs) = unzip4 $ take maxIter $ P.tail $
+          (_, q's, gs, dbgs, ts) = unzip5 $ take maxIter $ P.tail $
             iterate
               (optQ rlt)
-              (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g [])
+              (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g [], t)
           q' = P.last q's
-      put (q', P.last gs)
+      put (q', P.last gs, P.last ts)
       return (q', dbgs)
   ps    = map (qToP aGen) qs
   acts  = map (\p -> VS.map (getFinite . aEnum . appP sEnum p) states) ps
@@ -292,10 +294,10 @@ optQ
      , m ~ (k + 1)
      , Eq s, Eq a, RandomGen g
      )
-  => RLType s a m n                               -- ^ abstract type, to protect API
-  -> (s, Vector m (Vector n Double), g, Dbg s g)  -- ^ initial state, action-value matrix, and random generator
-  -> (s, Vector m (Vector n Double), g, Dbg s g)  -- ^ updated state, action-value matrix, and random generator
-optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
+  => RLType s a m n                                        -- ^ abstract type, to protect API
+  -> (s, Vector m (Vector n Double), g, Dbg s g, Integer)  -- ^ initial state, action-value matrix, and random generator
+  -> (s, Vector m (Vector n Double), g, Dbg s g, Integer)  -- ^ updated state, action-value matrix, and random generator
+optQ RLType{..} (s, q, gen, _, t) = (s', q', gen', dbgs, t + 1) where
   q' =
     q VS.// [ ( sNum
               , q `VS.index` sNum VS.// [(aEnum a, newVal)]
@@ -309,7 +311,7 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
   -- Policy definitions
   (x, gen') = random gen
   pol' st   = argmax (qf st) (actions st)  -- greedy
-  pol  st   = if x > epsilon               -- epsilon-greedy
+  pol  st   = if x > epsilon'              -- epsilon-greedy
                  then pol' st
                  else case otherActs of
                         [] -> pol' st
@@ -332,7 +334,7 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
   -- Do the update.
   newVal =
     fromMaybe
-      (oldVal + alpha * (r + disc * eQs'a' - oldVal)) $
+      (oldVal + alpha' * (r + disc * eQs'a' - oldVal)) $
       lookup s stateVals
   oldVal = qf s a
   r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
@@ -346,8 +348,8 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
         sum [ p * qf s' a'
             | a' <- acts
             , let p = if a' == pol' s'
-                         then 1 - epsilon
-                         else epsilon / fromIntegral (lActs - 1)
+                         then 1 - epsilon'
+                         else epsilon' / fromIntegral (lActs - 1)
             ]
   acts  = actions s'
   lActs = length acts
@@ -357,6 +359,9 @@ optQ RLType{..} (s, q, gen, _) = (s', q', gen', dbgs) where
               ]
             | (st, _) <- stateVals
             ]
+  alpha'    = alpha   / decayFact
+  epsilon'  = epsilon / decayFact
+  decayFact = (1 + beta * fromIntegral t)
 
 -- | Apply the matrix representation of an action-value function.
 appQ

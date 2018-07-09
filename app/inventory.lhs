@@ -304,6 +304,8 @@ data Opts w = Opts
         "The error correction gain"
     , dis   :: w ::: Maybe Double <?>
         "The discount rate"
+    , dcy   :: w ::: Maybe Double <?>
+        "The decay rate for epsilon/alpha"
     }
     deriving (Generic)
 
@@ -326,6 +328,7 @@ main = do
       eps'   = fromMaybe  0.1 (eps   o)
       alpha' = fromMaybe  0.5 (alph  o)
       disc'  = fromMaybe  0.9 (dis   o)
+      beta'  = fromMaybe  0   (dcy   o)
 
   -- Calculate and display optimum policy.
   writeFile "other/inventory.md" "\n### Policy optimization\n\n"
@@ -334,6 +337,7 @@ main = do
           { disc       = disc'
           , epsilon    = eps'
           , alpha      = alpha'
+          , beta       = beta'
           , maxIter    = nEvals
           , states     = allStatesV
           , actions    = actions'
