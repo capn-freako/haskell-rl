@@ -85,7 +85,7 @@ import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty)
 import Graphics.Rendering.Chart.Backend.Cairo
 import Statistics.Distribution                (density)
 import Statistics.Distribution.Gamma          (gammaDistr)
-import System.Random
+-- import System.Random
 import Text.Printf
 
 import RL.GPI
@@ -182,6 +182,20 @@ nextStates' MyState{..} toOrder =
   -- , onHand' >= -gMaxOnHand && onHand' <= 2 * gMaxOnHand
   ]
 
+-- | Pr [(s', r) | s, a]
+jointPMF :: MyState -> MyAction -> [((MyState, Double), Double)]
+jointPMF MyState{..} toOrder =
+  [ ((s', r), pDemand $ finite $ fromIntegral demand)
+  | demand <- [0..gMaxDemand]
+  , let s'       = MyState onHand'
+                           (P.tail onOrder ++ [toOrder])
+                           (epoch + 1)
+        onHand'  = bound $ onHand + P.head onOrder - demand
+        r        = fromIntegral p * fromIntegral stockOut - fromIntegral held
+        held     = max 0 onHand'
+        stockOut = min 0 onHand'
+  ]
+
 -- | R(s, a, s')
 --
 -- Returns a list of pairs, each containing:
@@ -257,6 +271,7 @@ testRewards p s =
     sys	48m38.034s
 ----------------------------------------------------------------------}
 
+#if 0
 vDP = [ [-116.5, -99.7, -85.4, -73.9, -65.4, -59.6]
       , [ -99.7, -85.4, -73.9, -65.4, -59.6, -56.3]
       , [ -85.4, -73.9, -65.4, -59.6, -56.3, -55.3]
@@ -286,6 +301,7 @@ pDP = [ [5, 5, 5, 5, 5, 5]
       ]
 pDPMeanSqr :: Double
 pDPMeanSqr = arrMeanSqr pDP
+#endif
 
 {----------------------------------------------------------------------
   Command line options defintions.
@@ -300,8 +316,8 @@ data Opts w = Opts
         "The ratio of stock-out to holding costs"
     , eps   :: w ::: Maybe Double <?>
         "The convergence tolerance for iteration"
-    , alph  :: w ::: Maybe Double <?>
-        "The error correction gain"
+    -- , alph  :: w ::: Maybe Double <?>
+    --     "The error correction gain"
     , dis   :: w ::: Maybe Double <?>
         "The discount rate"
     , dcy   :: w ::: Maybe Double <?>
@@ -317,6 +333,10 @@ instance ParseRecord (Opts Wrapped)
 ----------------------------------------------------------------------}
 mdFilename = "other/inventory.md"
 
+boolToDouble :: Bool -> Double
+boolToDouble True = 1
+boolToDouble _    = 0
+
 main :: IO ()
 main = do
   -- Process command line options.
@@ -326,121 +346,154 @@ main = do
       nEvals = fromMaybe  1   (nEval o)
       pVal   = fromMaybe 50   (p     o)
       eps'   = fromMaybe  0.1 (eps   o)
-      alpha' = fromMaybe  0.5 (alph  o)
+      -- alpha' = fromMaybe  0.5 (alph  o)
       disc'  = fromMaybe  0.9 (dis   o)
       beta'  = fromMaybe  0   (dcy   o)
 
-  -- Calculate and display optimum policy.
-  writeFile "other/inventory.md" "\n### Policy optimization\n\n"
-  let myRLType =
-        rltDef
-          { disc       = disc'
-          , epsilon    = eps'
-          , alpha      = alpha'
-          , beta       = beta'
-          , maxIter    = nEvals
-          , states     = allStatesV
-          , actions    = actions'
-          , nextStates = nextStates'
-          , rewards    = rewards' pVal
-          , sEnum      = sEnum'
-          , aEnum      = aEnum'
-          , aGen       = aGen'
-          -- , initStates = filter ((\x -> x >= 0 && x <= gMaxOnHand) . onHand) allStates
-          , initStates = filter ((\x -> x >= (-gMaxOnHand `div` 4) && x <= (5 * gMaxOnHand `div` 4)) . onHand) allStates
-          -- , initStates = allStates
-          }
-      res = doTD myRLType nIters
-      vs     = valFuncs res
-      ps     = polFuncs res
-      counts = polXCnts res
-      cnts   = valXCnts res
-      dbgss  = debugs   res
+  -- Run DP, to generate reference values.
+  let (fs, counts') = P.unzip $ take 8
+                   $ iterate
+                       ( optPol
+                           rltDef
+                             { disc       = disc'
+                             , epsilon    = 1
+                             , maxIter    = 4
+                             , states     = allStatesV
+                             , actions    = actions'
+                             , nextStates = nextStates'
+                             , rewards    = rewards' pVal
+                             , aEnum      = aEnum'
+                             }
+                       ) (const (0, 0), [])
+      counts = P.tail counts'
+      acts   = map (\f -> VS.map (fst . f) allStatesV) fs
+      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
+                  $ zip acts (P.tail acts)
+      ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
+        -- runWriter $ withinOnM eps'
+        runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
+                              ( \ (dv, _) ->
+                                  maxAndNonZero dv
+                              ) $ zip diffs (P.tail fs)
+      pol    = fst . g'
+      val    = snd . g'
+      cnts   = cnts'
 
-      val = appV sEnum' $ P.last vs
-      pol = appP sEnum' $ P.last ps
+  writeFile mdFilename "\n### Final policy\n\n"
+  appendFile mdFilename $ pack $ showFofState pol
+  appendFile mdFilename "\n### Final value function\n\n"
+  appendFile mdFilename $ pack $ showFofState (Pdouble . val)
 
-  appendFile "other/inventory.md" "\n### Final policy\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState pol
-  appendFile "other/inventory.md" "\n### Final value function\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . val)
-
-  -- DEBUGGING
-  appendFile "other/inventory.md" "\n## debug\n\n"
-
-  -- Reward expectations
-  appendFile "other/inventory.md" "\n### E[reward]\n\n"
-  appendFile "other/inventory.md" $ pack $ showFofState (Pdouble . testRewards pVal)
-
-#if 0
+#if 1
   -- Policy/Value changes vs. Iteration
-  toFile def "img/valueDiffs.png" $ do
+  toFile def "img/valueDiffs_inv.png" $ do
     layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
     plot ( line "Policy Changes"
                 [ [ (x,y)
-                  | (x,y) <- zip [(0::Int)..]
-                                 polChngCnts
+                  | (x,y) <- zip (map (* (length $ P.head counts)) [(0::Int)..])
+                                 cnts
                   ]
                 ]
          )
     plot ( line "Value Changes"
                 [ [ (x,y)
                   | (x,y) <- zip [(0::Int)..]
-                                 valChngCnts
+                                 (concat counts)
                   ]
                 ]
          )
-  appendFile "other/inventory.md" "\n![](img/valueDiffs.png)\n"
+  appendFile "other/inventory.md" "\n![](img/valueDiffs_inv.png)\n"
 #endif
 
-  -- Policy/Value error vs. Iteration
-  toFile def "img/valueErrs.png" $ do
-    layout_title .= "Policy/Value Errors vs. Evaluation Iteration"
-    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
-    plot ( line "Policy Error"
-                [ [ (x,y)
-                  | (x,y) <- zip [(0::Int)..]
-                                 [ ((/ pDPMeanSqr) . mean) $
-                                     map (mean . map (^ 2))
-                                         $ zipWith
-                                             (zipWith (-))
-                                             pDP
-                                             $ map (map (fromIntegral . appP sEnum' p))
-                                                   [ [ MyState onHnd
-                                                               (onOrd : replicate (gLeadTime - 1) 0)
-                                                               0
-                                                     | onOrd <- [0..gMaxOrder]
-                                                     ]
-                                                   | onHnd <- [0..gMaxOnHand]
-                                                   ]
-                                 | p <- ps
-                                 ]
-                  ]
-                ]
-         )
-    plot ( line "Value Error"
-                [ [ (x,y)
-                  | (x,y) <- zip [(0::Int)..]
-                                 [ ((/ vDPMeanSqr) . mean) $
-                                     map (mean . map (^ 2))
-                                         $ zipWith
-                                             (zipWith (-))
-                                             vDP
-                                             $ map (map (appV sEnum' v))
-                                                   [ [ MyState onHnd
-                                                               (onOrd : replicate (gLeadTime - 1) 0)
-                                                               0
-                                                     | onOrd <- [0..gMaxOrder]
-                                                     ]
-                                                   | onHnd <- [0..gMaxOnHand]
-                                                   ]
-                                 | v <- vs
-                                 ]
-                  ]
-                ]
-         )
-  appendFile "other/inventory.md" "\n![](img/valueErrs.png)\n"
+  -- Run all 3 flavors of TD, comparing results to DP.
+  appendFile mdFilename "\n### TD Results\n\n"
+
+  appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
+  -- appendFile mdFilename $ pack $ printf "alpha = %3.1f  \n" alph'
+  appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
+
+  -- let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
+  let (erss, _) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
+        let myRLType =
+              rltDef
+                { disc       = disc'
+                , epsilon    = eps'
+                -- , alpha      = alph'
+                , alpha      = alp
+                , beta       = beta'
+                , maxIter    = nEvals
+                , states     = allStatesV
+                , actions    = actions'
+                , nextStates = nextStates'
+                , rewards    = rewards' pVal
+                , sEnum      = sEnum'
+                , aEnum      = aEnum'
+                , aGen       = aGen'
+                , initStates = filter ((\x -> x >= (-gMaxOnHand `div` 4) && x <= (5 * gMaxOnHand `div` 4)) . onHand) allStates
+                }
+            ress = for [Sarsa, Qlearn, ExpSarsa] $
+                       \ stepT ->
+                         doTD myRLType{tdStepType = stepT} nIters
+            vss  = map (map (appV sEnum') . valFuncs) ress
+            ers  = map ( map ( \ v -> (/ vRefMeanSqr) . mean $
+                                      map (mean . map sqr)
+                                          $ zipWith
+                                              (zipWith (-))
+                                              -- vDP
+                                              vRef
+                                              $ map (map v)
+                                                    [ [ MyState onHnd
+                                                                (onOrd : replicate (gLeadTime - 1) 0)
+                                                                0
+                                                      | onOrd <- [0..gMaxOrder]
+                                                      ]
+                                                    | onHnd <- [0..gMaxOnHand]
+                                                    ]
+                             )
+                       ) vss
+            vRef = map (map val)
+                       [ [ MyState onHnd
+                                   (onOrd : replicate (gLeadTime - 1) 0)
+                                   0
+                         | onOrd <- [0..gMaxOrder]
+                         ]
+                       | onHnd <- [0..gMaxOnHand]
+                       ]
+            vRefMeanSqr = arrMeanSqr vRef
+         in (ers, [])
+      -- nPts   = nIters * nEvals
+
+  -- Value function error vs. Iteration
+  appendFile mdFilename "\n#### Mean Square Value Function Error vs. DP\n\n"
+  toFile def "img/vFuncErr_inv.png" $ do
+    layout_title .= "Mean Square Value Function Error vs. Iteration"
+    forM_ (zip (P.init erss) [PointShapeCircle, PointShapePlus]) $ \ (ers, ptShape) -> do
+      setColors $ map opaque [blue, green, red]
+      setShapes [ptShape]
+      forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] ers) $ \ (lbl, er) ->
+           plot ( points lbl
+                         [ (x,y)
+                         | (x,y) <- takeEvery (nIters `div` 100) $ zip [(0::Int)..] er
+                         ]
+                )
+    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] (P.last erss)) $ \ (lbl, er) ->
+         plot ( line lbl
+                       [[ (x,y)
+                        | (x,y) <- zip [(0::Int)..] er
+                       ]]
+              )
+  appendFile mdFilename "\n![](img/vFuncErr_inv.png)  \n"
+  appendFile mdFilename "circle: alpha=0.1  \n"
+  appendFile mdFilename "plus: alpha=0.2  \n"
+  appendFile mdFilename "line: alpha=0.5  \n"
+
+  -- DEBUGGING
+  appendFile mdFilename "\n## debug\n\n"
+
+  -- Reward expectations
+  appendFile mdFilename "### E[reward]\n\n"
+  appendFile mdFilename $ pack $ showFofState (Pdouble . testRewards pVal)
 
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
@@ -492,7 +545,7 @@ main = do
   appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
                                                   (minimum pmfSums) (maximum pmfSums)
 
-#if 1
+#if 0
   -- Debugging info from `doTD`
   -- data Dbg s = Dbg
   --   { nxtStPrbs :: [(s, Double)]
@@ -544,6 +597,7 @@ main = do
 
 #endif
 
+#if 0
 doDP
   :: RLType MyState MyAction 378 6
   -> Int
@@ -567,6 +621,12 @@ doDP rlt nIters =
       pol   = fst . g'
       val   = snd . g'
    in (val, pol, polChngCnts, valChngCnts)
+#endif
+
+for = flip map
+
+takeEvery _ [] = []
+takeEvery n xs = P.head xs : (takeEvery n $ drop n xs)
 
 \end{code}
 

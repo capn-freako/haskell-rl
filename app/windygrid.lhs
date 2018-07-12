@@ -109,6 +109,7 @@ gWind    = fromMaybe (P.error "gWind: Sized vector initialization from list fail
 
 type Ns = 70
 type Na =  9
+-- type Na =  4
 
 type MyState = (Int, Int)
 
@@ -162,6 +163,7 @@ mySEnum (r,c) = finite . fromIntegral $ r * gNumCols + c
 -- | A(s)
 myActions :: MyState -> [MyAction]
 myActions = const [Up, Dn, Rt, Lt, UL, UR, DL, DR, NM]
+-- myActions = const [Up, Dn, Rt, Lt]
 
 myAEnum :: MyAction -> Finite Na
 myAEnum = \case
@@ -191,8 +193,10 @@ myAGen = \case
 myNextStates :: MyState -> MyAction -> [MyState]
 myNextStates s@(r, c) act =
   if s `elem` myTermStates
+    -- then [s]
     then [s, s, s]
-    else [ (min (gNumRows - 1) (max 0 (r + dr + wr)), min (gNumCols - 1) (max 0 (c + dc)))
+    -- else [ bound ( (r + dr + wind), (c + dc) ) ]
+    else [ bound (r + dr + wr, c + dc)
          | wr <- if wind /= 0
                     -- then [wind, wind, wind]
                     then [wind - 1, wind, wind + 1]
@@ -220,6 +224,7 @@ myNextStates s@(r, c) act =
          DR ->  1
          NM ->  0
   wind = gWind `VS.index` finite (fromIntegral c)
+  bound (row, col) = ( min (gNumRows - 1) (max 0 row), min (gNumCols - 1) (max 0 col ) )
 
 myTermStates :: [MyState]
 myTermStates = [(3,7)]
@@ -236,6 +241,8 @@ myStartState = (3,0)
 -- Note: Previous requirement that reward values be unique eliminated,
 --       for coding convenience and runtime performance improvement.
 myRewards :: MyState -> MyAction -> MyState -> [(Double, Double)]
+--                  myRewards _ _ s' | s' `elem` myTermStates = [( 0, 1)]
+--                                   | otherwise              = [(-1, 1)]
 myRewards _ _ s' | s' `elem` myTermStates = [( 0, 0.3333)]
                  | otherwise              = [(-1, 0.3333)]
 
@@ -309,13 +316,13 @@ main = do
 
   -- Run DP, to generate reference values.
   -- let (fs, counts') = P.unzip $ take (nIters + 1)
-  let (fs, counts') = P.unzip $ take 11
+  let (fs, counts') = P.unzip $ take 20
                    $ iterate
                        ( optPol
                            rltDef
                              { disc       = gGamma
                              , epsilon    = 0.1
-                             , maxIter    = 10
+                             , maxIter    = 20
                              , states     = allStatesV
                              , actions    = myActions
                              , nextStates = myNextStates
@@ -339,7 +346,8 @@ main = do
       pol    = fst . g'
       val    = snd . g'
       cnts   = cnts'
-      visits = runEpisode 20 pol (((.) . (.)) (P.!! 1) myNextStates) myTermStates myStartState
+      visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
+      -- visits = runEpisode 20 pol (((.) . (.)) (P.!! 1) myNextStates) myTermStates myStartState
 
   appendFile mdFilename "\n#### Final policy\n\n"
   appendFile mdFilename $ pack $ showFofState pol

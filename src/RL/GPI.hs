@@ -20,6 +20,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-missing-fields #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -cpp #-}
 
 module RL.GPI where
   -- ( Pfloat (..)
@@ -190,11 +191,12 @@ doTD rlt@RLType{..} nIters = TDRetT vs ps polChngCnts valChngCnts dbgss where
                 _  -> P.head $ shuffle g initStates
           (_, q's, gs, dbgs, ts) = unzip5 $ take maxIter $ P.tail $
             iterate
-              (optQ rlt)
-              (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g [], t)
+              (optQn rlt)
+              -- (s, q, g, Dbg [] (VS.head states) (VS.head states) 0 0 g [], t)
+              (s, q, g, [], t)
           q' = P.last q's
       put (q', P.last gs, P.last ts)
-      return (q', dbgs)
+      return (q', P.last dbgs)
   ps    = map (qToP aGen) qs
   acts  = map (\p -> VS.map (getFinite . aEnum . appP sEnum p) states) ps
   diffs = map (VS.map (fromIntegral . abs) . uncurry (-))
@@ -362,6 +364,103 @@ optQ RLType{..} (s, q, gen, _, t) = (s', q', gen', dbgs, t + 1) where
   alpha'    = alpha   / decayFact
   epsilon'  = epsilon / decayFact
   decayFact = (1 + beta * fromIntegral t)
+
+#if 1
+-- | Yields a single episodic action-value improvement iteration, using n-step TD.
+--
+-- RLType field overrides:
+-- - epsilon: Used to form an "epsilon-greedy" policy.
+-- - maxIter: The "n" in n-step.
+-- - states:  First in list is assumed to be the initial state,
+--            if `initStates` is empty.
+optQn
+  :: ( KnownNat m, KnownNat n, KnownNat k
+     , m ~ (k + 1)
+     , Eq s, Eq a, RandomGen g
+     )
+  => RLType s a m n  -- ^ abstract type, to protect API
+  -- | initial state, action-value matrix, random generator, debugging info, and epoch
+  -> (s, Vector m (Vector n Double), g, [Dbg s g], Integer)
+  -> (s, Vector m (Vector n Double), g, [Dbg s g], Integer)
+optQn RLType{..} (s0, q, gen, _, t) = (P.last sNs, q', gen', debgs, t + fromIntegral maxIter) where
+  (sNs, q', gen', debgs, _) =
+    execState (traverse go [(-maxIter + 1)..(maxIter)]) ([s0], q, gen, [], [])
+  go = \ n -> do
+    (ss, qm, g, dbgs, rs) <- get
+
+    -- Single step update to Q.
+    let qm' = if n >= 0
+                then let sNum = sEnum $ P.head $ drop n ss
+                      in qm VS.// [ ( sNum
+                                    , qm `VS.index` sNum VS.// [(aEnum a, newVal)]
+                                    )
+                                  ]
+                else qm
+
+        -- Helpful abbreviations
+        qf = appQ sEnum aEnum qm
+        s  = P.last ss
+
+        -- Policy definitions
+        (x, g') = random g
+        pol' st = argmax (qf st) (actions st)  -- greedy
+        pol  st = if x > epsilon'              -- epsilon-greedy
+                    then pol' st
+                    else case otherActs of
+                           [] -> pol' st
+                           xs -> P.head $ shuffle gen $ xs
+         where otherActs = filter (/= (pol' st)) $ actions st
+
+        -- Use epsilon-greedy policy to choose action.
+        a = pol s
+
+        -- Produce a sample next state, obeying the actual distribution.
+        s' = P.head $ shuffle gen' $
+               concat [ replicate (round $ 100 * p) st
+                      | (st, p) <- s'p's
+                      ]
+        s'p's  = zip s's p's
+        s's    = nextStates s a
+        p's    = map (sum . map snd) rss  -- next state probabilities
+        rss    = map (rewards s a) s's
+
+        -- Do the update.
+        newVal =
+          fromMaybe
+            (oldVal + alpha' * ( sum (take maxIter $ drop n rs)
+                               + disc * eQs'a'
+                               - oldVal
+                               )
+            ) $ lookup s stateVals
+        oldVal = qf s a
+        r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
+        ps'    = fromMaybe (P.error "RL.GPI.optQ: Lookup failure at line 334!")
+                           (lookup s' s'p's)
+        eQs'a' =
+          case tdStepType of
+            Sarsa    -> qf s' $ pol  s'  -- Uses epsilon-greedy policy.
+            Qlearn   -> qf s' $ pol' s'  -- Uses greedy policy.
+            ExpSarsa ->  -- E[Q(s', a')]
+              sum [ p * qf s' a'
+                  | a' <- acts
+                  , let p = if a' == pol' s'
+                               then 1 - epsilon'
+                               else epsilon' / fromIntegral (lActs - 1)
+                  ]
+        acts  = actions s'
+        lActs = length acts
+        dbg   = Dbg s'p's s s' r eQs'a' gen $
+                  [ [ qf st act
+                    | act <- actions st
+                    ]
+                  | (st, _) <- stateVals
+                  ]
+        alpha'    = alpha   / decayFact
+        epsilon'  = epsilon / decayFact
+        decayFact = (1 + beta * fromIntegral t)
+
+    put (ss ++ [s'], qm', g', dbgs ++ [dbg], rs ++ [r])
+#endif
 
 -- | Apply the matrix representation of an action-value function.
 appQ
