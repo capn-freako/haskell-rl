@@ -110,18 +110,17 @@ instance (KnownNat n) => HasTrie (Finite n) where
 --    text.
 --
 class MDP s a where
-  type RewardT s a :: *  -- ^ Reward type.
   -- | State enumeration function - S.
   states :: [s]
   -- | Action enumeration function - A(s).
   actions :: s -> [a]
   -- | Joint probability distribution - Pr[(s', r) | s, a].
-  jointPMF :: s -> a -> [((s, RewardT s a), Double)]
+  jointPMF :: s -> a -> [((s, Double), Double)]
   -- | Initial states.
   initStates :: [s]
   initStates = []
   -- | Terminal states and their values.
-  termStates :: [(s, RewardT s a)]
+  termStates :: [(s, Double)]
   termStates = []
 
 {----------------------------------------------------------------------
@@ -136,8 +135,8 @@ nextStates s a = combProb . map (first fst) $ jointPMF s a
 
 -- | Rewards and their probabilities - R(s, a, s').
 rewards
-  :: (MDP s a, Eq s, Eq (RewardT s a), Ord (RewardT s a))
-  => s -> a -> s -> [((RewardT s a), Double)]
+  :: (MDP s a, Eq s, Eq (Double), Ord (Double))
+  => s -> a -> s -> [((Double), Double)]
 rewards s a s' = combProb . map (first snd)
   . filter ((== s') . fst . fst) $ jointPMF s a
 
@@ -222,10 +221,11 @@ data TDRetT s a r = TDRetT
 -- This is intended to be the function called by client code wishing to
 -- perform temporal difference based policy optimization.
 doTD
-  :: ( MDP s a, Num (RewardT s a), HasFin s, HasFin a )  -- , Ord r )  -- , Eq s, Eq a)
-  => HypParams (RewardT s a)  -- ^ Simulation hyper-parameters.
+  :: forall a s.
+  ( MDP s a, Num (Double), HasFin s, HasFin a )  -- , Ord r )  -- , Eq s, Eq a)
+  => HypParams (Double)  -- ^ Simulation hyper-parameters.
   -> Int          -- ^ Number of episodes to run.
-  -> TDRetT s a (RewardT s a)
+  -> TDRetT s a (Double)
 doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
   gen = mkStdGen 1
   (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen, 0) $
@@ -234,7 +234,7 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
       let s = case initStates of
                 [] -> P.head states
                 _  -> P.head $ shuffle g initStates
-          (_, q', g', dbgs, t') = optQn hParams (s, q, g, [], t)
+          (_, q', g', dbgs, t') = optQn @a hParams (s, q, g, [], t)
       put (q', g', t')
       return (q', dbgs)
   -- Calculate policies and count differences between adjacent pairs.
@@ -242,7 +242,7 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
   ass    = map (\p -> map p states) ps
   pDiffs = map (length . filter (== False)) $ zipWith (zipWith (==)) ass (P.tail ass)
   -- Calculate value functions and mean square differences between adjacent pairs.
-  vs     = map (\q -> \s -> maximum (appFm q s) $ actions s) qs
+  vs     = map (\q -> \s -> maximum . map (appFm @a q s) $ actions s) qs
   valss  = map (\v -> map v states) vs
   vErrs  = map mean $ zipWith (zipWith (sqr . (-))) valss (P.tail valss)
 
@@ -252,16 +252,18 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
 -- - epsilon: Used to form an "epsilon-greedy" policy.
 -- - maxIter: The "n" in n-step.
 optQn
-  :: forall s a m n k g.
-     ( MDP s a, HasFin s, HasFin a  -- , Eq s, Eq a
-     , KnownNat m, KnownNat n, KnownNat k, m ~ (k + 1)
+  -- :: forall a s m n k g.
+  :: forall a s m n g.
+     ( MDP s a, HasFin s, HasFin a, Ord s, Eq a
+     -- , KnownNat m, KnownNat n, KnownNat k, m ~ (k + 1)
+     , KnownNat m, KnownNat n  -- , KnownNat k, m ~ (k + 1)
      -- , m ~ Card s, n ~ Card a
      , Card s ~ m, Card a ~ n
      , RandomGen g
      )
-  => HypParams (RewardT s a)  -- ^ Simulation hyper-parameters.
-  -> (s, Vector m (Vector n (RewardT s a)), g, [Dbg s (RewardT s a)], Integer)
-  -> (s, Vector m (Vector n (RewardT s a)), g, [Dbg s (RewardT s a)], Integer)
+  => HypParams (Double)  -- ^ Simulation hyper-parameters.
+  -> (s, Vector m (Vector n (Double)), g, [Dbg s (Double)], Integer)
+  -> (s, Vector m (Vector n (Double)), g, [Dbg s (Double)], Integer)
 optQn HypParams{..} (s0, q, gen, _, t) =
   (P.last sNs, q', gen', debgs, t + fromIntegral maxIter)
  where
@@ -279,7 +281,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                 else qm
 
         -- Helpful abbreviations
-        qf = appFm @s @a qm
+        qf = appFm @a @s qm
         s  = P.last ss
 
         -- Policy definitions
@@ -300,10 +302,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                concat [ replicate (round $ 100 * p) st
                       | (st, p) <- s'p's
                       ]
-        s'p's  = zip s's p's
-        s's    = nextStates s a
-        p's    = map (sum . map snd) rss  -- next state probabilities
-        rss    = map (rewards s a . fst) s's
+        s'p's  = nextStates s a
 
         -- Do the update.
         newVal =
@@ -352,9 +351,9 @@ optPol :: ( MDP s a, Eq s, HasTrie s
           , Ord a, HasTrie a
           , KnownNat m, KnownNat n
           )
-       => HypParams r           -- ^ Simulation hyper-parameters.
-       -> (s -> (a, r), [Int])  -- ^ initial policy & value functions
-       -> (s -> (a, r), [Int])
+       => HypParams Double      -- ^ Simulation hyper-parameters.
+       -> (s -> (a, Double), [Int])  -- ^ initial policy & value functions
+       -> (s -> (a, Double), [Int])
 optPol HypParams{..} (g, _) = (bestA, cnts)
  where
   -- bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
@@ -503,7 +502,8 @@ optQ RLType{..} (s, q, gen, _, t) = (s', q', gen', dbgs, t + 1) where
 --
 -- Note that `r` here signifies row, not reward.
 appFm
-  :: ( HasFin r,   HasFin c
+  :: forall c r m n a.
+     ( HasFin r,   HasFin c
      , KnownNat m, KnownNat n
      , Card r ~ m, Card c ~ n
      )
