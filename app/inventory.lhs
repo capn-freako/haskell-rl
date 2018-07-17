@@ -30,6 +30,7 @@ code
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -cpp #-}
+-- {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -46,8 +47,10 @@ code
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 \end{code}
 
 [libraries](https://www.stackage.org/)
@@ -70,25 +73,35 @@ import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for, first, second)
 
+import GHC.TypeLits
+import qualified GHC.TypeLits as T
+
 import Options.Generic
 
-import qualified Data.Vector.Sized   as VS
+-- import qualified Data.Vector.Sized   as VS
+-- import Data.Vector.Sized                      (Vector)
 
 import Control.Arrow
 import Control.Monad.Writer
 import Data.Finite
+import Data.Finite.Internal
 import Data.List                              (sortBy, groupBy)
 -- import Data.List.Extras.Argmax                (argmax, argmin)
 import Data.MemoTrie
 import Data.Text                              (pack)
-import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty)
+import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty, Iso)
 import Graphics.Rendering.Chart.Backend.Cairo
 import Statistics.Distribution                (density)
 import Statistics.Distribution.Gamma          (gammaDistr)
 -- import System.Random
 import Text.Printf
 
+import ConCat.Isomorphism
+import ConCat.TArr
+
 import RL.GPI
+import RL.MDP
+import RL.Util
 \end{code}
 
 - [hoogle](https://www.stackage.org/package/hoogle)
@@ -102,20 +115,33 @@ import RL.GPI
 demandMean = 1
 pDemand    = gamma' $ finite $ round demandMean
 
-gLeadTime     =  3
-gMaxOrder     =  5
-gMaxOnHand    = 10
--- gReviewPer    =  1  -- `showFofState` assumes: gReviewPer = gLeadTime.
-gMaxDemand    = 10
--- gProfit       =  0
+type NLeadTime = 3
+gLeadTime = nat @NLeadTime
+
+type NMaxOrder = 5
+gMaxOrder = nat @NMaxOrder
+
+type NMaxOnHand = 10
+gMaxOnHand = nat @NMaxOnHand
+
+type NMaxDemand = 10
+gMaxDemand = nat @NMaxDemand
+
+gStockOutCost = 2
+gHoldingCost  = 1
 
 -- | State data type for "single-store / single-item" inventory optimization problem.
 --
--- TODO: Enforce limits, using sized vector / Finite instead of list / Int.
+-- @onHand@ is offset by @gMaxOnHand@, to represent: [-gMaxOnHand, gMaxOnHand].
+-- Negative values indicate backlog.
+--
+-- It is necessary to track the epoch, to:
+-- - gate ordering, and
+-- - track shipping.
 data MyState  = MyState
-  { onHand  :: Int    -- Should lie in [-gMaxOnHand, 2*gMaxOnHand].
-  , onOrder :: [Int]  -- Should have length `gLeadTime`. Elements should lie in [0, gMaxOrder].
-  , epoch   :: Int    -- Needed, to determine if ordering is allowed.
+  { onHand  :: Finite (2 T.* NMaxOnHand + 1)  -- offset by gMaxOnHand
+  , onOrder :: Finite (NMaxOrder + 1)
+  , epoch   :: Finite NLeadTime
   } deriving (Show, Eq, Ord, Generic)
 
 instance HasTrie MyState where
@@ -124,123 +150,78 @@ instance HasTrie MyState where
   untrie    = untrieGeneric    unMyStateTrie
   enumerate = enumerateGeneric unMyStateTrie
 
--- TODO: Convert this to Finite (gMaxOrder + 1).
-type MyAction = Int
+instance HasFin MyState where
+  type Card MyState = (2 T.* NMaxOnHand + 1) T.* (NMaxOrder + 1) T.* NLeadTime
+  iso = Iso stateToFin finToState
 
--- | S - all possible states.
---
--- Note: There is no need to track epochs [gLeadTime..].
-allStates :: [MyState]
-allStates =
-  [ MyState x (drop n ys ++ take n ys) n
-  | x <- [-gMaxOnHand..(2 * gMaxOnHand)]
-  , n <- [0..(gLeadTime - 1)]
-  , y <- [0..gMaxOrder]
-  , let ys = y : replicate (gLeadTime - 1) 0
-  ]
+stateToFin MyState{..} = finite $
+  getFinite onHand +
+  getFinite onOrder * (2 * gMaxOnHand + 1) +
+  getFinite epoch   * (2 * gMaxOnHand + 1) * (gMaxOrder  + 1)
 
--- Just a sized vector alternative to the list above.
---
--- TODO: Figure out how to determine the size from the constants above.
-allStatesV :: VS.Vector 558 MyState
-allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
-                       $ VS.fromList allStates
+finToState (Finite n) = MyState{..} where
+  (epoch,   rmndr)  = first finite      $ n     `divMod` ((2 * gMaxOnHand + 1) * (gMaxOrder  + 1))
+  (onOrder, onHand) = finite *** finite $ rmndr `divMod`  (2 * gMaxOnHand + 1) 
 
-sEnum' :: MyState -> Finite 558
-sEnum' MyState{..} = finite . fromIntegral $ tot where
-  tot =
-    if onHand < (-gMaxOnHand) || onHand > 2 * gMaxOnHand
-       then P.error $ printf "sEnum': onHand out of bounds: %d" onHand
-       else
-         epoch `mod` gLeadTime   +
-         gLeadTime * sum onOrder +
-         (gLeadTime * (gMaxOrder + 1)) * (onHand + gMaxOnHand)
+type MyAction = Finite (NMaxOrder + 1)
 
--- | A(s) - all possible actions from state `s`.
-actions' :: MyState -> [MyAction]
-actions' MyState{..} =
-  -- if epoch `mod` gReviewPer /= 0  -- Until I have a more sophisticated `showFofState`.
-  if epoch `mod` gLeadTime /= 0
-     then [0]
-     else [0..gMaxOrder]
+instance MDP MyState where
+  type ActionT MyState = MyAction
+  states =
+    [ MyState{..}
+    | onHand  <- map finite [0..(2 * gMaxOnHand)]
+    , onOrder <- map finite [0..gMaxOrder]
+    , epoch   <- map finite [0..(gLeadTime - 1)]
+    ]
+  actions MyState{..} = map finite $
+    if getFinite epoch `mod` gLeadTime /= 0
+      then [0]
+      else [0..gMaxOrder]
+  jointPMF MyState{..} a =
+    [ ((s', r), p)
+    | demand <- [0..gMaxDemand]
+    , let p = pDemand $ finite demand
+          s' = MyState (finite onHand'') onOrder' epoch'
+          onHand'' = onHand' + gMaxOnHand
+          onHand' =  -- Bounded to: [-gMaxOnHand, gMaxOnHand].
+            max (-gMaxOnHand) $
+                min gMaxOnHand $
+                    getFinite onHand - gMaxOnHand - demand + delivered
+          (onOrder', delivered) =
+            if getFinite epoch `mod` gLeadTime == 0
+              then (a, getFinite onOrder)
+              else (onOrder, 0)
+          epoch' = epoch + 1
+          r = fromIntegral $ onHand' *
+                ( if onHand' < 0  -- Back-log?
+                    then gStockOutCost
+                    else negate gHoldingCost  -- Reward must always be negative.
+                )
+    ]
 
-aEnum' :: MyAction -> Finite 6
-aEnum' = finite . fromIntegral
-
-aGen' :: Finite 6 -> MyAction
-aGen' = fromIntegral . getFinite
-
--- | S'(s, a) - list of next possible states.
-nextStates' :: MyState -> MyAction -> [MyState]
-nextStates' MyState{..} toOrder =
-  [ MyState onHand'
-            (P.tail onOrder ++ [toOrder])
-            (epoch + 1)
-  | demand <- [0..gMaxDemand]
-  , let onHand' = onHand + P.head onOrder - demand
-  -- , let onHand' = max (-gMaxOnHand) $ min (2 * gMaxOnHand) $ onHand + P.head onOrder - demand
-  -- , onHand' >= -gMaxOnHand && onHand' <= 2 * gMaxOnHand
-  ]
-
--- | Pr [(s', r) | s, a]
-jointPMF :: MyState -> MyAction -> [((MyState, Double), Double)]
-jointPMF MyState{..} toOrder =
-  [ ((s', r), pDemand $ finite $ fromIntegral demand)
-  | demand <- [0..gMaxDemand]
-  , let s'       = MyState onHand'
-                           (P.tail onOrder ++ [toOrder])
-                           (epoch + 1)
-        onHand'  = bound $ onHand + P.head onOrder - demand
-        r        = fromIntegral p * fromIntegral stockOut - fromIntegral held
-        held     = max 0 onHand'
-        stockOut = min 0 onHand'
-  ]
-
--- | R(s, a, s')
---
--- Returns a list of pairs, each containing:
--- - a reward value, and
--- - the probability of occurence for that value.
---
--- Note: Previous requirement that reward values be unique eliminated,
---       for coding convenience and runtime performance improvement.
-rewards' :: Int -> MyState -> MyAction -> MyState -> [(Double, Double)]
-rewards' p MyState{..} _ (MyState onHand' _ _) =
-  [ ( fromIntegral p * fromIntegral stockOut - fromIntegral held
-    , pDemand $ finite $ fromIntegral demand
-    )
-  | let held     = max 0 onHand'
-        stockOut = min 0 onHand'
-        demand   = onHand + P.head onOrder - onHand'
-  ]
-
--- | Show a function from `MyState`, assuming the `On Order` quantity
--- is in the first element of the `onOrder` list.
+-- | Show a function from `MyState`, assuming epoch 0.
 --
 -- This makes sense as the default, since actions (i.e. - orders) may
--- only be taken (i.e. - placed) when the first element of `onOrder` is
--- non-zero, because that corresponds to an epoch that is an integral
--- multiple of the review period, which is, currently, assumed to be
--- equal to lead time.
+-- only be taken (i.e. - placed) in epoch 0.
+-- (Actually, in any epoch such that epoch `mod` gLeadTime = 0,
+-- but we only track epoch mod gLeadTime.)
 showFofState :: (Show a, Ord a) => (MyState -> a) -> String
 showFofState = showFofState' 0
 
--- | Show a function from `MyState`, assuming the `On Order` quantity
--- is in the `k-th` element of the `onOrder` list.
+-- | Show a function from @MyState@, for epoch `k`.
 showFofState' :: (Show a, Ord a) => Int -> (MyState -> a) -> String
 showFofState' k g = unlines
-  ( "\\begin{array}{" : intersperse '|' (replicate (gMaxOrder + 1) 'c') : "}" :
-    ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (gMaxOrder + 1) ' ') ++ " \\\\") :
+  ( "\\begin{array}{" : intersperse '|' (replicate (fromIntegral (gMaxOrder + 1)) 'c') : "}" :
+    ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (fromIntegral (gMaxOrder + 1)) ' ') ++ " \\\\") :
       ["\\hline"] ++
       intersperse "\\hline"
         ( map ((++ " \\\\") . intercalate " & ")
               [ (show onHnd :) $ map show
-                [ g (MyState onHnd (drop k ys ++ take k ys) k)
+                [ g (MyState (finite onHnd) (finite onOrdr) (finite $ fromIntegral (k `mod` (fromIntegral gLeadTime))))
                 | onOrdr <- [0..gMaxOrder]
-                , let ys = onOrdr : replicate (gLeadTime - 1) 0
                 ]
               | onHnd' <- [0..gMaxOnHand]
-              , let onHnd = gMaxOnHand - onHnd'
+              , let onHnd = gMaxOnHand - onHnd'  -- Just putting (0,0) at lower-left corner.
               ]
         )
       ++ ["\\hline"]
@@ -249,6 +230,7 @@ showFofState' k g = unlines
     )
   )
 
+#if 0
 -- | Expected reward for a given state, assuming equiprobable actions.
 testRewards :: Int -> MyState -> Double
 testRewards p s =
@@ -260,6 +242,7 @@ testRewards p s =
        ]
   where acts  = actions' s
         pNorm = fromIntegral $ length acts
+#endif
 
 {----------------------------------------------------------------------
   DP reference, for TD comparison.
@@ -309,19 +292,19 @@ pDPMeanSqr = arrMeanSqr pDP
 
 data Opts w = Opts
     { nIter :: w ::: Maybe Int <?>
-        "The number of policy improvement iterations"
+        "The number of policy improvement iterations."
     , nEval :: w ::: Maybe Int <?>
-        "The number of policy evaluation iterations per policy improvement iteration"
-    , p     :: w ::: Maybe Int <?>
-        "The ratio of stock-out to holding costs"
+        "The 'n' in n-step TD."
+    -- , p     :: w ::: Maybe Int <?>
+    --     "The ratio of stock-out to holding costs"
     , eps   :: w ::: Maybe Double <?>
-        "The convergence tolerance for iteration"
+        "The 'epsilon' in epsilon-greedy policy."
     -- , alph  :: w ::: Maybe Double <?>
     --     "The error correction gain"
     , dis   :: w ::: Maybe Double <?>
-        "The discount rate"
+        "The discount rate."
     , dcy   :: w ::: Maybe Double <?>
-        "The decay rate for epsilon/alpha"
+        "The decay rate for epsilon/alpha."
     }
     deriving (Generic)
 
@@ -341,10 +324,10 @@ main :: IO ()
 main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
-    unwrapRecord "A toy inventory optimizer."
-  let nIters = fromMaybe  2   (nIter o)
-      nEvals = fromMaybe  1   (nEval o)
-      pVal   = fromMaybe 50   (p     o)
+    unwrapRecord "A mock inventory ordering optimizer."
+  let nIters = fromMaybe  10000   (nIter o)
+      nEvals = fromMaybe      3   (nEval o)
+      -- pVal   = fromMaybe 50   (p     o)
       eps'   = fromMaybe  0.1 (eps   o)
       -- alpha' = fromMaybe  0.5 (alph  o)
       disc'  = fromMaybe  0.9 (dis   o)
@@ -354,20 +337,15 @@ main = do
   let (fs, counts') = P.unzip $ take 8
                    $ iterate
                        ( optPol
-                           rltDef
+                           hypParamsDef
                              { disc       = disc'
                              , epsilon    = 1
                              , maxIter    = 4
-                             , states     = allStatesV
-                             , actions    = actions'
-                             , nextStates = nextStates'
-                             , rewards    = rewards' pVal
-                             , aEnum      = aEnum'
                              }
                        ) (const (0, 0), [])
       counts = P.tail counts'
-      acts   = map (\f -> VS.map (fst . f) allStatesV) fs
-      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
+      acts   = map (\f -> map (fst . f) states) fs
+      diffs  = map (map boolToDouble . uncurry (zipWith (/=)))
                   $ zip acts (P.tail acts)
       ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
         -- runWriter $ withinOnM eps'
@@ -415,27 +393,19 @@ main = do
 
   -- let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
   let (erss, _) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
-        let myRLType =
-              rltDef
+        let myHypParams =
+              hypParamsDef
                 { disc       = disc'
                 , epsilon    = eps'
-                -- , alpha      = alph'
                 , alpha      = alp
                 , beta       = beta'
                 , maxIter    = nEvals
-                , states     = allStatesV
-                , actions    = actions'
-                , nextStates = nextStates'
-                , rewards    = rewards' pVal
-                , sEnum      = sEnum'
-                , aEnum      = aEnum'
-                , aGen       = aGen'
-                , initStates = filter ((\x -> x >= (-gMaxOnHand `div` 4) && x <= (5 * gMaxOnHand `div` 4)) . onHand) allStates
                 }
             ress = for [Sarsa, Qlearn, ExpSarsa] $
                        \ stepT ->
-                         doTD myRLType{tdStepType = stepT} nIters
-            vss  = map (map (appV sEnum') . valFuncs) ress
+                         doTD myHypParams{tdStepType = stepT} nIters
+            -- vss  = map (map valFuncs) ress
+            vss  = map valFuncs ress
             ers  = map ( map ( \ v -> (/ vRefMeanSqr) . mean $
                                       map (mean . map sqr)
                                           $ zipWith
@@ -443,9 +413,7 @@ main = do
                                               -- vDP
                                               vRef
                                               $ map (map v)
-                                                    [ [ MyState onHnd
-                                                                (onOrd : replicate (gLeadTime - 1) 0)
-                                                                0
+                                                    [ [ MyState (finite onHnd) (finite onOrd) 0
                                                       | onOrd <- [0..gMaxOrder]
                                                       ]
                                                     | onHnd <- [0..gMaxOnHand]
@@ -453,16 +421,13 @@ main = do
                              )
                        ) vss
             vRef = map (map val)
-                       [ [ MyState onHnd
-                                   (onOrd : replicate (gLeadTime - 1) 0)
-                                   0
+                       [ [ MyState (finite onHnd) (finite onOrd) 0
                          | onOrd <- [0..gMaxOrder]
                          ]
                        | onHnd <- [0..gMaxOnHand]
                        ]
             vRefMeanSqr = arrMeanSqr vRef
          in (ers, [])
-      -- nPts   = nIters * nEvals
 
   -- Value function error vs. Iteration
   appendFile mdFilename "\n#### Mean Square Value Function Error vs. DP\n\n"
@@ -492,8 +457,8 @@ main = do
   appendFile mdFilename "\n## debug\n\n"
 
   -- Reward expectations
-  appendFile mdFilename "### E[reward]\n\n"
-  appendFile mdFilename $ pack $ showFofState (Pdouble . testRewards pVal)
+  -- appendFile mdFilename "### E[reward]\n\n"
+  -- appendFile mdFilename $ pack $ showFofState (Pdouble . testRewards pVal)
 
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
@@ -533,13 +498,13 @@ main = do
                       . groupBy ((==) `on` fst)
                       . sortBy (compare `on` fst)
                       . ( \ st ->
-                            [ (nxtSt, prob / fromIntegral (length (actions' st)))
-                            | act   <- actions' st
-                            , nxtSt <- nextStates' st act
-                            , let prob = (sum . map snd) $ rewards' pVal st act nxtSt
+                            [ (nxtSt, prob / fromIntegral (length (actions st)))
+                            | act   <- actions st
+                            , nxtSt <- map fst $ nextStates st act
+                            , let prob = (sum . map snd) $ rewards st act nxtSt
                             ]
                         )
-                      ) allStates
+                      ) states
       pmfSums :: [Double]
       pmfSums = map (sum . map snd) nxtStPMFs
   appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
@@ -599,7 +564,7 @@ main = do
 
 #if 0
 doDP
-  :: RLType MyState MyAction 378 6
+  :: HypParams MyState MyAction 378 6
   -> Int
   -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
 doDP rlt nIters =
@@ -622,8 +587,6 @@ doDP rlt nIters =
       val   = snd . g'
    in (val, pol, polChngCnts, valChngCnts)
 #endif
-
-for = flip map
 
 takeEvery _ [] = []
 takeEvery n xs = P.head xs : (takeEvery n $ drop n xs)

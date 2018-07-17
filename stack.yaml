@@ -39,6 +39,17 @@ resolver: lts-11.14
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - .
+- location:
+   git: https://github.com/conal/concat.git
+   commit: c45b1e6b352c7be09d8e92e6669b8f6aac36063d
+  extra-dep: true
+  subdirs:
+  - classes
+  - examples
+  - inline
+  - satisfy
+  - known
+  - plugin
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)

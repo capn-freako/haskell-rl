@@ -31,6 +31,8 @@ library
   hs-source-dirs: src
   exposed-modules:
     RL.GPI
+    RL.MDP
+    RL.Util
   build-depends:
     base >= 4.7 && < 5
     , protolude
@@ -42,6 +44,12 @@ library
     , list-extras
     , random
     , toolshed
+    , concat-classes
+    , concat-examples
+    , concat-inline
+    , concat-satisfy
+    , concat-known
+    , concat-plugin
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,
@@ -347,6 +355,8 @@ executable inventory
     , statistics
     , list-extras
     , random
+    , concat-examples
+    -- , ghc-typelits-natnormalise
 
 executable windygrid
   default-language:
@@ -382,6 +392,7 @@ executable windygrid
     , statistics
     , random
     , toolshed
+    , concat-examples
 
 test-suite test
   default-language:

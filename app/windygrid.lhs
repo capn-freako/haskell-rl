@@ -31,6 +31,7 @@ code
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -cpp #-}
 \end{code}
 
@@ -49,6 +50,7 @@ code
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 \end{code}
@@ -73,25 +75,33 @@ import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for, first, second)
 
+-- import GHC.TypeLits
+-- import qualified GHC.TypeLits as T
+
 import Options.Generic
 
 import Control.Arrow
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
-import Data.List                              (sortBy, groupBy, unzip3)
+-- import Data.List                              (sortBy, groupBy, unzip3)
 import Data.MemoTrie
 import Data.Text                              (pack)
-import Data.Typeable
-import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty)
+-- import Data.Typeable
+import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty, Iso)
 import Graphics.Rendering.Chart.Backend.Cairo
-import Statistics.Distribution                (density)
-import Statistics.Distribution.Gamma          (gammaDistr)
-import System.Random
+-- import Statistics.Distribution                (density)
+-- import Statistics.Distribution.Gamma          (gammaDistr)
+-- import System.Random
 import Text.Printf
-import ToolShed.System.Random                 (shuffle)
+-- import ToolShed.System.Random                 (shuffle)
+
+import ConCat.Isomorphism
+import ConCat.TArr
 
 import RL.GPI
+import RL.MDP
+import RL.Util
 \end{code}
 
 - [hoogle](https://www.stackage.org/package/hoogle)
@@ -102,16 +112,68 @@ import RL.GPI
 ----------------------------------------------------------------------}
 
 gGamma   = 1  -- Specified by problem.
-gNumRows = 7
-gNumCols = 10
+
 gWind    = fromMaybe (P.error "gWind: Sized vector initialization from list failure!")
                      (VS.fromList [0,0,0,1,1,1,2,2,1,0] :: Maybe (VS.Vector 10 Int))
 
-type Ns = 70
-type Na =  9
--- type Na =  4
+type NNumRows = 7
+gNumRows = int @NNumRows
 
-type MyState = (Int, Int)
+type NNumCols = 10
+gNumCols = int @NNumCols
+
+-- type Ns = NNumRows T.* NNumCols
+type Na = 9
+
+-- type MyState = (Int, Int)
+type MyState = (Finite NNumRows, Finite NNumCols)
+
+instance MDP MyState where
+  type ActionT MyState = MyAction
+  states =
+    [ ((finite . fromIntegral) r, (finite . fromIntegral) c)
+    | r <- [0..(gNumRows - 1)]
+    , c <- [0..(gNumCols - 1)]
+    ]
+  actions = const [Up, Dn, Rt, Lt, UL, UR, DL, DR, NM]
+  jointPMF s@(r,c) act =
+    [ ((s', rwd), 0.3333)
+    | wr <- let wind = gWind `VS.index` finite (fromIntegral c)
+             in if wind /= 0
+                  then [wind - 1, wind, wind + 1]
+                  else [0, 0, 0]  -- Duplication is to keep probabilities correct.
+    , let s' = if s `elem` (map fst termStates)
+                 then s
+                 else bound ((fromIntegral . getFinite) r + dr + wr, (fromIntegral . getFinite) c + dc)
+          dr = case act of
+                 Up ->  1
+                 Dn -> -1
+                 Lt ->  0
+                 Rt ->  0
+                 UL ->  1
+                 UR ->  1
+                 DL -> -1
+                 DR -> -1
+                 NM ->  0
+          dc = case act of
+                 Up ->  0
+                 Dn ->  0
+                 Lt -> -1
+                 Rt ->  1
+                 UL -> -1
+                 UR ->  1
+                 DL -> -1
+                 DR ->  1
+                 NM ->  0
+          bound (row, col) = ( (finite . fromIntegral) $ min (gNumRows - 1) (max 0 row)
+                             , (finite . fromIntegral) $ min (gNumCols - 1) (max 0 col ) )
+          rwd = fromIntegral $
+            if s' `elem` (map fst termStates)
+              then  0
+              else -1
+    ]
+  termStates = [((3,7), 0)]
+  initStates = [(3,0)]
 
 data MyAction = Up
               | Dn
@@ -126,15 +188,15 @@ data MyAction = Up
 
 instance Show MyAction where
   show x = case x of
-             Up -> " \\uparrow "
-             Dn -> " \\downarrow "
-             Rt -> " \\rightarrow "
-             Lt -> " \\leftarrow "
-             UL -> " \\nwarrow "
-             UR -> " \\nearrow "
-             DL -> " \\swarrow "
-             DR -> " \\searrow "
-             NM -> " \\cdot "
+             Up -> "\\uparrow "
+             Dn -> "\\downarrow "
+             Rt -> "\\rightarrow "
+             Lt -> "\\leftarrow "
+             UL -> "\\nwarrow "
+             UR -> "\\nearrow "
+             DL -> "\\swarrow "
+             DR -> "\\searrow "
+             NM -> "\\cdot "
 
 instance HasTrie MyAction where
   newtype (MyAction :->: b) = MyActionTrie { unMyActionTrie :: Reg MyAction :->: b } 
@@ -142,31 +204,12 @@ instance HasTrie MyAction where
   untrie    = untrieGeneric    unMyActionTrie
   enumerate = enumerateGeneric unMyActionTrie
 
--- | S
-allStates :: [MyState]
-allStates =
-  [ (r, c)
-  | r <- [0..(gNumRows - 1)]
-  , c <- [0..(gNumCols - 1)]
-  ]
+instance HasFin MyAction where
+  type Card MyAction = Na
+  iso = Iso actToFin finToAct
 
--- Just a sized vector alternative to the list above.
---
--- TODO: Figure out how to determine the size from the constants above.
-allStatesV :: VS.Vector Ns MyState
-allStatesV = fromMaybe (P.error "main.allStatesV: Fatal error converting `allStates`!")
-                       $ VS.fromList allStates
-
-mySEnum :: MyState -> Finite Ns
-mySEnum (r,c) = finite . fromIntegral $ r * gNumCols + c
-
--- | A(s)
-myActions :: MyState -> [MyAction]
-myActions = const [Up, Dn, Rt, Lt, UL, UR, DL, DR, NM]
--- myActions = const [Up, Dn, Rt, Lt]
-
-myAEnum :: MyAction -> Finite Na
-myAEnum = \case
+actToFin :: MyAction -> Finite Na
+actToFin = \case
   Up -> 0
   Dn -> 1
   Rt -> 2
@@ -177,8 +220,8 @@ myAEnum = \case
   DR -> 7
   NM -> 8
 
-myAGen :: Finite Na -> MyAction
-myAGen = \case
+finToAct :: Finite Na -> MyAction
+finToAct = \case
   0 -> Up
   1 -> Dn
   2 -> Rt
@@ -187,74 +230,19 @@ myAGen = \case
   5 -> UR
   6 -> DL
   7 -> DR
-  8 -> NM
-
--- | S'(s, a) - list of next possible states.
-myNextStates :: MyState -> MyAction -> [MyState]
-myNextStates s@(r, c) act =
-  if s `elem` myTermStates
-    -- then [s]
-    then [s, s, s]
-    -- else [ bound ( (r + dr + wind), (c + dc) ) ]
-    else [ bound (r + dr + wr, c + dc)
-         | wr <- if wind /= 0
-                    -- then [wind, wind, wind]
-                    then [wind - 1, wind, wind + 1]
-                    else [0, 0, 0]  -- Duplication is to keep probabilities correct.
-         ]
- where
-  dr = case act of
-         Up ->  1
-         Dn -> -1
-         Lt ->  0
-         Rt ->  0
-         UL ->  1
-         UR ->  1
-         DL -> -1
-         DR -> -1
-         NM ->  0
-  dc = case act of
-         Up ->  0
-         Dn ->  0
-         Lt -> -1
-         Rt ->  1
-         UL -> -1
-         UR ->  1
-         DL -> -1
-         DR ->  1
-         NM ->  0
-  wind = gWind `VS.index` finite (fromIntegral c)
-  bound (row, col) = ( min (gNumRows - 1) (max 0 row), min (gNumCols - 1) (max 0 col ) )
-
-myTermStates :: [MyState]
-myTermStates = [(3,7)]
-
-myStartState :: MyState
-myStartState = (3,0)
-
--- | R(s, a, s')
---
--- Returns a list of pairs, each containing:
--- - a reward value, and
--- - the probability of occurence for that value.
---
--- Note: Previous requirement that reward values be unique eliminated,
---       for coding convenience and runtime performance improvement.
-myRewards :: MyState -> MyAction -> MyState -> [(Double, Double)]
---                  myRewards _ _ s' | s' `elem` myTermStates = [( 0, 1)]
---                                   | otherwise              = [(-1, 1)]
-myRewards _ _ s' | s' `elem` myTermStates = [( 0, 0.3333)]
-                 | otherwise              = [(-1, 0.3333)]
+  _ -> NM
 
 -- | Show a function from `MyState` to `Bool`.
 showFofState :: (Show a, Typeable a) => (MyState -> a) -> String
 showFofState g = unlines
-  ( "\\begin{array}{|" : intersperse '|' (replicate gNumCols 'c') : "|}" :
+  ( ("\\begin{array}{|" ++ (intersperse '|' (replicate gNumCols 'c')) ++ "|}") :
     ( "\\hline" :
       intersperse "\\hline"
         ( map ((++ " \\\\") . intercalate " & ")
               [ map g'
-                [ (r', c)
+                [ ( (finite . fromIntegral) r'
+                  , (finite . fromIntegral) c
+                  )
                 | c <- [0..(gNumCols - 1)]
                 ]
               | r <- [0..(gNumRows - 1)]
@@ -266,8 +254,8 @@ showFofState g = unlines
     )
   )
   where g' s
-          | s == myStartState = "S"
-          | s `elem` myTermStates = "G"
+          | s `elem` initStates           = "S"
+          | s `elem` (map fst termStates) = "G"
           | otherwise = toString (g s)
 
 {----------------------------------------------------------------------
@@ -280,7 +268,7 @@ data Opts w = Opts
     , nEval :: w ::: Maybe Int <?>
         "The maximum number of state transitions allowed in each episode"
     , eps   :: w ::: Maybe Double <?>
-        "Probability of chosing initial action randomly"
+        "Probability of chosing action randomly"
     -- , alph  :: w ::: Maybe Double <?>
     --     "Learning gain (step size)"
     , dcy   :: w ::: Maybe Double <?>
@@ -295,10 +283,6 @@ instance ParseRecord (Opts Wrapped)
 ----------------------------------------------------------------------}
 
 mdFilename = "other/windygrid.md"
-
-boolToDouble :: Bool -> Double
-boolToDouble True = 1
-boolToDouble _    = 0
 
 main :: IO ()
 main = do
@@ -319,24 +303,17 @@ main = do
   let (fs, counts') = P.unzip $ take 20
                    $ iterate
                        ( optPol
-                           rltDef
+                           hypParamsDef
                              { disc       = gGamma
                              , epsilon    = 0.1
                              , maxIter    = 20
-                             , states     = allStatesV
-                             , actions    = myActions
-                             , nextStates = myNextStates
-                             , rewards    = myRewards
-                             , stateVals  = zip myTermStates $ repeat 0
-                             , sEnum      = mySEnum
-                             , aEnum      = myAEnum
-                             , aGen       = myAGen
                              }
                        ) (const (Rt, 0), [])
       counts = P.tail counts'
-      acts   = map (\f -> VS.map (fst . f) allStatesV) fs
-      diffs  = map (VS.map boolToDouble . uncurry (VS.zipWith (/=)))
+      acts   = map (\f -> map (fst . f) states) fs
+      diffs  = map (map boolToDouble . uncurry (zipWith (/=)))
                   $ zip acts (P.tail acts)
+      g' :: MyState -> (MyAction, Double)
       ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
         -- runWriter $ withinOnM eps'
         runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
@@ -346,8 +323,10 @@ main = do
       pol    = fst . g'
       val    = snd . g'
       cnts   = cnts'
-      visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
-      -- visits = runEpisode 20 pol (((.) . (.)) (P.!! 1) myNextStates) myTermStates myStartState
+      -- visits = runEpisode 20 pol (((.) . (.)) P.head) (map fst nextStates) termStates $ P.head initStates
+      visits =
+        runEpisode 20 pol (((.) . (.)) (P.head . map fst) nextStates)
+          (map fst termStates) $ P.head initStates
 
   appendFile mdFilename "\n#### Final policy\n\n"
   appendFile mdFilename $ pack $ showFofState pol
@@ -386,33 +365,22 @@ main = do
   appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
 
   let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
-        let myRLType =
-              rltDef
+        let myHypParams =
+              hypParamsDef
                 { disc       = gGamma
                 , epsilon    = eps'
-                -- , alpha      = alph'
                 , alpha      = alp
                 , beta       = beta'
                 , maxIter    = nEvals
-                , states     = allStatesV
-                , actions    = myActions
-                , nextStates = myNextStates
-                , rewards    = myRewards
-                , stateVals  = zip myTermStates $ repeat 0
-                , sEnum      = mySEnum
-                , aEnum      = myAEnum
-                , aGen       = myAGen
-                , initStates = [myStartState]
                 , tdStepType = Qlearn
                 }
-            -- res = doTD myRLType nIters
             ress = for [Sarsa, Qlearn, ExpSarsa] $
                        \ stepT ->
-                         doTD myRLType{tdStepType = stepT} nIters
-            vss  = map (map (appV mySEnum) . valFuncs) ress
+                         doTD myHypParams{tdStepType = stepT} nIters
+            vss  = map valFuncs ress
             ers  = map ( map ( \ v -> (/ dpNorm) . mean $
                                         [ sqr (v s - val s)
-                                        | s <- allStates
+                                        | s <- states
                                         ]
                              )
                        ) vss
@@ -426,9 +394,9 @@ main = do
             -- maximum [Double] :: Double
          in (ers, termVals)
       dpNorm = mean [ sqr (val s)
-                    | s <- allStates
+                    | s <- states
                     ]
-      nPts   = nIters * nEvals
+      -- nPts   = nIters * nEvals
       -- ps     = polFuncs res
       -- counts = polXCnts res
       -- cnts   = valXCnts res
@@ -511,11 +479,6 @@ main = do
   appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
 
 #endif
-
-for = flip map
-
-takeEvery _ [] = []
-takeEvery n xs = P.head xs : (takeEvery n $ drop n xs)
 
 \end{code}
 

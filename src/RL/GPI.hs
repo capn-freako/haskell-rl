@@ -56,25 +56,21 @@ import qualified Prelude as P
 import Prelude (Show(..))
 import Protolude  hiding (show, for)
 
-import GHC.TypeLits
-
 import qualified Data.Vector.Sized   as VS
 import Data.Vector.Sized             (Vector)
 
-import Control.Arrow                 ((&&&))
 import Control.Monad.Writer
 import Data.Finite
-import Data.Finite.Internal
-import Data.List                     ((!!), lookup, groupBy, unzip5)
+import Data.List                     (lookup, groupBy)  -- , unzip5)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
-import Statistics.Distribution       (density)
-import Statistics.Distribution.Gamma (gammaDistr)
 import System.Random
 import ToolShed.System.Random        (shuffle)
-import Text.Printf
 
 import ConCat.TArr
+
+import RL.MDP
+import RL.Util
 
 {----------------------------------------------------------------------
   Orphans
@@ -85,74 +81,6 @@ instance (KnownNat n) => HasTrie (Finite n) where
   trie f                   = FiniteTrie (VS.generate (f . finite . fromIntegral))
   untrie (FiniteTrie v)    = VS.index v
   enumerate (FiniteTrie v) = map (first (finite . fromIntegral)) $ (VS.toList . VS.indexed) v
-
-{----------------------------------------------------------------------
-  Markov Decision Process (MDP) Definition.
-----------------------------------------------------------------------}
-
--- | Markov Decision Process (MDP) (finite discrete)
---
--- Laws:
---
--- 1. 1 == sum . map snd $
---           [ jointPMF s a
---           | s <- states
---           , a <- actions s
---           ]
---
--- Usage notes:
---
--- 1. If @initStates@ is empty
---    then use `head states` as the initial state;
---    else randomly select initial state from @initStates@.
---
--- 2. The notation used in the commentary comes from the Sutton & Barto
---    text.
---
-class MDP s a where
-  -- | State enumeration function - S.
-  states :: [s]
-  -- | Action enumeration function - A(s).
-  actions :: s -> [a]
-  -- | Joint probability distribution - Pr[(s', r) | s, a].
-  jointPMF :: s -> a -> [((s, Double), Double)]
-  -- | Initial states.
-  initStates :: [s]
-  initStates = []
-  -- | Terminal states and their values.
-  termStates :: [(s, Double)]
-  termStates = []
-
-{----------------------------------------------------------------------
-  Helper functions applicable only to MDPs.
-----------------------------------------------------------------------}
-
--- | Next states and their probabilities - S'(s, a).
-nextStates
-  :: (MDP s a, Eq s, Ord s)
-  => s -> a -> [(s, Double)]
-nextStates s a = combProb . map (first fst) $ jointPMF s a
-
--- | Rewards and their probabilities - R(s, a, s').
-rewards
-  :: (MDP s a, Eq s, Eq (Double), Ord (Double))
-  => s -> a -> s -> [((Double), Double)]
-rewards s a s' = combProb . map (first snd)
-  . filter ((== s') . fst . fst) $ jointPMF s a
-
-{----------------------------------------------------------------------
-  Helper functions expected to be used only locally.
-----------------------------------------------------------------------}
-
--- Eliminate duplicates from a probability distribution, by combining
--- like terms and summing their probabilities.
-combProb
-  :: (Eq a, Ord a)
-  => [(a, Double)] -> [(a, Double)]
-combProb =
-  map ((fst . P.head) &&& (sum . map snd))
-  . groupBy ((==)    `on` fst)
-  . sortBy  (compare `on` fst)
 
 {----------------------------------------------------------------------
   General policy iterator
@@ -221,20 +149,23 @@ data TDRetT s a r = TDRetT
 -- This is intended to be the function called by client code wishing to
 -- perform temporal difference based policy optimization.
 doTD
-  :: forall a s.
-  ( MDP s a, Num (Double), HasFin s, HasFin a )  -- , Ord r )  -- , Eq s, Eq a)
+  :: forall s.
+     ( MDP s, Ord s, Eq (ActionT s)
+     , HasFin' s, HasFin' (ActionT s)
+     -- , KnownNat (Card s), KnownNat (Card (ActionT s))
+     )  -- , Ord r )  -- , Eq s, Eq a)
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
-  -> Int          -- ^ Number of episodes to run.
-  -> TDRetT s a (Double)
+  -> Int                 -- ^ Number of episodes to run.
+  -> TDRetT s (ActionT s) (Double)
 doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
   gen = mkStdGen 1
   (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen, 0) $
     replicateM nIters $ do
       (q, g, t) <- get
-      let s = case initStates of
+      let s = case initStates @s of
                 [] -> P.head states
                 _  -> P.head $ shuffle g initStates
-          (_, q', g', dbgs, t') = optQn @a hParams (s, q, g, [], t)
+          (_, q', g', dbgs, t') = optQn hParams (s, q, g, [], t)
       put (q', g', t')
       return (q', dbgs)
   -- Calculate policies and count differences between adjacent pairs.
@@ -242,9 +173,9 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
   ass    = map (\p -> map p states) ps
   pDiffs = map (length . filter (== False)) $ zipWith (zipWith (==)) ass (P.tail ass)
   -- Calculate value functions and mean square differences between adjacent pairs.
-  vs     = map (\q -> \s -> maximum . map (appFm @a q s) $ actions s) qs
+  vs     = map (\q -> \s -> maximum . map (appFm q s) $ actions s) qs
   valss  = map (\v -> map v states) vs
-  vErrs  = map mean $ zipWith (zipWith (sqr . (-))) valss (P.tail valss)
+  vErrs  = map (mean . map sqr) $ zipWith (zipWith (-)) valss (P.tail valss)
 
 -- | Yields a single episodic action-value improvement iteration, using n-step TD.
 --
@@ -253,12 +184,12 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
 -- - maxIter: The "n" in n-step.
 optQn
   -- :: forall a s m n k g.
-  :: forall a s m n g.
-     ( MDP s a, HasFin s, HasFin a, Ord s, Eq a
+  :: forall s m n g.
+     ( MDP s, HasFin' s, HasFin' (ActionT s), Ord s, Eq (ActionT s)
      -- , KnownNat m, KnownNat n, KnownNat k, m ~ (k + 1)
      , KnownNat m, KnownNat n  -- , KnownNat k, m ~ (k + 1)
      -- , m ~ Card s, n ~ Card a
-     , Card s ~ m, Card a ~ n
+     , Card s ~ m, Card (ActionT s) ~ n
      , RandomGen g
      )
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
@@ -281,7 +212,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                 else qm
 
         -- Helpful abbreviations
-        qf = appFm @a @s qm
+        qf = appFm qm
         s  = P.last ss
 
         -- Policy definitions
@@ -347,13 +278,13 @@ optQn HypParams{..} (s0, q, gen, _, t) =
 -- - maxIter: max. policy evaluation iterations (0 = Value Iteration)
 --
 -- Returns a combined policy & value function.
-optPol :: ( MDP s a, Eq s, HasTrie s
-          , Ord a, HasTrie a
-          , KnownNat m, KnownNat n
+optPol :: ( MDP s, Eq s, Ord s, HasTrie s
+          , Ord (ActionT s), HasTrie (ActionT s)
+          -- , KnownNat m, KnownNat n
           )
        => HypParams Double      -- ^ Simulation hyper-parameters.
-       -> (s -> (a, Double), [Int])  -- ^ initial policy & value functions
-       -> (s -> (a, Double), [Int])
+       -> (s -> ((ActionT s), Double), [Int])  -- ^ initial policy & value functions
+       -> (s -> ((ActionT s), Double), [Int])
 optPol HypParams{..} (g, _) = (bestA, cnts)
  where
   -- bestA   = maximumBy (compare `on` snd) . aVals v'  --This one just searched for the maximum value.
@@ -377,8 +308,7 @@ optPol HypParams{..} (g, _) = (bestA, cnts)
                                     | (r, p) <- rs' s a s'
                                     ]
             ]
-      )
-      $ lookup s termStates
+      ) $ lookup s termStates
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
   ((_, v'), cnts) =  -- `cnts` is # of value changes > epsilon.
@@ -395,7 +325,7 @@ optPol HypParams{..} (g, _) = (bestA, cnts)
                     (> epsilon)
                 . fst
                 )
-                $ zip (map abs $ zipWith (-) vs (P.tail vs))
+                $ zip (map (map abs) $ zipWith (zipWith (-)) vs (P.tail vs))
                       (P.tail evalIters)
   vs = map (for states) evalIters
   evalIters = take (maxIter + 1) $ iterate (evalPol (fst . g)) $ snd . g
@@ -497,196 +427,4 @@ optQ RLType{..} (s, q, gen, _, t) = (s', q', gen', dbgs, t + 1) where
   epsilon'  = epsilon / decayFact
   decayFact = (1 + beta * fromIntegral t)
 #endif
-
--- | Apply the matrix representation of a function.
---
--- Note that `r` here signifies row, not reward.
-appFm
-  :: forall c r m n a.
-     ( HasFin r,   HasFin c
-     , KnownNat m, KnownNat n
-     , Card r ~ m, Card c ~ n
-     )
-  => Vector m (Vector n a)  -- ^ matrix representation of f(r,c)
-  -> r                      -- ^ row
-  -> c                      -- ^ column
-  -> a
-appFm f r c = f `VS.index` toFin r `VS.index` toFin c
-
--- | Apply the vector representation of a function.
-appFv
-  :: ( HasFin x , KnownNat n , Card x ~ n )
-  => Vector n a  -- ^ vector representation of f(x)
-  -> x           -- ^ function argument
-  -> a
-appFv f x = f `VS.index` toFin x
-
--- | Convert an action-value matrix to a value vector.
---
--- (i.e. - Q(s,a) -> V(s))
-qToV
-  :: ( Ord a
-     , KnownNat m, KnownNat n, KnownNat k
-     , n ~ (k + 1)
-     )
-  => Vector m (Vector n a)  -- ^ matrix representation of Q(s,a)
-  -> Vector m a             -- ^ matrix representation of V(s)
-qToV = VS.map VS.maximum
-
--- | Convert an action-value matrix to a policy vector.
---
--- (i.e. - Q(s,a) -> A(s))
-qToP
-  :: ( Ord a, HasFin act
-     , KnownNat m, KnownNat n, KnownNat k
-     , n ~ (k + 1), Card act ~ n
-     )
-  => Vector m (Vector n a)  -- ^ matrix representation of Q(s,a)
-  -> Vector m act           -- ^ vector representation of P(s)
-qToP = VS.map (unFin . VS.maxIndex)
-
-{----------------------------------------------------------------------
-  Misc.
-----------------------------------------------------------------------}
-
--- Unary function type alias, for notational convenience.
--- type Unary a = a -> a
-
--- | To control the formatting of printed floats in output matrices.
-newtype Pfloat = Pfloat { unPfloat :: Float}
-  deriving (Eq)
-
-instance Show Pfloat where
-  show x = printf "%4.1f" (unPfloat x)
-
-newtype Pdouble = Pdouble { unPdouble :: Double }
-  deriving (Eq, Ord)
-
-instance Show Pdouble where
-  show x = printf "%4.1f" (unPdouble x)
-
-poisson :: Finite 5 -> Finite 12 -> Float
-poisson (Finite lambda) (Finite n') =
-  lambda' ^ n * exp (-lambda') / fromIntegral (fact n)
- where lambda' = fromIntegral lambda
-       n       = fromIntegral n'
-
-fact :: Int -> Int
-fact 0 = 1
-fact n = product [1..n]
-
-poissonVals :: VS.Vector 5 (VS.Vector 12 Float)
-poissonVals = VS.generate (VS.generate . poisson)
-
-poisson' :: Finite 5 -> Finite 21 -> Float
-poisson' n x@(Finite x') =
-  if x > 11  -- The Python code enforces this limit. And we're trying
-    then 0   -- for an "apples-to-apples" performance comparison.
-    else poissonVals `VS.index` n `VS.index` finite x'
-
--- | Gamma pdf
---
--- Assuming `scale = 1`, `shape` should be: 1 + mean.
-gammaPdf :: Double -> Double -> Double -> Double
-gammaPdf shape scale = density (gammaDistr shape scale)
-
--- | Gamma pmf
---
--- Scale assumed to be `1`, so as to match the calling signature of
--- `poisson`.
-gamma :: Finite 5 -> Finite 12 -> Double
-gamma (Finite expect') (Finite n') =
-  0.1 * sum [gammaPdf' (n + x) | x <- [0.1 * m | m <- [-4..5]]]
-    where gammaPdf' = gammaPdf (1 + expect) 1
-          expect    = fromIntegral expect'
-          n         = fromIntegral n'
-
-gammaVals :: VS.Vector 5 (VS.Vector 12 Double)
-gammaVals = VS.generate (VS.generate . gamma)
-
-gamma' :: Finite 5 -> Finite 21 -> Double
-gamma' n (Finite x') =
-  if x' > 11
-    then 0
-    else gammaVals `VS.index` n `VS.index` finite x'
-
--- | Monadically search list for first element less than
--- given threshold under the given function, and return the last element
--- if the threshold was never met.
--- Return 'Nothing' if the input list was empty.
-withinOnM :: Monad m
-          => Double
-          -> (a -> m Double)
-          -> [a]
-          -> m (Maybe a)
-withinOnM _   _ [] = return Nothing
-withinOnM eps f xs = do
-  n <- withinIxM eps $ map f xs
-  case n of
-    Nothing -> return Nothing
-    Just n' -> return $ Just (xs !! n')
-
--- | Monadically find index of first list element less than or equal to
--- given threshold, or the index of the last element if the threshold
--- was never met.
---
--- A return value of 'Nothing' indicates an empty list was given.
-withinIxM :: Monad m
-          => Double
-          -> [m Double]
-          -> m (Maybe Int)
-withinIxM _   [] = return Nothing
-withinIxM eps xs = withinIxM' 0 xs
- where withinIxM' n []     = return $ Just (n - 1)
-       withinIxM' n (y:ys) = do
-         y' <- y
-         if y' < eps then return (Just n)
-                     else withinIxM' (n+1) ys
-
--- | Return the maximum value of a set, as well as a count of the number
--- of non-zero elements in the set.
---
--- (See documentation for `chooseAndCount` function.)
-maxAndNonZero :: (Foldable t, Num a, Ord a) => t a -> Writer [Int] a
-maxAndNonZero = chooseAndCount max (/= 0)
-
--- | Choose a value from the set using the given comparison function,
--- and provide a count of the number of elements in the set meeting the
--- given criteria.
-chooseAndCount :: (Foldable t, Num a)
-               => (a -> a -> a)  -- ^ choice function
-               -> (a -> Bool)    -- ^ counting predicate
-               -> t a            -- ^ foldable set of elements to count/compare
-               -> Writer [Int] a
-chooseAndCount f p xs = do
-  let (val, cnt::Int) =
-        foldl' ( \ (v, c) x ->
-                   ( f v x
-                   , if p x
-                       then c + 1
-                       else c
-                   )
-               ) (0,0) xs
-  tell [cnt]
-  return val
-
-vsFor = flip VS.map
-
--- | Mean value of a collection
-mean :: (Foldable f, Fractional a) => f a -> a
-mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (0,0::Integer)
-
--- | Find the mean square of a list of lists.
-arrMeanSqr :: (Functor f, Foldable f, Functor g, Foldable g, Fractional a) => f (g a) -> a
-arrMeanSqr = mean . fmap mean . fmap (fmap sqr)
-
-sqr :: Num a => a -> a
-sqr x = x * x
-
--- | Convert any showable type to a string, avoiding the introduction
--- of extra quotation marks when that type is a string to begin with.
-toString :: (Show a, Typeable a) => a -> P.String
-toString x = fromMaybe (show x) (cast x)
-
-for = flip map
 
