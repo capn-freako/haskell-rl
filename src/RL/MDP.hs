@@ -67,8 +67,8 @@ nextStates s a = combProb . map (first fst) $ jointPMF s a
 
 -- | Rewards and their probabilities - R(s, a, s').
 rewards
-  :: (MDP s, Eq s, Eq (Double), Ord (Double))
-  => s -> ActionT s -> s -> [((Double), Double)]
+  :: (MDP s, Eq s)
+  => s -> ActionT s -> s -> [(Double, Double)]
 rewards s a s' = combProb . map (first snd)
   . filter ((== s') . fst . fst) $ jointPMF s a
 

@@ -28,29 +28,6 @@
 {-# LANGUAGE TypeApplications #-}
 
 module RL.GPI where
-  -- ( Pfloat (..)
-  -- , Pdouble (..)
-  -- , RLType (..)
-  -- , rltDef
-  -- , optPol
-  -- , optQ
-  -- , doTD
-  -- , runEpisode
-  -- , maxAndNonZero
-  -- , chooseAndCount
-  -- , poisson'
-  -- , gamma'
-  -- , gamma
-  -- , withinOnM
-  -- , mean
-  -- , arrMeanSqr
-  -- , qToV
-  -- , qToP
-  -- , appFv
-  -- , appFv
-  -- , appFm
-  -- , toString
-  -- ) where
 
 import qualified Prelude as P
 import Prelude (Show(..))
@@ -154,8 +131,7 @@ doTD
   :: forall s.
      ( MDP s, Ord s, Eq (ActionT s)
      , HasFin' s, HasFin' (ActionT s)
-     -- , KnownNat (Card s), KnownNat (Card (ActionT s))
-     )  -- , Ord r )  -- , Eq s, Eq a)
+     )
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
   -> Int                 -- ^ Number of episodes to run.
   -> TDRetT s (ActionT s) (Double)
@@ -167,7 +143,6 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
       let s = case initStates @s of
                 [] -> P.head states
                 _  -> P.head $ shuffle g initStates
-          -- (_, q', g', dbgs, t') = optQn hParams (s, q, g, [], t)
           (_, q's, g's, dbgs, t's) =
             unzip5 $ take maxIter $ P.tail
                    $ iterate (optQn hParams) (s, q, g, [], t)
@@ -286,15 +261,14 @@ optQn HypParams{..} (s0, q, gen, _, t) =
 
 -- | Yields a single policy improvment iteration.
 --
--- RLType field overrides:
--- - maxIter: max. policy evaluation iterations (0 = Value Iteration)
+-- @HypParams@ field overrides:
+-- - @maxIter@: max. policy evaluation iterations (0 = Value Iteration)
 --
 -- Returns a combined policy & value function.
 optPol :: ( MDP s, Eq s, Ord s, HasTrie s
           , Ord (ActionT s), HasTrie (ActionT s)
-          -- , KnownNat m, KnownNat n
           )
-       => HypParams Double      -- ^ Simulation hyper-parameters.
+       => HypParams Double                     -- ^ Simulation hyper-parameters.
        -> (s -> ((ActionT s), Double), [Int])  -- ^ initial policy & value functions
        -> (s -> ((ActionT s), Double), [Int])
 optPol HypParams{..} (g, _) = (bestA, cnts)
@@ -312,7 +286,6 @@ optPol HypParams{..} (g, _) = (bestA, cnts)
   actVal v s a =
     fromMaybe  -- We look for terminal states first, before performing the default action.
       ( sum [ pt * disc * u + rt
-            -- | s' <- nextStates s a
             | s' <- map fst $ nextStates s a
             , let u = v s'
             , let (pt, rt) = foldl' prSum (0,0)
@@ -325,7 +298,6 @@ optPol HypParams{..} (g, _) = (bestA, cnts)
   rs' = memo3 rewards
   ((_, v'), cnts) =  -- `cnts` is # of value changes > epsilon.
     if length evalIters == 1
-      -- then ((VS.replicate 0, P.head evalIters), [])
       then (([], P.head evalIters), [])
       else
         first (fromMaybe (P.error "optPol: Major blow-up!"))
@@ -356,87 +328,4 @@ runEpisode
 runEpisode n pol nxt terms init =
   takeWhile (`notElem` terms) $
     take n $ iterate (\s -> nxt s (pol s)) init
-
-#if 0
--- | Yields a single episodic action-value improvement iteration.
---
--- RLType field overrides:
--- - epsilon: Used to form an "epsilon-greedy" policy.
--- - maxIter: (ignored)
--- - states:  First in list is assumed to be the initial state,
---            if `initStates` is empty.
-optQ
-  :: ( KnownNat m, KnownNat n, KnownNat k
-     , m ~ (k + 1)
-     , Eq s, Eq a, RandomGen g
-     )
-  => RLType s a m n                                        -- ^ abstract type, to protect API
-  -> (s, Vector m (Vector n Double), g, Dbg s g, Integer)  -- ^ initial state, action-value matrix, and random generator
-  -> (s, Vector m (Vector n Double), g, Dbg s g, Integer)  -- ^ updated state, action-value matrix, and random generator
-optQ RLType{..} (s, q, gen, _, t) = (s', q', gen', dbgs, t + 1) where
-  q' =
-    q VS.// [ ( sNum
-              , q `VS.index` sNum VS.// [(aEnum a, newVal)]
-              )
-            ]
-
-  -- Helpful abbreviations
-  sNum = sEnum s
-  qf   = appFm q
-
-  -- Policy definitions
-  (x, gen') = random gen
-  pol' st   = argmax (qf st) (actions st)  -- greedy
-  pol  st   = if x > epsilon'              -- epsilon-greedy
-                 then pol' st
-                 else case otherActs of
-                        [] -> pol' st
-                        xs -> P.head $ shuffle gen $ xs
-   where otherActs = filter (/= (pol' st)) $ actions st
-
-  -- Use epsilon-greedy policy to choose action.
-  a = pol s
-
-  -- Produce a sample next state, obeying the actual distribution.
-  s' = P.head $ shuffle gen' $
-         concat [ replicate (round $ 100 * p) st
-                | (st, p) <- s'p's
-                ]
-  s'p's  = zip s's p's
-  s's    = nextStates s a
-  p's    = map (sum . map snd) rss  -- next state probabilities
-  rss    = map (rewards s a) s's
-
-  -- Do the update.
-  newVal =
-    fromMaybe
-      (oldVal + alpha' * (r + disc * eQs'a' - oldVal)) $
-      lookup s termStates
-  oldVal = qf s a
-  r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
-  ps'    = fromMaybe (P.error "RL.GPI.optQ: Lookup failure at line 334!")
-                     (lookup s' s'p's)
-  eQs'a' =
-    case tdStepType of
-      Sarsa    -> qf s' $ pol  s'  -- Uses epsilon-greedy policy.
-      Qlearn   -> qf s' $ pol' s'  -- Uses greedy policy.
-      ExpSarsa ->  -- E[Q(s', a')]
-        sum [ p * qf s' a'
-            | a' <- acts
-            , let p = if a' == pol' s'
-                         then 1 - epsilon'
-                         else epsilon' / fromIntegral (lActs - 1)
-            ]
-  acts  = actions s'
-  lActs = length acts
-  dbgs  = Dbg s'p's s s' r eQs'a' gen $
-            [ [ qf st act
-              | act <- actions st
-              ]
-            | (st, _) <- termStates
-            ]
-  alpha'    = alpha   / decayFact
-  epsilon'  = epsilon / decayFact
-  decayFact = (1 + beta * fromIntegral t)
-#endif
 

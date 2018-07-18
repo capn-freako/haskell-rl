@@ -75,26 +75,17 @@ import qualified Prelude as P
 import Prelude (unlines, Show(..), String)
 import Protolude  hiding (show, for, first, second)
 
--- import GHC.TypeLits
--- import qualified GHC.TypeLits as T
-
 import Options.Generic
 
 import Control.Arrow
 import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
--- import Data.List                              (sortBy, groupBy, unzip3)
 import Data.MemoTrie
 import Data.Text                              (pack)
--- import Data.Typeable
 import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty, Iso)
 import Graphics.Rendering.Chart.Backend.Cairo
--- import Statistics.Distribution                (density)
--- import Statistics.Distribution.Gamma          (gammaDistr)
--- import System.Random
 import Text.Printf
--- import ToolShed.System.Random                 (shuffle)
 
 import ConCat.Isomorphism
 import ConCat.TArr
@@ -122,10 +113,8 @@ gNumRows = int @NNumRows
 type NNumCols = 10
 gNumCols = int @NNumCols
 
--- type Ns = NNumRows T.* NNumCols
 type Na = 9
 
--- type MyState = (Int, Int)
 type MyState = (Finite NNumRows, Finite NNumCols)
 
 instance MDP MyState where
@@ -271,8 +260,6 @@ data Opts w = Opts
         "The 'n' in n-step TD."
     , eps   :: w ::: Maybe Double <?>
         "Probability of chosing action randomly"
-    -- , alph  :: w ::: Maybe Double <?>
-    --     "Learning gain (step size)"
     , dcy   :: w ::: Maybe Double <?>
         "The decay rate for epsilon/alpha"
     }
@@ -295,14 +282,12 @@ main = do
       nEvals = fromMaybe     20 (nEval o)
       nSteps' = fromMaybe     0 (nStep o)
       eps'   = fromMaybe    0.1 (eps   o)
-      -- alph'  = fromMaybe    0.5 (alph  o)
       beta'  = fromMaybe    0   (dcy   o)
 
   -- Calculate and display optimum policy.
   writeFile mdFilename "\n### DP Results\n\n"
 
   -- Run DP, to generate reference values.
-  -- let (fs, counts') = P.unzip $ take (nIters + 1)
   let (fs, counts') = P.unzip $ take 20
                    $ iterate
                        ( optPol
@@ -318,7 +303,6 @@ main = do
                   $ zip acts (P.tail acts)
       g' :: MyState -> (MyAction, Double)
       ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
-        -- runWriter $ withinOnM eps'
         runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
                               ( \ (dv, _) ->
                                   maxAndNonZero dv
@@ -326,7 +310,6 @@ main = do
       pol    = fst . g'
       val    = snd . g'
       cnts   = cnts'
-      -- visits = runEpisode 20 pol (((.) . (.)) P.head) (map fst nextStates) termStates $ P.head initStates
       visits =
         runEpisode 20 pol (((.) . (.)) (P.head . map fst) nextStates)
           (map fst termStates) $ P.head initStates
@@ -364,7 +347,6 @@ main = do
   appendFile mdFilename "\n### TD Results\n\n"
 
   appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
-  -- appendFile mdFilename $ pack $ printf "alpha = %3.1f  \n" alph'
   appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
 
   let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
@@ -390,26 +372,10 @@ main = do
                        ) vss
             termVals :: [[Double]]
             termVals = map (map (maximum . map maximum . termQs) . concat . debugs) ress
-            -- ress :: [TDRetT]
-            -- debugs (x :: TDRet) :: [[Dbg]]
-            -- concat [[Dbg]] :: [Dbg]
-            -- termQs (x :: Dbg) :: [[Double]]
-            -- map maximum [[Double]] :: [Double]
-            -- maximum [Double] :: Double
          in (ers, termVals)
       dpNorm = mean [ sqr (val s)
                     | s <- states
                     ]
-      -- nPts   = nIters * nEvals
-      -- ps     = polFuncs res
-      -- counts = polXCnts res
-      -- cnts   = valXCnts res
-      -- dbgss  = debugs   res
-
-      -- val = appV mySEnum $ P.last vs
-      -- pol = appP mySEnum $ P.last ps
-      -- -- visits = runEpisode 20 pol (((.) . (.)) P.head myNextStates) myTermStates myStartState
-
 
   -- Value function error vs. Iteration
   appendFile mdFilename "\n#### Mean Square Value Function Error vs. DP\n\n"
@@ -461,28 +427,6 @@ main = do
   appendFile mdFilename "circle: alpha=0.1  \n"
   appendFile mdFilename "plus: alpha=0.2  \n"
   appendFile mdFilename "line: alpha=0.5  \n"
-
-#if 0
-  -- Debugging info from `doTD`
-  -- data Dbg s = Dbg
-  --   { nxtStPrbs :: [(s, Double)]
-  --   , nxtSt     :: s
-  --   , rwd       :: Double
-  --   , eNxtVal   :: Double
-  --   } deriving (Show)
-  appendFile mdFilename "\n### Debugging info from doTD\n\n"
-  appendFile mdFilename $ pack $ printf "Length dbgss: %d  \n" (length dbgss)
-  appendFile mdFilename $ pack $ printf "Length dbgss[0]: %d  \n" (length $ P.head dbgss)
-  let dbgs       = concat dbgss
-      nxtStPrbss = map nxtStPrbs dbgs
-      nxtStTots  = map (sum . map snd) nxtStPrbss
-      rwds       = map rwd dbgs
-      eNxtVals   = map eNxtVal dbgs
-  appendFile mdFilename $ pack $ printf "Next state total probabilities: min. = %f, max. = %f  \n" (minimum nxtStTots) (maximum nxtStTots)
-  appendFile mdFilename $ pack $ printf "Rewards: min. = %f, max. = %f  \n" (minimum rwds) (maximum rwds)
-  appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
-
-#endif
 
 \end{code}
 

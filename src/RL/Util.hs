@@ -224,6 +224,7 @@ mean = uncurry (/) . second fromIntegral . foldl' (\ (!s, !n) x -> (s+x, n+1)) (
 arrMeanSqr :: (Functor f, Foldable f, Functor g, Foldable g, Fractional a) => f (g a) -> a
 arrMeanSqr = mean . fmap mean . fmap (fmap sqr)
 
+-- | Take the square of a numerical type.
 sqr :: Num a => a -> a
 sqr x = x * x
 

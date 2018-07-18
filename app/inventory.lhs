@@ -30,7 +30,6 @@ code
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -cpp #-}
--- {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -78,22 +77,17 @@ import qualified GHC.TypeLits as T
 
 import Options.Generic
 
--- import qualified Data.Vector.Sized   as VS
--- import Data.Vector.Sized                      (Vector)
-
 import Control.Arrow
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
 import Data.List                              (sortBy, groupBy)
--- import Data.List.Extras.Argmax                (argmax, argmin)
 import Data.MemoTrie
 import Data.Text                              (pack)
 import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty, Iso)
 import Graphics.Rendering.Chart.Backend.Cairo
 import Statistics.Distribution                (density)
 import Statistics.Distribution.Gamma          (gammaDistr)
--- import System.Random
 import Text.Printf
 
 import ConCat.Isomorphism
@@ -230,62 +224,6 @@ showFofState' k g = unlines
     )
   )
 
-#if 0
--- | Expected reward for a given state, assuming equiprobable actions.
-testRewards :: Int -> MyState -> Double
-testRewards p s =
-  mean [ ( sum
-         . map (uncurry (*) . second (/ pNorm))
-         ) $ rewards' p s a s'
-       | a  <- acts
-       , s' <- nextStates' s a
-       ]
-  where acts  = actions' s
-        pNorm = fromIntegral $ length acts
-#endif
-
-{----------------------------------------------------------------------
-  DP reference, for TD comparison.
-
-    dca9047d694f:haskell-rl a594349$ time stack exec -- inventory --nIter 8 --nEval 4 --eps 1 --alph 0.5 --dis 0.9 --p 2
-
-    real	27m27.109s
-    user	26m0.135s
-    sys	48m38.034s
-----------------------------------------------------------------------}
-
-#if 0
-vDP = [ [-116.5, -99.7, -85.4, -73.9, -65.4, -59.6]
-      , [ -99.7, -85.4, -73.9, -65.4, -59.6, -56.3]
-      , [ -85.4, -73.9, -65.4, -59.6, -56.3, -55.3]
-      , [ -73.9, -65.4, -59.6, -56.3, -55.3, -55.9]
-      , [ -65.4, -59.6, -56.3, -55.3, -55.9, -57.9]
-      , [ -59.6, -56.3, -55.3, -55.9, -57.9, -60.4]
-      , [ -56.3, -55.3, -55.9, -57.9, -60.4, -63.0]
-      , [ -55.3, -55.9, -57.9, -60.4, -63.0, -65.6]
-      , [ -55.9, -57.9, -60.4, -63.0, -65.6, -68.3]
-      , [ -57.9, -60.4, -63.0, -65.6, -68.3, -70.9]
-      , [ -60.4, -63.0, -65.6, -68.3, -70.9, -74.1]
-      ]
-vDPMeanSqr :: Double
-vDPMeanSqr = arrMeanSqr vDP
-
-pDP = [ [5, 5, 5, 5, 5, 5]
-      , [5, 5, 5, 5, 5, 5]
-      , [5, 5, 5, 5, 5, 5]
-      , [5, 5, 5, 5, 5, 5]
-      , [5, 5, 5, 5, 5, 5]
-      , [5, 5, 5, 5, 5, 4]
-      , [5, 5, 5, 5, 4, 3]
-      , [5, 5, 5, 4, 3, 2]
-      , [5, 5, 4, 3, 2, 1]
-      , [5, 4, 3, 2, 1, 0]
-      , [4, 3, 2, 1, 0, 0]
-      ]
-pDPMeanSqr :: Double
-pDPMeanSqr = arrMeanSqr pDP
-#endif
-
 {----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
@@ -297,12 +235,8 @@ data Opts w = Opts
         "The 'n' in n-step TD."
     , nStep :: w ::: Maybe Int <?>
         "The 'n' in n-step TD."
-    -- , p     :: w ::: Maybe Int <?>
-    --     "The ratio of stock-out to holding costs"
     , eps   :: w ::: Maybe Double <?>
         "The 'epsilon' in epsilon-greedy policy."
-    -- , alph  :: w ::: Maybe Double <?>
-    --     "The error correction gain"
     , dis   :: w ::: Maybe Double <?>
         "The discount rate."
     , dcy   :: w ::: Maybe Double <?>
@@ -326,9 +260,7 @@ main = do
   let nIters = fromMaybe  10000   (nIter o)
       nEvals = fromMaybe      1   (nEval o)
       nSteps' = fromMaybe     0   (nStep o)
-      -- pVal   = fromMaybe 50   (p     o)
       eps'   = fromMaybe  0.1 (eps   o)
-      -- alpha' = fromMaybe  0.5 (alph  o)
       disc'  = fromMaybe  0.9 (dis   o)
       beta'  = fromMaybe  0   (dcy   o)
 
@@ -361,7 +293,6 @@ main = do
   appendFile mdFilename "\n### Final value function\n\n"
   appendFile mdFilename $ pack $ showFofState (Pdouble . val)
 
-#if 1
   -- Policy/Value changes vs. Iteration
   toFile def "img/valueDiffs_inv.png" $ do
     layout_title .= "Policy/Value Changes vs. Evaluation Iteration"
@@ -381,16 +312,13 @@ main = do
                 ]
          )
   appendFile "other/inventory.md" "\n![](img/valueDiffs_inv.png)\n"
-#endif
 
   -- Run all 3 flavors of TD, comparing results to DP.
   appendFile mdFilename "\n### TD Results\n\n"
 
   appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
-  -- appendFile mdFilename $ pack $ printf "alpha = %3.1f  \n" alph'
   appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
 
-  -- let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
   let (erss, _) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
         let myHypParams =
               hypParamsDef
@@ -404,13 +332,11 @@ main = do
             ress = for [Sarsa, Qlearn, ExpSarsa] $
                        \ stepT ->
                          doTD myHypParams{tdStepType = stepT} nIters
-            -- vss  = map (map valFuncs) ress
             vss  = map valFuncs ress
             ers  = map ( map ( \ v -> (/ vRefMeanSqr) . mean $
                                       map (mean . map sqr)
                                           $ zipWith
                                               (zipWith (-))
-                                              -- vDP
                                               vRef
                                               $ map (map v)
                                                     [ [ MyState (finite onHnd) (finite onOrd) 0
@@ -455,10 +381,6 @@ main = do
 
   -- DEBUGGING
   appendFile mdFilename "\n## debug\n\n"
-
-  -- Reward expectations
-  -- appendFile mdFilename "### E[reward]\n\n"
-  -- appendFile mdFilename $ pack $ showFofState (Pdouble . testRewards pVal)
 
   -- Plot the pdfs.
   appendFile  "other/inventory.md"
@@ -509,85 +431,6 @@ main = do
       pmfSums = map (sum . map snd) nxtStPMFs
   appendFile "other/inventory.md" $ pack $ printf "\nNext state PMF sums: min = %5.2f; max = %5.2f.\n"
                                                   (minimum pmfSums) (maximum pmfSums)
-
-#if 0
-  -- Debugging info from `doTD`
-  -- data Dbg s = Dbg
-  --   { nxtStPrbs :: [(s, Double)]
-  --   , curSt     :: s
-  --   , nxtSt     :: s
-  --   , rwd       :: Double
-  --   , eNxtVal   :: Double
-  --   , randGen   :: g
-  --   } deriving (Show)
-  appendFile mdFilename "\n### Debugging info from doTD\n\n"
-  appendFile mdFilename $ pack $ printf "Length dbgss: %d  \n" (length dbgss)
-  appendFile mdFilename $ pack $ printf "Length dbgss[0]: %d  \n" (length $ P.head dbgss)
-  let dbgs       = concat dbgss
-      nxtStPrbss = map nxtStPrbs dbgs
-      nxtStTots  = map (sum . map snd) nxtStPrbss
-      rwds       = map rwd dbgs
-      eNxtVals   = map eNxtVal dbgs
-      curSts     = map curSt dbgs
-      randGens   = map randGen dbgs
-  appendFile mdFilename $ pack $ printf "Next state total probabilities: min. = %f, max. = %f  \n" (minimum nxtStTots) (maximum nxtStTots)
-  appendFile mdFilename $ pack $ printf "Rewards: min. = %f, max. = %f  \n" (minimum rwds) (maximum rwds)
-  appendFile mdFilename $ pack $ printf "E[Q(s', a')]: min. = %f, max. = %f  \n" (minimum eNxtVals) (maximum eNxtVals)
-
-  -- Initial state histogram
-  let titles' = ["First state visits"]
-      values' = map (show *** (: [])) $
-                    map (P.head &&& length) $
-                        group . sort $ map (getFinite . sEnum') curSts
-  toFile def "img/stHist.png" $
-    do layout_title .= "First State Histogram"
-       setColors $ map opaque [blue, green, red, yellow]
-       layout_x_axis . laxis_generate .= autoIndexAxis (map fst values')
-       plot $ plotBars <$> bars titles' (addIndexes (map snd values'))
-  appendFile "other/inventory.md" "\n![First state histogram](img/stHist.png)\n"
-
-  -- Random number generator checking
-  let rns = map (fst . random) randGens :: [Integer]
-  let titles'' = ["Random Numbers"]
-      values'' = map (show *** (: [])) $
-                    map (P.head &&& length) $
-                        group . sort $ rns
-  toFile def "img/randNums.png" $
-    do layout_title .= "Random Numbers"
-       setColors $ map opaque [blue, green, red, yellow]
-       layout_x_axis . laxis_generate .= autoIndexAxis (map fst values'')
-       plot $ plotBars <$> bars titles'' (addIndexes (map snd values''))
-  appendFile "other/inventory.md" "\n![Random numbers](img/randNums.png)\n"
-
-
-#endif
-
-#if 0
-doDP
-  :: HypParams MyState MyAction 378 6
-  -> Int
-  -> (MyState -> Double, MyState -> MyAction, [Int], [[Int]])
-doDP rlt nIters =
-  let (fs, counts') = P.unzip $ take (nIters + 1) $
-        iterate
-          (optPol rlt)
-          (const (0, 0), [])
-      valChngCnts = P.tail counts'
-      acts        = map (\f -> VS.map (fst . f) allStatesV) fs
-      diffs       = map ( VS.map (fromIntegral . abs)
-                        . uncurry (-)
-                        ) $ zip acts $ P.tail acts
-      ((_, g'), polChngCnts) = first (fromMaybe (P.error "main: Major failure!")) $
-        -- runWriter $ withinOnM eps'
-        runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
-                              ( \ (dv, _) ->
-                                  maxAndNonZero dv
-                              ) $ zip diffs (P.tail fs)
-      pol   = fst . g'
-      val   = snd . g'
-   in (val, pol, polChngCnts, valChngCnts)
-#endif
-
 \end{code}
 
 output
