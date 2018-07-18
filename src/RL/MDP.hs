@@ -1,6 +1,7 @@
 ------------------------------------------------------------------------
 -- |
 -- Module      :  RL.MDP
+-- Description :  Markov Decision Process
 -- Copyright   :  (c) Target Corp., 2018
 -- License     :  BSD-style (see the file LICENSE)
 --
@@ -25,16 +26,20 @@ import Data.List                     (groupBy)
 --
 -- Laws:
 --
--- 1. 1 == sum . map snd $
+-- 1. @jointPMF@ must return a true probability distribution. That is:
+--
+--     @
+--     1 = sum . map snd $
 --           [ jointPMF s a
 --           | s <- states
 --           , a <- actions s
 --           ]
+--     @
 --
 -- Usage notes:
 --
 -- 1. If @initStates@ is empty
---    then use `head states` as the initial state;
+--    then use @head states@ as the initial state;
 --    else randomly select initial state from @initStates@.
 --
 -- 2. The notation used in the commentary comes from the Sutton & Barto
@@ -42,11 +47,11 @@ import Data.List                     (groupBy)
 --
 class MDP s where
   type ActionT s :: *
-  -- | State enumeration function - S.
+  -- | State enumeration function - \(S\).
   states :: [s]
-  -- | Action enumeration function - A(s).
+  -- | Action enumeration function - \(A(s)\).
   actions :: s -> [ActionT s]
-  -- | Joint probability distribution - Pr[(s', r) | s, a].
+  -- | Joint probability distribution - \(Pr[(s', r) | s, a]\).
   jointPMF :: s -> ActionT s -> [((s, Double), Double)]
   -- | Initial states.
   initStates :: [s]
@@ -76,7 +81,7 @@ rewards s a s' = combProb . map (first snd)
   Helper functions expected to be used only locally.
 ----------------------------------------------------------------------}
 
--- Eliminate duplicates from a probability distribution, by combining
+-- | Eliminate duplicates from a probability distribution, by combining
 -- like terms and summing their probabilities.
 combProb
   :: (Eq a, Ord a)

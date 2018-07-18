@@ -1,6 +1,6 @@
 name:          haskell-rl
-version:       0.0.1
-synopsis:      See readme.md
+version:       0.0.2
+synopsis:      Haskell library for doing reinforcement learning.
 description:   See readme.md for description.
 category:      project
 homepage:      https://git.target.com/RedOptHaskell/haskell-rl/wiki
@@ -20,6 +20,8 @@ extra-source-files:
   stack.yaml
   other/lhs.css
   other/header.md
+  app/windygrid.lhs
+  app/inventory.lhs
 
 library
   default-language:

@@ -1,6 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  RL.GPI
+-- Description :  General Policy Iterator
 -- Copyright   :  (c) Target Corp., 2018
 -- License     :  BSD-style (see the file LICENSE)
 --
@@ -65,16 +66,16 @@ instance (KnownNat n) => HasTrie (Finite n) where
 
 -- | Hyper-parameters
 --
--- The stated intents of the various fields are correct for the @optPol@
+-- The stated intents of the various fields are correct for the @'optPol'@
 -- function, which was the first solver written and performs dynamic
 -- programming (DP).
 --
 -- Some fields have overloaded meanings/uses, depending upon whether
--- we're `optPol`ing, `optQ`ing, or ...
+-- we're @optPol@ing, @optQ@ing, or ...
 -- Individual functions below call out such differences in their header
 -- commentary as appropriate.
 --
--- The type parameter `r` should be equal to the reward type of the MDP
+-- The type parameter @r@ should be equal to the reward type of the MDP
 -- being solved.
 data HypParams r = HypParams
   { disc       :: r       -- ^ discount rate
@@ -86,7 +87,7 @@ data HypParams r = HypParams
   , nSteps     :: Int     -- ^ # of steps in n-step TD
   }
 
--- | A default value of type `HypParams`, to use as a starting point.
+-- | A default value of type @HypParams@, to use as a starting point.
 hypParamsDef :: HypParams Double
 hypParamsDef = HypParams
   { disc       =  1
@@ -113,7 +114,7 @@ data Dbg s r = Dbg
   , termQs    :: [[r]]
   } deriving (Show)
 
--- | Abstract type of return value from `doTD` function.
+-- | Abstract type of return value from @'doTD'@ function.
 data TDRetT s a r = TDRetT
   { valFuncs :: [s -> r]
   , polFuncs :: [s -> a]
@@ -121,7 +122,6 @@ data TDRetT s a r = TDRetT
   , valErrs  :: [r]
   , debugs   :: [[Dbg s r]]
   }
-  -- } deriving (Show)
 
 -- | Find optimum policy and value functions, using temporal difference.
 --
@@ -160,9 +160,9 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
 
 -- | Yields a single episodic action-value improvement iteration, using n-step TD.
 --
--- HypParams field overrides:
--- - epsilon: Used to form an "epsilon-greedy" policy.
--- - maxIter: The "n" in n-step.
+-- @'HypParams'@ field overrides:
+--
+-- - @epsilon@: Used to form an "epsilon-greedy" policy.
 optQn
   :: ( MDP s, HasFin' s, Ord s
      , Eq (ActionT s), HasFin' (ActionT s)
@@ -261,7 +261,8 @@ optQn HypParams{..} (s0, q, gen, _, t) =
 
 -- | Yields a single policy improvment iteration.
 --
--- @HypParams@ field overrides:
+-- @'HypParams'@ field overrides:
+--
 -- - @maxIter@: max. policy evaluation iterations (0 = Value Iteration)
 --
 -- Returns a combined policy & value function.

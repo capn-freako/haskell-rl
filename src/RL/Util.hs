@@ -1,6 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  RL.Util
+-- Description :  Misc. Utilities
 -- Copyright   :  (c) Target Corp., 2018
 -- License     :  BSD-style (see the file LICENSE)
 --
@@ -50,7 +51,7 @@ int = fromIntegral (nat @n)
 -- The first argument is assumed to index the rows of the matrix.
 appFm
   :: ( HasFin' a,   HasFin' b )
-  => Vector (Card a) (Vector (Card b) c)  -- ^ matrix representation of f(r,c)
+  => Vector (Card a) (Vector (Card b) c)  -- ^ matrix representation of @f(r,c)@
   -> a                                    -- ^ row
   -> b                                    -- ^ column
   -> c
@@ -59,26 +60,26 @@ appFm f x y = f `VS.index` toFin x `VS.index` toFin y
 -- | Apply the vector representation of a function.
 appFv
   :: ( HasFin' x )
-  => Vector (Card x) a  -- ^ vector representation of f(x)
+  => Vector (Card x) a  -- ^ vector representation of @f(x)@
   -> x                  -- ^ function argument
   -> a
 appFv f x = f `VS.index` toFin x
 
 -- | Convert an action-value matrix to a value vector.
 --
--- (i.e. - Q(s,a) -> V(s))
+-- (i.e. - \(Q(s,a) -> V(s)\))
 qToV
   :: ( Ord a
      , KnownNat m, KnownNat n, KnownNat k
      , n ~ (k + 1)
      )
-  => Vector m (Vector n a)  -- ^ matrix representation of Q(s,a)
-  -> Vector m a             -- ^ matrix representation of V(s)
+  => Vector m (Vector n a)  -- ^ matrix representation of @Q(s,a)@
+  -> Vector m a             -- ^ vector representation of @V(s)@
 qToV = VS.map VS.maximum
 
 -- | Convert an action-value matrix to a policy vector.
 --
--- (i.e. - Q(s,a) -> A(s))
+-- (i.e. - \(Q(s,a) -> A(s)\))
 qToP
   :: ( Ord a, HasFin' act
      , KnownNat m, KnownNat n, KnownNat k
@@ -99,6 +100,7 @@ newtype Pfloat = Pfloat { unPfloat :: Float}
 instance Show Pfloat where
   show x = printf "%4.1f" (unPfloat x)
 
+-- | To control the formatting of printed doubles in output matrices.
 newtype Pdouble = Pdouble { unPdouble :: Double }
   deriving (Eq, Ord)
 
