@@ -295,6 +295,8 @@ data Opts w = Opts
         "The number of policy improvement iterations."
     , nEval :: w ::: Maybe Int <?>
         "The 'n' in n-step TD."
+    , nStep :: w ::: Maybe Int <?>
+        "The 'n' in n-step TD."
     -- , p     :: w ::: Maybe Int <?>
     --     "The ratio of stock-out to holding costs"
     , eps   :: w ::: Maybe Double <?>
@@ -316,17 +318,14 @@ instance ParseRecord (Opts Wrapped)
 ----------------------------------------------------------------------}
 mdFilename = "other/inventory.md"
 
-boolToDouble :: Bool -> Double
-boolToDouble True = 1
-boolToDouble _    = 0
-
 main :: IO ()
 main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A mock inventory ordering optimizer."
   let nIters = fromMaybe  10000   (nIter o)
-      nEvals = fromMaybe      3   (nEval o)
+      nEvals = fromMaybe      1   (nEval o)
+      nSteps' = fromMaybe     0   (nStep o)
       -- pVal   = fromMaybe 50   (p     o)
       eps'   = fromMaybe  0.1 (eps   o)
       -- alpha' = fromMaybe  0.5 (alph  o)
@@ -358,7 +357,7 @@ main = do
       cnts   = cnts'
 
   writeFile mdFilename "\n### Final policy\n\n"
-  appendFile mdFilename $ pack $ showFofState pol
+  appendFile mdFilename $ pack $ showFofState (getFinite . pol)
   appendFile mdFilename "\n### Final value function\n\n"
   appendFile mdFilename $ pack $ showFofState (Pdouble . val)
 
@@ -400,6 +399,7 @@ main = do
                 , alpha      = alp
                 , beta       = beta'
                 , maxIter    = nEvals
+                , nSteps     = nSteps'
                 }
             ress = for [Sarsa, Qlearn, ExpSarsa] $
                        \ stepT ->
@@ -587,9 +587,6 @@ doDP rlt nIters =
       val   = snd . g'
    in (val, pol, polChngCnts, valChngCnts)
 #endif
-
-takeEvery _ [] = []
-takeEvery n xs = P.head xs : (takeEvery n $ drop n xs)
 
 \end{code}
 

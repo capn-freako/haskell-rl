@@ -61,7 +61,7 @@ import Data.Vector.Sized             (Vector)
 
 import Control.Monad.Writer
 import Data.Finite
-import Data.List                     (lookup, groupBy)  -- , unzip5)
+import Data.List                     (lookup, groupBy, unzip5)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import System.Random
@@ -106,6 +106,7 @@ data HypParams r = HypParams
   , beta       :: r       -- ^ epsilon/alpha decay factor
   , maxIter    :: Int     -- ^ max. value function evaluation iterations
   , tdStepType :: TDStep  -- ^ temporal difference step type
+  , nSteps     :: Int     -- ^ # of steps in n-step TD
   }
 
 -- | A default value of type `HypParams`, to use as a starting point.
@@ -117,6 +118,7 @@ hypParamsDef = HypParams
   , beta       =  0    -- No decay by default.
   , maxIter    = 10
   , tdStepType = Qlearn
+  , nSteps     = 0     -- TD(0) by default.
   }
 
 -- | Type of temporal difference (TD) step.
@@ -165,9 +167,13 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
       let s = case initStates @s of
                 [] -> P.head states
                 _  -> P.head $ shuffle g initStates
-          (_, q', g', dbgs, t') = optQn hParams (s, q, g, [], t)
-      put (q', g', t')
-      return (q', dbgs)
+          -- (_, q', g', dbgs, t') = optQn hParams (s, q, g, [], t)
+          (_, q's, g's, dbgs, t's) =
+            unzip5 $ take maxIter $ P.tail
+                   $ iterate (optQn hParams) (s, q, g, [], t)
+          q' = P.last q's
+      put (q', P.last g's, P.last t's)
+      return (q', P.last dbgs)
   -- Calculate policies and count differences between adjacent pairs.
   ps     = map (\q -> \s -> argmax (appFm q s) $ actions s) qs
   ass    = map (\p -> map p states) ps
@@ -183,37 +189,28 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
 -- - epsilon: Used to form an "epsilon-greedy" policy.
 -- - maxIter: The "n" in n-step.
 optQn
-  -- :: forall a s m n k g.
-  :: forall s m n g.
-     ( MDP s, HasFin' s, HasFin' (ActionT s), Ord s, Eq (ActionT s)
-     -- , KnownNat m, KnownNat n, KnownNat k, m ~ (k + 1)
-     , KnownNat m, KnownNat n  -- , KnownNat k, m ~ (k + 1)
-     -- , m ~ Card s, n ~ Card a
-     , Card s ~ m, Card (ActionT s) ~ n
+  :: ( MDP s, HasFin' s, Ord s
+     , Eq (ActionT s), HasFin' (ActionT s)
      , RandomGen g
      )
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
-  -> (s, Vector m (Vector n (Double)), g, [Dbg s (Double)], Integer)
-  -> (s, Vector m (Vector n (Double)), g, [Dbg s (Double)], Integer)
+  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double)), g, [Dbg s (Double)], Integer)
+  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double)), g, [Dbg s (Double)], Integer)
 optQn HypParams{..} (s0, q, gen, _, t) =
-  (P.last sNs, q', gen', debgs, t + fromIntegral maxIter)
+  (P.last sNs, q', gen', debgs, t + fromIntegral nSteps + 1)
  where
-  (sNs, q', gen', debgs, _) =
-    execState (traverse go [(-maxIter + 1)..(maxIter)])
-              ([s0], q, gen, [], [])
+  (sNs, _, q', gen', debgs, _) =
+    execState (traverse go [(-nSteps)..(max 0 (nSteps - 1))])
+              ([s0], [], q, gen, [], [])
+  gammas = scanl (*) 1 $ repeat disc  -- [1, disc, disc^2, ...]
   go = \ n -> do  -- Single state transition with potential update to Q.
-    (ss, qm, g, dbgs, rs) <- get
-    let qm' = if n >= 0  -- Only begin updating Q after `maxIter` state transitions.
-                then let sNum = toFin $ P.head $ drop n ss
-                      in qm VS.// [ ( sNum
-                                    , qm `VS.index` sNum VS.// [(toFin a, newVal)]
-                                    )
-                                  ]
-                else qm
-
-        -- Helpful abbreviations
-        qf = appFm qm
-        s  = P.last ss
+    (ss, as, qm, g, dbgs, rs) <- get
+    let -- Helpful abbreviations
+        qf        = appFm qm   -- From matrix representation of Q(s,a) to actual function.
+        s         = P.last ss  -- This is NOT the state to be updated (unless we're doing TD(0)).
+        alpha'    = alpha   / decayFact
+        epsilon'  = epsilon / decayFact
+        decayFact = (1 + beta * fromIntegral t)
 
         -- Policy definitions
         (x, g') = random g
@@ -225,8 +222,9 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                            xs -> P.head $ shuffle gen $ xs
          where otherActs = filter (/= (pol' st)) $ actions st
 
-        -- Use epsilon-greedy policy to choose action.
-        a = pol s
+        -- Use epsilon-greedy policy to choose next action.
+        a   = pol s
+        as' = as ++ [a]
 
         -- Produce a sample next state, obeying the actual distribution.
         s' = P.head $ shuffle gen' $
@@ -235,15 +233,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                       ]
         s'p's  = nextStates s a
 
-        -- Do the update.
-        newVal =
-          fromMaybe
-            (oldVal + alpha' * ( sum (take maxIter $ drop n rs)
-                               + disc * eQs'a'
-                               - oldVal
-                               )
-            ) $ lookup s termStates
-        oldVal = qf s a
+        -- Calculate reward and Q(s',a').
         r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
         ps'    = fromMaybe (P.error "RL.GPI.optQ: Lookup failure at line 334!")
                            (lookup s' s'p's)
@@ -260,17 +250,39 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                   ]
         acts  = actions s'
         lActs = length acts
+
+        -- Only begin updating Q after `nSteps` state transitions.
+        qm' = if n >= 0
+                then let sN     = ss  P.!! n
+                         aN     = as' P.!! n
+                         sNum   = toFin sN
+                         aNum   = toFin aN
+                         newVal =
+                           fromMaybe
+                             (oldVal
+                              + alpha'
+                                * ( ( sum $
+                                        zipWith (*)
+                                                (r : (take nSteps $ drop n rs) ++ [eQs'a'])
+                                                gammas
+                                    ) - oldVal )
+                             ) $ lookup s termStates
+                         oldVal = qf sN aN
+                      in qm VS.// [ ( sNum
+                                    , qm `VS.index` sNum VS.// [(aNum, newVal)]
+                                    )
+                                  ]
+                else qm
+
+        -- TEMPORARY DEBUGGING INFO
         dbg   = Dbg s'p's s s' r eQs'a' $
                   [ [ qf st act
                     | act <- actions st
                     ]
                   | (st, _) <- termStates
                   ]
-        alpha'    = alpha   / decayFact
-        epsilon'  = epsilon / decayFact
-        decayFact = (1 + beta * fromIntegral t)
 
-    put (ss ++ [s'], qm', g', dbgs ++ [dbg], rs ++ [r])
+    put (ss ++ [s'], as', qm', g', dbgs ++ [dbg], rs ++ [r])
 
 -- | Yields a single policy improvment iteration.
 --

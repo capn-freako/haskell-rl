@@ -267,6 +267,8 @@ data Opts w = Opts
         "The number of TD episodes"
     , nEval :: w ::: Maybe Int <?>
         "The maximum number of state transitions allowed in each episode"
+    , nStep :: w ::: Maybe Int <?>
+        "The 'n' in n-step TD."
     , eps   :: w ::: Maybe Double <?>
         "Probability of chosing action randomly"
     -- , alph  :: w ::: Maybe Double <?>
@@ -291,6 +293,7 @@ main = do
     unwrapRecord "A solution to Example 6.5 - Windy Gridworld."
   let nIters = fromMaybe  10000 (nIter o)
       nEvals = fromMaybe     20 (nEval o)
+      nSteps' = fromMaybe     0 (nStep o)
       eps'   = fromMaybe    0.1 (eps   o)
       -- alph'  = fromMaybe    0.5 (alph  o)
       beta'  = fromMaybe    0   (dcy   o)
@@ -373,6 +376,7 @@ main = do
                 , beta       = beta'
                 , maxIter    = nEvals
                 , tdStepType = Qlearn
+                , nSteps     = nSteps'
                 }
             ress = for [Sarsa, Qlearn, ExpSarsa] $
                        \ stepT ->
