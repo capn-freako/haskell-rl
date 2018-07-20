@@ -401,33 +401,6 @@ main = do
   appendFile mdFilename "plus: alpha=0.2  \n"
   appendFile mdFilename "line: alpha=0.5  \n"
 
-  -- DEBUGGING
-  appendFile mdFilename "\n## debug\n\n"
-
-  -- Terminal states values vs. Iteration
-  appendFile mdFilename "\n#### Terminal States - Values vs. Iteration\n\n"
-  toFile def "img/termVals.png" $ do
-    layout_title .= "Terminal States - Values vs. Iteration"
-    forM_ (zip (P.init termValss) [PointShapeCircle, PointShapePlus]) $ \ (termVals, ptShape) -> do
-      setColors $ map opaque [blue, green, red]
-      setShapes [ptShape]
-      forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] termVals) $ \ (lbl, er) ->
-           plot ( points lbl
-                         [ (x,y)
-                         | (x,y) <- takeEvery (nIters `div` 100) $ zip [(0::Int)..] er
-                         ]
-                )
-    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] (P.last termValss)) $ \ (lbl, er) ->
-         plot ( line lbl
-                       [[ (x,y)
-                        | (x,y) <- zip [(0::Int)..] er
-                       ]]
-              )
-  appendFile mdFilename "\n![](img/termVals.png)  \n"
-  appendFile mdFilename "circle: alpha=0.1  \n"
-  appendFile mdFilename "plus: alpha=0.2  \n"
-  appendFile mdFilename "line: alpha=0.5  \n"
-
 \end{code}
 
 output
