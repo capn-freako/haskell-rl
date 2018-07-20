@@ -21,6 +21,9 @@ import Protolude  hiding (show, for)
 
 import Control.Arrow                 ((&&&))
 import Data.List                     (groupBy)
+import Data.List.Extras.Argmax       (argmax)
+import System.Random
+import ToolShed.System.Random        (shuffle)
 
 -- | Markov Decision Process (MDP) (finite discrete)
 --
@@ -56,8 +59,8 @@ class MDP s where
   -- | Initial states.
   initStates :: [s]
   initStates = states
-  -- | Terminal states and their values.
-  termStates :: [(s, Double)]
+  -- | Terminal states.
+  termStates :: [s]
   termStates = []
 
 {----------------------------------------------------------------------
@@ -77,9 +80,32 @@ rewards
 rewards s a s' = combProb . map (first snd)
   . filter ((== s') . fst . fst) $ jointPMF s a
 
-{----------------------------------------------------------------------
-  Helper functions expected to be used only locally.
-----------------------------------------------------------------------}
+-- * Policy Generators
+--
+-- The following functions take an action-value function, Q(s,a), and
+-- produce a policy.
+
+type Policy s a = s -> a
+type PolGen s   = MDP s => (s -> ActionT s -> Double)
+                        -> Policy s (ActionT s)
+
+-- | Greedy policy.
+greedy :: PolGen s
+greedy q = \ s -> argmax (q s) (actions s)
+
+-- | Epsilon-Greedy policy.
+epsGreedy
+  :: RandomGen g
+  => g       -- Random number generator.
+  -> Double  -- Epsilon; should lie in [0, 1).
+  -> PolGen s
+epsGreedy gen eps =
+  let (x, gen') = random gen
+   in if x > eps
+        then greedy
+        else const $ P.head . shuffle gen' . actions
+
+-- * Misc.
 
 -- | Eliminate duplicates from a probability distribution, by combining
 -- like terms and summing their probabilities.

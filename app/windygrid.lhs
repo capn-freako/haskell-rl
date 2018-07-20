@@ -131,7 +131,7 @@ instance MDP MyState where
              in if wind /= 0
                   then [wind - 1, wind, wind + 1]
                   else [0, 0, 0]  -- Duplication is to keep probabilities correct.
-    , let s' = if s `elem` (map fst termStates)
+    , let s' = if s `elem` termStates
                  then s
                  else bound ((fromIntegral . getFinite) r + dr + wr, (fromIntegral . getFinite) c + dc)
           dr = case act of
@@ -157,11 +157,11 @@ instance MDP MyState where
           bound (row, col) = ( (finite . fromIntegral) $ min (gNumRows - 1) (max 0 row)
                              , (finite . fromIntegral) $ min (gNumCols - 1) (max 0 col ) )
           rwd = fromIntegral $
-            if s' `elem` (map fst termStates)
+            if s' `elem` termStates
               then  0
               else -1
     ]
-  termStates = [((3,7), 0)]
+  termStates = [(3,7)]
   initStates = [(3,0)]
 
 data MyAction = Up
@@ -243,8 +243,8 @@ showFofState g = unlines
     )
   )
   where g' s
-          | s `elem` initStates           = "S"
-          | s `elem` (map fst termStates) = "G"
+          | s `elem` initStates = "S"
+          | s `elem` termStates = "G"
           | otherwise = toString (g s)
 
 {----------------------------------------------------------------------
@@ -312,7 +312,7 @@ main = do
       cnts   = cnts'
       visits =
         runEpisode 20 pol (((.) . (.)) (P.head . map fst) nextStates)
-          (map fst termStates) $ P.head initStates
+          termStates $ P.head initStates
 
   appendFile mdFilename "\n#### Final policy\n\n"
   appendFile mdFilename $ pack $ showFofState pol
@@ -349,7 +349,7 @@ main = do
   appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
   appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
 
-  let (erss, termValss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
+  let (erss, resss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
         let myHypParams =
               hypParamsDef
                 { disc       = gGamma
@@ -370,9 +370,8 @@ main = do
                                         ]
                              )
                        ) vss
-            termVals :: [[Double]]
-            termVals = map (map (maximum . map maximum . termQs) . concat . debugs) ress
-         in (ers, termVals)
+            dbgss = map debugs ress
+         in (ers, ress)
       dpNorm = mean [ sqr (val s)
                     | s <- states
                     ]
@@ -402,8 +401,19 @@ main = do
   appendFile mdFilename "line: alpha=0.5  \n"
 
   -- DEBUGGING
+  -- print $ map (rwd . P.head) . P.last . P.last $ dbgssss
+  -- print $ map (rwd . P.last) . P.last . P.last $ dbgssss
+
   appendFile mdFilename "\n## debug\n\n"
 
+  appendFile mdFilename "\n#### State Visits\n\n"
+  let qMs = map qMats $ P.last $ P.last resss
+  appendFile mdFilename $ pack $ showFofState $
+    \ s ->
+      appFm q
+    
+
+#if 0
   -- Terminal states values vs. Iteration
   appendFile mdFilename "\n#### Terminal States - Values vs. Iteration\n\n"
   toFile def "img/termVals.png" $ do
@@ -427,6 +437,7 @@ main = do
   appendFile mdFilename "circle: alpha=0.1  \n"
   appendFile mdFilename "plus: alpha=0.2  \n"
   appendFile mdFilename "line: alpha=0.5  \n"
+#endif
 
 \end{code}
 

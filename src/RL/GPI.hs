@@ -37,9 +37,10 @@ import Protolude  hiding (show, for)
 import qualified Data.Vector.Sized   as VS
 import Data.Vector.Sized             (Vector)
 
+-- import Control.Monad.Loops
 import Control.Monad.Writer
 import Data.Finite
-import Data.List                     (lookup, groupBy, unzip5)
+import Data.List                     (lookup, groupBy, unzip5, zip3)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import System.Random
@@ -85,6 +86,7 @@ data HypParams r = HypParams
   , maxIter    :: Int     -- ^ max. value function evaluation iterations
   , tdStepType :: TDStep  -- ^ temporal difference step type
   , nSteps     :: Int     -- ^ # of steps in n-step TD
+  , mode       :: Mode    -- ^ optimization mode
   }
 
 -- | A default value of type @HypParams@, to use as a starting point.
@@ -97,6 +99,7 @@ hypParamsDef = HypParams
   , maxIter    = 10
   , tdStepType = Qlearn
   , nSteps     = 0     -- TD(0) by default.
+  , mode       = TD
   }
 
 -- | Type of temporal difference (TD) step.
@@ -104,23 +107,28 @@ data TDStep = Sarsa
             | Qlearn
             | ExpSarsa
 
+-- | Optimization mode.
+data Mode = MC
+          | TD
+  deriving (Show, Eq)
+
 -- | Abstract type for capturing debugging information.
-data Dbg s r = Dbg
-  { nxtStPrbs :: [(s, Double)]
-  , curSt     :: s
+data Dbg s a r = Dbg
+  { curSt     :: s
+  , act       :: a
   , nxtSt     :: s
   , rwd       :: r
-  , eNxtVal   :: r
-  , termQs    :: [[r]]
+  , nxtStPrbs :: [(s, Double)]
   } deriving (Show)
 
 -- | Abstract type of return value from @'doTD'@ function.
-data TDRetT s a r = TDRetT
+data TDRetT s a r m n = TDRetT
   { valFuncs :: [s -> r]
   , polFuncs :: [s -> a]
   , polXCnts :: [Int]
   , valErrs  :: [r]
-  , debugs   :: [[Dbg s r]]
+  , debugs   :: [[Dbg s a r]]
+  , qMats    :: [Vector m (Vector n (Double, Int))]
   }
 
 -- | Find optimum policy and value functions, using temporal difference.
@@ -135,9 +143,9 @@ doTD
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
   -> Int                 -- ^ Number of episodes to run.
   -> TDRetT s (ActionT s) (Double)
-doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
+doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss qs where
   gen = mkStdGen 1
-  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate 0), gen, 0) $
+  (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate (0, 0)), gen, 0) $
     replicateM nIters $ do
       (q, g, t) <- get
       let s = case initStates @s of
@@ -154,110 +162,133 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss where
   ass    = map (\p -> map p states) ps
   pDiffs = map (length . filter (== False)) $ zipWith (zipWith (==)) ass (P.tail ass)
   -- Calculate value functions and mean square differences between adjacent pairs.
-  vs     = map (\q -> \s -> maximum . map (appFm q s) $ actions s) qs
+  vs     = map (\q -> \s -> maximum . map (fst . appFm q s) $ actions s) qs
   valss  = map (\v -> map v states) vs
   vErrs  = map (mean . map sqr) $ zipWith (zipWith (-)) valss (P.tail valss)
 
--- | Yields a single episodic action-value improvement iteration, using n-step TD.
---
--- @'HypParams'@ field overrides:
---
--- - @epsilon@: Used to form an "epsilon-greedy" policy.
+{- | Yields a single episodic action-value improvement iteration, using n-step TD.
+
+@'HypParams'@ field overrides:
+
+- @epsilon@: Used to form an "epsilon-greedy" policy.
+
+This function accomodates Monte Carlo (MC) method by using the
+following method of mean calculation, which has the same form as
+temporal difference (TD) error correction:
+
+\[
+y = f(x) \
+z = g(y)
+\]
+
+-}
 optQn
   :: ( MDP s, HasFin' s, Ord s
      , Eq (ActionT s), HasFin' (ActionT s)
      , RandomGen g
      )
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
-  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double)), g, [Dbg s (Double)], Integer)
-  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double)), g, [Dbg s (Double)], Integer)
+  -- | Tuple element descriptions:
+  --
+  -- - Current state.
+  -- - Augmented matrix representation of Q(s,a). Cell type: (value, # of adjustments).
+  -- - Random number generator.
+  -- - List of debugging data structures.
+  -- - Simulation time in units of state transitions.
+  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
+  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
 optQn HypParams{..} (s0, q, gen, _, t) =
-  (P.last sNs, q', gen', debgs, t + fromIntegral nSteps + 1)
+  (sN, q VS.// qUpdates, gen', debugs, t + (fromIntegral . length) sts)
  where
-  (sNs, _, q', gen', debgs, _) =
-    execState (traverse go [(-nSteps)..(max 0 (nSteps - 1))])
-              ([s0], [], q, gen, [], [])
-  gammas = scanl (*) 1 $ repeat disc  -- [1, disc, disc^2, ...]
-  go = \ n -> do  -- Single state transition with potential update to Q.
-    (ss, as, qm, g, dbgs, rs) <- get
-    let -- Helpful abbreviations
-        qf        = appFm qm   -- From matrix representation of Q(s,a) to actual function.
-        s         = P.last ss  -- This is NOT the state to be updated (unless we're doing TD(0)).
-        alpha'    = alpha   / decayFact
-        epsilon'  = epsilon / decayFact
-        decayFact = (1 + beta * fromIntegral t)
-
-        -- Policy definitions
-        (x, g') = random g
-        pol' st = argmax (qf st) (actions st)  -- greedy
-        pol  st = if x > epsilon'              -- epsilon-greedy
-                    then pol' st
-                    else case otherActs of
-                           [] -> pol' st
-                           xs -> P.head $ shuffle gen $ xs
-         where otherActs = filter (/= (pol' st)) $ actions st
-
-        -- Use epsilon-greedy policy to choose next action.
-        a   = pol s
-        as' = as ++ [a]
-
+  sN = if mode == MC
+         then sT
+         else if nSteps > 0
+                then (P.last . P.init) sts
+                else sT
+  qUpdates =
+    [ ( sNum
+      , q `VS.index` sNum VS.// [(aNum, (newVal, visits s a + 1))]
+      )
+    | (s, a, ret) <- zip3 sts' acts rets
+    , let sNum = toFin s
+          aNum = toFin a
+          newVal =
+            if s `elem` termStates
+              then 0
+              else oldVal + errGain * (ret - oldVal)
+          oldVal = qf s a
+          errGain =
+            case mode of
+              MC -> 1 / (fromIntegral $ visits s a)  -- See discussion on mean calculation above.
+              _  -> alpha'
+    ]
+  -- Returns are much easier to calculate with reversed rewards.
+  rets = P.tail $ scanl (+) (v sT * disc ^ (length rs')) rs'
+  rs'  = reverse $ zipWith (*) gammas $ reverse rwds  -- reversed discounted rewards
+  sT   = P.head sts
+  sts' = P.tail sts
+  -- State value function corresponding to Q(s,a) depends on mode.
+  v st = case mode of
+    MC -> 0  -- We assume we reached a terminal state.
+    _  ->
+      case tdStepType of
+        Sarsa    -> qf st $ epsGreedy gen epsilon' qf st  -- Uses epsilon-greedy policy.
+        Qlearn   -> qf st $ greedy qf st                  -- Uses greedy policy.
+        ExpSarsa ->  -- E[Q(s', a')]
+          sum [ p * qf st a
+              | a <- as
+              , let p = if a == greedy qf st
+                           then 1 - epsilon'
+                           else epsilon' / fromIntegral (lActs - 1)
+              ] where as    = actions st
+                      lActs = length acts
+  gammas    = scanl (*) 1 $ repeat disc      -- [1, disc, disc^2, ...]
+  qf        = ((<$>) . (<$>)) fst $ appFm q  -- From augmented matrix representation of Q(s,a) to actual function.
+  visits    = ((<$>) . (<$>)) snd $ appFm q  -- # of visits/adjustments to particular (s,a) pair.
+  alpha'    = alpha   / decayFact
+  epsilon'  = epsilon / decayFact
+  decayFact = (1 + beta * fromIntegral t)
+  (sts, acts, rwds, debugs, gen') =
+    execState (replicateM (nSteps + 1) go)
+              ([s0], [], [], [], gen)
+  go = do  -- Single state transition.
+    (ss, as, rs, dbgs, g) <- get
+    let s  = P.head ss
+        -- Use an epsilon-greedy policy to select next action.
+        a  = epsGreedy g epsilon' qf s
         -- Produce a sample next state, obeying the actual distribution.
-        s' = P.head $ shuffle gen' $
+        s' = P.head $ shuffle g $
                concat [ replicate (round $ 100 * p) st
                       | (st, p) <- s'p's
                       ]
-        s'p's  = nextStates s a
-
-        -- Calculate reward and Q(s',a').
-        r      = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
-        ps'    = fromMaybe (P.error "RL.GPI.optQ: Lookup failure at line 334!")
-                           (lookup s' s'p's)
-        eQs'a' =
-          case tdStepType of
-            Sarsa    -> qf s' $ pol  s'  -- Uses epsilon-greedy policy.
-            Qlearn   -> qf s' $ pol' s'  -- Uses greedy policy.
-            ExpSarsa ->  -- E[Q(s', a')]
-              sum [ p * qf s' a'
-                  | a' <- acts
-                  , let p = if a' == pol' s'
-                               then 1 - epsilon'
-                               else epsilon' / fromIntegral (lActs - 1)
-                  ]
-        acts  = actions s'
-        lActs = length acts
-
-        -- Only begin updating Q after `nSteps` state transitions.
-        qm' = if n >= 0
-                then let sN     = ss  P.!! n
-                         aN     = as' P.!! n
-                         sNum   = toFin sN
-                         aNum   = toFin aN
-                         newVal =
-                           fromMaybe
-                             (oldVal
-                              + alpha'
-                                * ( ( sum $
-                                        zipWith (*)
-                                                (r : (take nSteps $ drop n rs) ++ [eQs'a'])
-                                                gammas
-                                    ) - oldVal )
-                             ) $ lookup s termStates
-                         oldVal = qf sN aN
-                      in qm VS.// [ ( sNum
-                                    , qm `VS.index` sNum VS.// [(aNum, newVal)]
-                                    )
-                                  ]
-                else qm
-
+        s'p's = nextStates s a
+        -- Calculate reward.
+        r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
+        ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
+                        (lookup s' s'p's)
+        -- Advance the random number generator.
+        (_::Int, g') = random g
         -- TEMPORARY DEBUGGING INFO
-        dbg   = Dbg s'p's s s' r eQs'a' $
-                  [ [ qf st act
-                    | act <- actions st
-                    ]
-                  | (st, _) <- termStates
-                  ]
+        dbg = Dbg s a s' r s'p's
+    put (s' : ss, a : as, r : rs, dbg : dbgs, g')
+    return $
+      if s' `elem` termStates
+        then Nothing              -- Short circuit remaining computation,
+        else Just (s, a, r, dbg)  -- if we've reached a terminal state.
 
-    put (ss ++ [s'], as', qm', g', dbgs ++ [dbg], rs ++ [r])
+{-
+\bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\
+\\[
+\\begin{eqnarray}
+\\bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\\\
+\\bar{x}^{N+1} &=& \frac{x_0 + x_1 + ... + x_N}{N+1} \\\\
+\\bar{x}^{N+1} &=& \frac{N \cdot bar{x}^N + x_N}{N+1} \\\\
+\\bar{x}^{N+1} &=& \frac{(N+1) \cdot bar{x}^N - bar{x}^N + x_N}{N+1} \\\\
+\\bar{x}^{N+1} &=& bar{x}^N + \frac{x_N - bar{x}^N}{N+1} \\\\
+\\bar{x}^{N+1} &=& bar{x}^N + \frac{1}{N+1} \cdot \left( x_N - bar{x}^N \right) \\\\
+\\end{eqnarray}
+\\]
+-}
 
 -- | Yields a single policy improvment iteration.
 --
@@ -285,8 +316,10 @@ optPol HypParams{..} (g, _) = (bestA, cnts)
                       ]
   actVal' = memo . uncurry . actVal
   actVal v s a =
-    fromMaybe  -- We look for terminal states first, before performing the default action.
-      ( sum [ pt * disc * u + rt
+    if s `elem` termStates
+      then 0
+      else
+        sum [ pt * disc * u + rt
             | s' <- map fst $ nextStates s a
             , let u = v s'
             , let (pt, rt) = foldl' prSum (0,0)
@@ -294,7 +327,6 @@ optPol HypParams{..} (g, _) = (bestA, cnts)
                                     | (r, p) <- rs' s a s'
                                     ]
             ]
-      ) $ lookup s termStates
   prSum (x1,y1) (x2,y2) = (x1+x2,y1+y2)
   rs' = memo3 rewards
   ((_, v'), cnts) =  -- `cnts` is # of value changes > epsilon.

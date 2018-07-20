@@ -47,14 +47,22 @@ jointPMF :: MDP s => s -> ActionT s -> [((s, Double), Double)]
 -- | Initial states.
 initStates :: MDP s => [s]
 
--- | Terminal states and their values.
-termStates :: MDP s => [(s, Double)]
+-- | Terminal states.
+termStates :: MDP s => [s]
 
 -- | Next states and their probabilities - S'(s, a).
 nextStates :: (MDP s, Eq s, Ord s) => s -> ActionT s -> [(s, Double)]
 
 -- | Rewards and their probabilities - R(s, a, s').
 rewards :: (MDP s, Eq s) => s -> ActionT s -> s -> [(Double, Double)]
+type Policy s a = s -> a
+type PolGen s = MDP s => (s -> ActionT s -> Double) -> Policy s (ActionT s)
+
+-- | Greedy policy.
+greedy :: PolGen s
+
+-- | Epsilon-Greedy policy.
+epsGreedy :: RandomGen g => g -> Double -> PolGen s
 
 -- | Eliminate duplicates from a probability distribution, by combining
 --   like terms and summing their probabilities.
@@ -187,7 +195,7 @@ module RL.GPI
 --   The type parameter <tt>r</tt> should be equal to the reward type of
 --   the MDP being solved.
 data HypParams r
-HypParams :: r -> r -> r -> r -> Int -> TDStep -> Int -> HypParams r
+HypParams :: r -> r -> r -> r -> Int -> TDStep -> Int -> Mode -> HypParams r
 
 -- | discount rate
 [disc] :: HypParams r -> r
@@ -210,6 +218,9 @@ HypParams :: r -> r -> r -> r -> Int -> TDStep -> Int -> HypParams r
 -- | # of steps in n-step TD
 [nSteps] :: HypParams r -> Int
 
+-- | optimization mode
+[mode] :: HypParams r -> Mode
+
 -- | A default value of type <tt>HypParams</tt>, to use as a starting
 --   point.
 hypParamsDef :: HypParams Double
@@ -220,24 +231,28 @@ Sarsa :: TDStep
 Qlearn :: TDStep
 ExpSarsa :: TDStep
 
+-- | Optimization mode.
+data Mode
+MC :: Mode
+TD :: Mode
+
 -- | Abstract type for capturing debugging information.
-data Dbg s r
-Dbg :: [(s, Double)] -> s -> s -> r -> r -> [[r]] -> Dbg s r
-[nxtStPrbs] :: Dbg s r -> [(s, Double)]
-[curSt] :: Dbg s r -> s
-[nxtSt] :: Dbg s r -> s
-[rwd] :: Dbg s r -> r
-[eNxtVal] :: Dbg s r -> r
-[termQs] :: Dbg s r -> [[r]]
+data Dbg s a r
+Dbg :: s -> a -> s -> r -> [(s, Double)] -> Dbg s a r
+[curSt] :: Dbg s a r -> s
+[act] :: Dbg s a r -> a
+[nxtSt] :: Dbg s a r -> s
+[rwd] :: Dbg s a r -> r
+[nxtStPrbs] :: Dbg s a r -> [(s, Double)]
 
 -- | Abstract type of return value from <tt><a>doTD</a></tt> function.
 data TDRetT s a r
-TDRetT :: [s -> r] -> [s -> a] -> [Int] -> [r] -> [[Dbg s r]] -> TDRetT s a r
+TDRetT :: [s -> r] -> [s -> a] -> [Int] -> [r] -> [[Dbg s a r]] -> TDRetT s a r
 [valFuncs] :: TDRetT s a r -> [s -> r]
 [polFuncs] :: TDRetT s a r -> [s -> a]
 [polXCnts] :: TDRetT s a r -> [Int]
 [valErrs] :: TDRetT s a r -> [r]
-[debugs] :: TDRetT s a r -> [[Dbg s r]]
+[debugs] :: TDRetT s a r -> [[Dbg s a r]]
 
 -- | Find optimum policy and value functions, using temporal difference.
 --   
@@ -253,7 +268,15 @@ doTD :: forall s. (MDP s, Ord s, Eq (ActionT s), HasFin' s, HasFin' (ActionT s))
 --   <ul>
 --   <li><tt>epsilon</tt>: Used to form an "epsilon-greedy" policy.</li>
 --   </ul>
-optQn :: (MDP s, HasFin' s, Ord s, Eq (ActionT s), HasFin' (ActionT s), RandomGen g) => HypParams (Double) -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double)), g, [Dbg s (Double)], Integer) -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double)), g, [Dbg s (Double)], Integer)
+--   
+--   This function accomodates Monte Carlo (MC) method by using the
+--   following method of mean calculation, which has the same form as
+--   temporal difference (TD) error correction:
+--   
+--   [ y = f(x) z = g(y)
+--   
+--   ]
+optQn :: (MDP s, HasFin' s, Ord s, Eq (ActionT s), HasFin' (ActionT s), RandomGen g) => HypParams (Double) -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer) -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
 
 -- | Yields a single policy improvment iteration.
 --   
@@ -269,5 +292,7 @@ optPol :: (MDP s, Eq s, Ord s, HasTrie s, Ord (ActionT s), HasTrie (ActionT s)) 
 
 -- | Run one episode of a MDP, returning the list of states visited.
 runEpisode :: Eq s => Int -> (s -> a) -> (s -> a -> s) -> [s] -> s -> [s]
-instance (GHC.Show.Show r, GHC.Show.Show s) => GHC.Show.Show (RL.GPI.Dbg s r)
+instance (GHC.Show.Show r, GHC.Show.Show a, GHC.Show.Show s) => GHC.Show.Show (RL.GPI.Dbg s a r)
+instance GHC.Classes.Eq RL.GPI.Mode
+instance GHC.Show.Show RL.GPI.Mode
 instance GHC.TypeNats.KnownNat n => Data.MemoTrie.HasTrie (Data.Finite.Internal.Finite n)
