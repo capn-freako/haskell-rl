@@ -28,13 +28,9 @@ import Data.List                     (groupBy)
 --
 -- 1. @jointPMF@ must return a true probability distribution. That is:
 --
---     @
---     1 = sum . map snd $
---           [ jointPMF s a
---           | s <- states
---           , a <- actions s
---           ]
---     @
+--     @ 1 = sum . map snd $ jointPMF s a @
+--
+--     \(, \forall s \in \text{states}, \forall a \in \text{actions s}\)
 --
 -- Usage notes:
 --

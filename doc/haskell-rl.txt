@@ -6,7 +6,7 @@
 --   
 --   See readme.md for description.
 @package haskell-rl
-@version 0.0.2
+@version 4.0
 
 
 -- | Markov Decision Process (MDP)
@@ -18,8 +18,7 @@ module RL.MDP
 --   
 --   <ol>
 --   <li><tt>jointPMF</tt> must return a true probability distribution.
---   That is:<pre>1 = sum . map snd $ [ jointPMF s a | s &lt;- states , a
---   &lt;- actions s ] </pre></li>
+--   That is:<pre> 1 = sum . map snd $ jointPMF s a</pre>&lt;math&gt;</li>
 --   </ol>
 --   
 --   Usage notes:
