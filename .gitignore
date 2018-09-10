@@ -25,4 +25,5 @@ other/*.md
 prof/
 *.ps
 *.out
-
+TAGS
+ctags
