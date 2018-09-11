@@ -1,5 +1,5 @@
 name:          haskell-rl
-version:       0.0.2
+version:       4.0
 synopsis:      Haskell library for doing reinforcement learning.
 description:   See readme.md for description.
 category:      project
