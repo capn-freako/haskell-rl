@@ -176,7 +176,7 @@ instance GHC.Show.Show RL.Util.Pfloat
 --   
 --   Developed while doing the exercises in Ch. 4-6 of the book
 --   <i>Reinforcement Learning: an Introduction</i>, Richard S. Sutton and
---   Andrew G. Barto The MIT Press Cambridge, Massachusetts; London,
+--   Andrew G. Barto, The MIT Press, Cambridge, Massachusetts; London,
 --   England
 module RL.GPI
 
@@ -245,19 +245,35 @@ Dbg :: s -> a -> s -> r -> [(s, Double)] -> Dbg s a r
 [nxtStPrbs] :: Dbg s a r -> [(s, Double)]
 
 -- | Abstract type of return value from <tt><a>doTD</a></tt> function.
-data TDRetT s a r
-TDRetT :: [s -> r] -> [s -> a] -> [Int] -> [r] -> [[Dbg s a r]] -> TDRetT s a r
-[valFuncs] :: TDRetT s a r -> [s -> r]
-[polFuncs] :: TDRetT s a r -> [s -> a]
-[polXCnts] :: TDRetT s a r -> [Int]
-[valErrs] :: TDRetT s a r -> [r]
-[debugs] :: TDRetT s a r -> [[Dbg s a r]]
+data TDRetT s a r m n
+TDRetT :: [s -> r] -> [s -> a] -> [Int] -> [r] -> [[Dbg s a r]] -> [Vector m (Vector n (Double, Int))] -> TDRetT s a r m n
+[valFuncs] :: TDRetT s a r m n -> [s -> r]
+[polFuncs] :: TDRetT s a r m n -> [s -> a]
+[polXCnts] :: TDRetT s a r m n -> [Int]
+[valErrs] :: TDRetT s a r m n -> [r]
+[debugs] :: TDRetT s a r m n -> [[Dbg s a r]]
+[qMats] :: TDRetT s a r m n -> [Vector m (Vector n (Double, Int))]
 
 -- | Find optimum policy and value functions, using temporal difference.
 --   
 --   This is intended to be the function called by client code wishing to
 --   perform temporal difference based policy optimization.
-doTD :: forall s. (MDP s, Ord s, Eq (ActionT s), HasFin' s, HasFin' (ActionT s)) => HypParams (Double) -> Int -> TDRetT s (ActionT s) (Double)
+doTD :: forall s. (MDP s, Ord s, Eq (ActionT s), HasFin' s, HasFin' (ActionT s)) => HypParams (Double) -> Int -> TDRetT s (ActionT s) (Double) (Card s) (Card (ActionT s))
+
+-- | Object of <tt><a>optQn</a></tt> function.
+--   
+--   Tuple element descriptions:
+--   
+--   <ul>
+--   <li>Current state.</li>
+--   <li>Augmented matrix representation of Q(s,a). Cell type: (value, # of
+--   adjustments).</li>
+--   <li>Random number generator.</li>
+--   <li>List of debugging data structures.</li>
+--   <li>Simulation time in units of state transitions.</li>
+--   </ul>
+type OptQT s g = (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
+type Unop a = a -> a
 
 -- | Yields a single episodic action-value improvement iteration, using
 --   n-step TD.
@@ -268,14 +284,14 @@ doTD :: forall s. (MDP s, Ord s, Eq (ActionT s), HasFin' s, HasFin' (ActionT s))
 --   <li><tt>epsilon</tt>: Used to form an "epsilon-greedy" policy.</li>
 --   </ul>
 --   
---   This function accomodates Monte Carlo (MC) method by using the
---   following method of mean calculation, which has the same form as
+--   This function accomodates the <i>Monte Carlo</i> (MC) method by using
+--   the following method of mean calculation, which has the same form as
 --   temporal difference (TD) error correction:
 --   
---   [ y = f(x) z = g(y)
+--   \[ y = f(x) \z = g(y)
 --   
---   ]
-optQn :: (MDP s, HasFin' s, Ord s, Eq (ActionT s), HasFin' (ActionT s), RandomGen g) => HypParams (Double) -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer) -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
+--   \]
+optQn :: (MDP s, HasFin' s, Ord s, Eq (ActionT s), HasFin' (ActionT s), RandomGen g) => HypParams (Double) -> Unop (OptQT s g)
 
 -- | Yields a single policy improvment iteration.
 --   

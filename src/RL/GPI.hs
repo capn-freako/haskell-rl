@@ -13,8 +13,8 @@
 --
 -- Developed while doing the exercises in Ch. 4-6 of the book
 -- /Reinforcement Learning: an Introduction/,
---   Richard S. Sutton and Andrew G. Barto
---     The MIT Press
+--   Richard S. Sutton and Andrew G. Barto,
+--     The MIT Press,
 --       Cambridge, Massachusetts; London, England
 -----------------------------------------------------------------------------
 
@@ -142,7 +142,7 @@ doTD
      )
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
   -> Int                 -- ^ Number of episodes to run.
-  -> TDRetT s (ActionT s) (Double)
+  -> TDRetT s (ActionT s) (Double) (Card s) (Card (ActionT s))
 doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss qs where
   gen = mkStdGen 1
   (qs, dbgss) = unzip $ flip evalState (VS.replicate (VS.replicate (0, 0)), gen, 0) $
@@ -166,20 +166,40 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss qs where
   valss  = map (\v -> map v states) vs
   vErrs  = map (mean . map sqr) $ zipWith (zipWith (-)) valss (P.tail valss)
 
+{- | Object of @'optQn'@ function.
+
+Tuple element descriptions:
+
+- Current state.
+- Augmented matrix representation of Q(s,a). Cell type: (value, # of adjustments).
+- Random number generator.
+- List of debugging data structures.
+- Simulation time in units of state transitions.
+-}
+type OptQT s g =
+  ( s
+  , Vector (Card s) (Vector (Card (ActionT s)) (Double, Int))
+  , g
+  , [Dbg s (ActionT s) (Double)]
+  , Integer
+  )
+
+type Unop a = a -> a
+
 {- | Yields a single episodic action-value improvement iteration, using n-step TD.
 
 @'HypParams'@ field overrides:
 
 - @epsilon@: Used to form an "epsilon-greedy" policy.
 
-This function accomodates Monte Carlo (MC) method by using the
+This function accomodates the /Monte Carlo/ (MC) method by using the
 following method of mean calculation, which has the same form as
 temporal difference (TD) error correction:
 
-\[
-y = f(x) \
+\\[
+y = f(x) \\\\
 z = g(y)
-\]
+\\]
 
 -}
 optQn
@@ -188,15 +208,7 @@ optQn
      , RandomGen g
      )
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
-  -- | Tuple element descriptions:
-  --
-  -- - Current state.
-  -- - Augmented matrix representation of Q(s,a). Cell type: (value, # of adjustments).
-  -- - Random number generator.
-  -- - List of debugging data structures.
-  -- - Simulation time in units of state transitions.
-  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
-  -> (s, Vector (Card s) (Vector (Card (ActionT s)) (Double, Int)), g, [Dbg s (ActionT s) (Double)], Integer)
+  -> Unop (OptQT s g)
 optQn HypParams{..} (s0, q, gen, _, t) =
   (sN, q VS.// qUpdates, gen', debugs, t + (fromIntegral . length) sts)
  where
@@ -276,19 +288,17 @@ optQn HypParams{..} (s0, q, gen, _, t) =
         then Nothing              -- Short circuit remaining computation,
         else Just (s, a, r, dbg)  -- if we've reached a terminal state.
 
-{-
-\bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\
-\\[
-\\begin{eqnarray}
-\\bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\\\
-\\bar{x}^{N+1} &=& \frac{x_0 + x_1 + ... + x_N}{N+1} \\\\
-\\bar{x}^{N+1} &=& \frac{N \cdot bar{x}^N + x_N}{N+1} \\\\
-\\bar{x}^{N+1} &=& \frac{(N+1) \cdot bar{x}^N - bar{x}^N + x_N}{N+1} \\\\
-\\bar{x}^{N+1} &=& bar{x}^N + \frac{x_N - bar{x}^N}{N+1} \\\\
-\\bar{x}^{N+1} &=& bar{x}^N + \frac{1}{N+1} \cdot \left( x_N - bar{x}^N \right) \\\\
-\\end{eqnarray}
-\\]
--}
+-- \[
+-- \begin{eqnarray}
+-- \bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\\\
+-- \bar{x}^{N+1} &=& \frac{x_0 + x_1 + ... + x_N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& \frac{N \cdot bar{x}^N + x_N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& \frac{(N+1) \cdot bar{x}^N - bar{x}^N + x_N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& bar{x}^N + \frac{x_N - bar{x}^N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& bar{x}^N + \frac{1}{N+1} \cdot \left( x_N - bar{x}^N \right) \\\\
+-- \end{eqnarray}
+-- \]
+--
 
 -- | Yields a single policy improvment iteration.
 --

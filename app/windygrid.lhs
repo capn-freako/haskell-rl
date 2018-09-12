@@ -349,7 +349,10 @@ main = do
   appendFile mdFilename $ pack $ printf "epsilon = %4.2f  \n" eps'
   appendFile mdFilename $ pack $ printf "beta = %8.6f  \n" beta'
 
-  let (erss, resss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->
+  -- let r :: ( [[[Double]]]
+  --          , [[TDRetT MyState MyAction Double (Card MyState) (Card (ActionT MyState))]]
+  --          )
+  let (erss, resss) = unzip $ for [0.1, 0.2, 0.5] $ \ alp ->        
         let myHypParams =
               hypParamsDef
                 { disc       = gGamma
@@ -360,6 +363,7 @@ main = do
                 , tdStepType = Qlearn
                 , nSteps     = nSteps'
                 }
+            -- ress :: [TDRetT MyState MyAction Double (Card MyState) (Card (ActionT MyState))]
             ress = for [Sarsa, Qlearn, ExpSarsa] $
                        \ stepT ->
                          doTD myHypParams{tdStepType = stepT} nIters
@@ -370,7 +374,7 @@ main = do
                                         ]
                              )
                        ) vss
-            dbgss = map debugs ress
+            -- dbgss = map debugs ress
          in (ers, ress)
       dpNorm = mean [ sqr (val s)
                     | s <- states
@@ -407,10 +411,19 @@ main = do
   appendFile mdFilename "\n## debug\n\n"
 
   appendFile mdFilename "\n#### State Visits\n\n"
-  let qMs = map qMats $ P.last $ P.last resss
-  appendFile mdFilename $ pack $ showFofState $
-    \ s ->
-      appFm q
+  let qM = P.last $ qMats $ P.last $ P.last resss
+      qS = VS.map (VS.sum . VS.map snd) qM
+      q  = fromMaybe (P.error "VS.fromList failure!") $
+             VS.fromList
+             [ fromMaybe (P.error "VS.fromList failure!") $
+                 VS.fromList
+                 [ qS `VS.index` (finite $ fromIntegral (r * gNumCols + c))
+                 | c <- [0..(gNumCols-1)]
+                 ]
+             | r <- [0..(gNumRows-1)]
+             ]
+  appendFile mdFilename $ pack $ showFofState $ uncurry (appFm q)
+    -- \ s -> snd $ appFm q s
     
 
 #if 0
