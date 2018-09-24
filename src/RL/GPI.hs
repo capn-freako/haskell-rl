@@ -121,6 +121,14 @@ data Dbg s a r = Dbg
   , nxtStPrbs :: [(s, Double)]
   } deriving (Show)
 
+-- | Abstract type of return value from @'doDP'@ function.
+data DPRetT s a r = DPRetT
+  { valFunc :: s -> r
+  , polFunc :: s -> a
+  , valXCnts :: [[Int]]
+  , polXCnts' :: [Int]
+  }
+
 -- | Abstract type of return value from @'doTD'@ function.
 data TDRetT s a r m n = TDRetT
   { valFuncs :: [s -> r]
@@ -131,10 +139,43 @@ data TDRetT s a r m n = TDRetT
   , qMats    :: [Vector m (Vector n (Double, Int))]
   }
 
+-- | Find optimum policy and value functions, using /dynamic programming/.
+--
+-- This is intended to be the function called by client code wishing to
+-- perform /dynamic programming/ based policy optimization.
+doDP
+  :: forall s.
+     ( MDP s, Ord s, HasTrie s, HasFin' s
+     , Eq (ActionT s), Ord (ActionT s)
+     , HasTrie (ActionT s), HasFin' (ActionT s)
+     )
+  => HypParams (Double)  -- ^ Simulation hyper-parameters.
+  -> Int                 -- ^ Number of episodes to run.
+  -> DPRetT s (ActionT s) Double
+doDP hParams@HypParams{..} nIters = DPRetT val pol valXCnts polXCnts where
+  (fs, valXCntss) =
+    P.unzip $ take nIters $ iterate (optPol hParams) (const (defAct, 0), [])
+  defAct   = P.head $ actions defState
+  defState = if length (initStates @s) > 0
+               then P.head $ initStates @s
+               else P.head states
+  valXCnts = P.tail valXCntss
+  acts     = map (\f -> map (fst . f) states) fs
+  diffs    = map (map boolToDouble . uncurry (zipWith (/=)))
+               $ zip acts (P.tail acts)
+  g' :: s -> (ActionT s, Double)
+  ((_, g'), polXCnts) = first (fromMaybe (P.error "doDP: Major failure!")) $
+    runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
+                  ( \ (dv, _) ->
+                      maxAndNonZero dv
+                  ) $ zip diffs (P.tail fs)
+  pol = fst . g'
+  val = snd . g'
+
 -- | Find optimum policy and value functions, using temporal difference.
 --
 -- This is intended to be the function called by client code wishing to
--- perform temporal difference based policy optimization.
+-- perform /temporal difference/ based policy optimization.
 doTD
   :: forall s.
      ( MDP s, Ord s, Eq (ActionT s)
@@ -152,11 +193,12 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss qs where
                 [] -> P.head states
                 _  -> P.head $ shuffle g initStates
           (_, q's, g's, dbgs, t's) =
-            unzip5 $ take maxIter $ P.tail
-                   $ iterate (optQn hParams) (s, q, g, [], t)
+            unzip5 $ take (maxIter + 1) $
+                          iterate (optQn hParams) (s, q, g, [], t)
           q' = P.last q's
       put (q', P.last g's, P.last t's)
-      return (q', P.last dbgs)
+      -- return (q', P.last dbgs)
+      return (q', concat dbgs)
   -- Calculate policies and count differences between adjacent pairs.
   ps     = map (\q -> \s -> argmax (appFm q s) $ actions s) qs
   ass    = map (\p -> map p states) ps
@@ -210,7 +252,7 @@ optQn
   => HypParams (Double)  -- ^ Simulation hyper-parameters.
   -> Unop (OptQT s g)
 optQn HypParams{..} (s0, q, gen, _, t) =
-  (sN, q VS.// qUpdates, gen', debugs, t + (fromIntegral . length) sts)
+  (sN, q VS.// qUpdates, gen', reverse debugs, t + (fromIntegral . length) sts)
  where
   sN = if mode == MC
          then sT
@@ -231,7 +273,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
           oldVal = qf s a
           errGain =
             case mode of
-              MC -> 1 / (fromIntegral $ visits s a)  -- See discussion on mean calculation above.
+              MC -> 1 / (1 + (fromIntegral $ visits s a))  -- See discussion on mean calculation above.
               _  -> alpha'
     ]
   -- Returns are much easier to calculate with reversed rewards.
@@ -266,27 +308,31 @@ optQn HypParams{..} (s0, q, gen, _, t) =
   go = do  -- Single state transition.
     (ss, as, rs, dbgs, g) <- get
     let s  = P.head ss
-        -- Use an epsilon-greedy policy to select next action.
-        a  = epsGreedy g epsilon' qf s
-        -- Produce a sample next state, obeying the actual distribution.
-        s' = P.head $ shuffle g $
-               concat [ replicate (round $ 100 * p) st
-                      | (st, p) <- s'p's
-                      ]
-        s'p's = nextStates s a
-        -- Calculate reward.
-        r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
-        ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
-                        (lookup s' s'p's)
-        -- Advance the random number generator.
-        (_::Int, g') = random g
-        -- TEMPORARY DEBUGGING INFO
-        dbg = Dbg s a s' r s'p's
-    put (s' : ss, a : as, r : rs, dbg : dbgs, g')
-    return $
-      if s' `elem` termStates
-        then Nothing              -- Short circuit remaining computation,
-        else Just (s, a, r, dbg)  -- if we've reached a terminal state.
+    if s `elem` termStates
+      then return ()
+      else do
+            -- Use an epsilon-greedy policy to select next action.
+        let a  = epsGreedy g epsilon' qf s
+            -- Produce a sample next state, obeying the actual distribution.
+            s' = P.head $ shuffle g $
+                   concat [ replicate (round $ 100 * p) st
+                          | (st, p) <- s'p's
+                          ]
+            s'p's = nextStates s a
+            -- Calculate reward.
+            r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
+            ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
+                            (lookup s' s'p's)
+            -- Advance the random number generator.
+            (_::Int, g') = random g
+            -- TEMPORARY DEBUGGING INFO
+            dbg = Dbg s a s' r s'p's
+        put (s' : ss, a : as, r : rs, dbg : dbgs, g')  -- Note the reverse order build-up.
+        return ()
+      -- if s' `elem` termStates
+      -- if s `elem` termStates
+      --   then Nothing              -- Short circuit remaining computation,
+      --   else Just (s, a, r, dbg)  -- if we've reached a terminal state.
 
 -- \[
 -- \begin{eqnarray}
@@ -371,4 +417,3 @@ runEpisode
 runEpisode n pol nxt terms init =
   takeWhile (`notElem` terms) $
     take n $ iterate (\s -> nxt s (pol s)) init
-

@@ -26,6 +26,7 @@ code
 
 \begin{code}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 \end{code}
 
@@ -44,6 +45,7 @@ code
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 \end{code}
 
 [libraries](https://www.stackage.org/)
@@ -58,21 +60,28 @@ code
 
 \begin{code}
 import qualified Prelude as P
-import Prelude (unlines, Show(..), String, error, (!!))
+import Prelude (unlines, Show(..), String)
 
 import Protolude  hiding (show, for)
 import Options.Generic
 
 import qualified Data.Vector.Sized as VS
 
-import Control.Arrow          ((&&&), (***))
-import Control.Monad.Writer
-import Data.Vector.Sized      (Vector, (//), index)
+import Control.Arrow          ((***), (&&&))
+import Data.MemoTrie
 import Data.Finite
 import Data.Text              (pack)
-import System.Random.Shuffle
+import Data.Vector.Sized      (Vector, index)
+import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty, Iso, Vector, index)
+import Graphics.Rendering.Chart.Backend.Cairo
 import Text.Printf
-import Useful.IO              (rand)
+
+import ConCat.TArr
+import ConCat.Isomorphism
+
+import RL.MDP
+import RL.GPI
+import RL.Util
 \end{code}
 
 code
@@ -83,149 +92,207 @@ code
 \begin{code}
 
 {----------------------------------------------------------------------
-  Problem specific definitions
+  State definitions & instances.
 ----------------------------------------------------------------------}
 
+type Nstates = 440
+
 data BJState = BJState
-  { playerSum  :: Int   -- 12 - 21
-  , usableAce  :: Bool
-  , dealerCard :: Int   -- 1 - 10
-  , dealerSum  :: Int   -- For debugging only; not used for learning.
-  , polHit     :: Bool  -- For debugging only; not used for learning.
-  , didHit     :: Bool
-  } deriving (Show)
+  { playerSum  :: Finite 11  -- ^ Represents the range: 12 - 22
+  , usableAce  :: Bool       -- ^ A "usable" ace is one currently counted as 11.
+  , dealerCard :: Finite 10  -- ^ "0" is an ace; all face cards are "9".
+  , done       :: Bool       -- ^ Flags a game as complete when true.
+  } deriving (Show, Eq, Ord, Generic)
+
+instance HasFin BJState where
+  type Card BJState = Nstates
+  iso = Iso stToFin finToSt
+
+stToFin :: BJState -> Finite Nstates
+stToFin BJState{..} = finite $
+  getFinite playerSum     * 40 +
+  boolToInteger usableAce * 20 +
+  getFinite dealerCard    * 2 +
+  boolToInteger done
+  
+finToSt :: Finite Nstates -> BJState
+finToSt n =
+  let (pSum,  r)    = divMod (getFinite n) 40
+      (ace,   r')   = divMod r 20
+      (dCard, done) = divMod r' 2
+   in if pSum > 10
+         then P.error "finToSt: Blew out a Finite 11!"
+         else BJState (finite pSum) (integerToBool ace) (finite dCard) (integerToBool done)
+
+-- | The @'MDP'@ instance for @'BJState'@.
+instance MDP BJState where
+  type ActionT BJState = BJAction
+  states  = allStates
+  actions = \BJState{..} ->
+    if playerSum > 8 || done == True  -- If we're made or bust then we have to stand.
+      then [Stand]
+      else [Hit, Stand]
+  jointPMF st act = case act of
+    Hit -> hit   st
+    _   -> stand st
+  termStates = filter (\BJState{..} -> done == True)                   allStates
+  initStates = filter (\BJState{..} -> done /= True && playerSum < 10) allStates
+
+allStates :: [BJState]
+allStates =
+  [ BJState (finite pSum) ace (finite dlrCrd) dn
+  | pSum   <- [0..10]
+  , ace    <- [False, True]
+  , dlrCrd <- [0..9]
+  , dn     <- [False, True]
+  ]
 
 stateDef :: BJState
 stateDef = BJState
-  { playerSum  = 12
+  { playerSum  = finite 0
   , usableAce  = False
-  , dealerCard = 1
-  , dealerSum  = 12
-  , polHit     = False
-  , didHit     = False
+  , dealerCard = finite 9
+  , done       = False
   }
 
-newtype BJAction = BJAction { act :: Bool }  -- Hit?
+{----------------------------------------------------------------------
+  Actions
+----------------------------------------------------------------------}
+
+type Nacts = 2
+
+data BJAction = Hit
+              | Stand
+  deriving (Eq, Generic)
 
 instance Show BJAction where
-  show (BJAction x) =
-    if x then "H"
-         else " "
+  show = \case
+    Hit -> "H"
+    _   -> " "
 
-allActs :: [BJAction]
-allActs = map BJAction [False, True]
+instance HasTrie BJAction where
+  newtype (BJAction :->: b) = BJActionTrie { unBJActionTrie :: Reg BJAction :->: b } 
+  trie      = trieGeneric      BJActionTrie 
+  untrie    = untrieGeneric    unBJActionTrie
+  enumerate = enumerateGeneric unBJActionTrie
 
-type BJPolicy = BJState -> BJAction
+instance HasFin BJAction where
+  type Card BJAction = Nacts
+  iso = Iso actToFin finToAct
 
-appPolV :: Vector 200 BJAction -> BJPolicy
-appPolV v = \s -> v `index` enumState s
+actToFin :: BJAction -> Finite Nacts
+actToFin = \case
+  Hit -> 0
+  _   -> 1
 
-enumState :: BJState -> Finite 200
-enumState s@BJState{..} =
-  let offset = (dealerCard - 1) * 10 + playerSum - 12
-   in if offset < 0
-        then error (show s)
-        else if usableAce
-               then finite . fromIntegral $ 100 + offset
-               else finite . fromIntegral $ offset
+finToAct :: Finite Nacts -> BJAction
+finToAct = \case
+  0 -> Hit
+  _ -> Stand
 
-validStates :: [BJState] -> [BJState]
-validStates =
-  filter ( \ BJState{..} ->
-                playerSum  >= 12 && playerSum  <= 21
-             && dealerCard >= 1  && dealerCard <= 10
-         )
+{----------------------------------------------------------------------
+  Helper functions.
+----------------------------------------------------------------------}
 
-data DbgT = DbgT
-  { upCard :: Int
-  , states :: [BJState]
-  , reward :: Int
-  }
+hit :: BJState -> [((BJState, Double), Double)]
+hit st@BJState{..} =
+  [ ((nxtSt, 0), 0.0769)           -- 0.0769 = 1/13.
+  | card <- [1..10] ++ [10,10,10]  -- Ten, Jack, Queen, and King = 10.
+  , let (tot, ace) = cardSum (getFinite playerSum + 12) usableAce card
+        nxtSt      = st{ playerSum = finite $ min 10 (tot - 12)
+                       , usableAce = ace
+                       }
+  ]
 
-play :: BJPolicy -> [Int] -> BJAction -> Writer [DbgT] (Int, [BJState])
-play pol cards randAct =
-  do let (r, ss) | pTot == 21 = if dTot == 21
-                                  then (0, [])
-                                  else (1, [])
-                 | dTot == 21 = (-1, [])
-                 | otherwise =
-                   runWriter $ play' pol (drop 4 cards) dCards pCards Init randAct
-     tell [ DbgT { upCard = cards !! 2
-                 , states = ss
-                 , reward = r
-                 }
-          ]
-     return (r, ss)
-  where (pTot, _) = cardSum pCards
-        (dTot, _) = cardSum dCards
-        dCards    = take 2 $ drop 2 cards
-        pCards    = take 2 cards
+stand :: BJState -> [((BJState, Double), Double)]
+stand st@BJState{..} =
+  [ ((st', 0), 1 - pWin)
+  , ((st', 1), pWin)
+  ]
+  where
+    st'  = st{done = True}
+    pTot = getFinite playerSum + 12
+    pWin =
+      if pTot > 21
+        then 0
+        else sum . map snd $
+               filter ((\x -> x < pTot || x > 21) . fst) $
+                      playHand init ace 1
+    (init, ace) = if dealerCard == 0
+                    then (11, True)
+                    else (getFinite dealerCard + 1, False)
 
-data PlayPhase = Init    -- Bringing player's sum > 11.
-               | Player  -- Player is hitting/standing.
-               | Dealer  -- Dealer is hitting/standing.
+-- | Adjust the total count of a hand after taking a card.
+--
+-- Make use of a "usable ace" to avoid going bust.
+-- (A "usable ace" is one that is currently being counted as 11.)
+cardSum :: Integer -> Bool -> Integer -> (Integer, Bool)
+cardSum acc ace card = (acc', ace')
+  where (acc', ace') = case card of
+          1 -> case ace of
+            True -> if acc + 1 > 21
+                      then (acc - 9, False)  -- Use our usable ace to avoid bust.
+                      else (acc + 1, True)
+            _    -> if acc + 11 <= 21
+                      then (acc + 11, True)  -- Count the ace as 11.
+                      else (acc +  1, False)
+          _ -> case ace of
+            True -> if acc + card > 21
+                      then (acc + card - 10, False)
+                      else (acc + card,      True)
+            _    -> (acc + card, False)
 
-play' :: BJPolicy   -- current policy
-      -> [Int]      -- remaining deck of cards
-      -> [Int]      -- dealer's cards
-      -> [Int]      -- player's cards
-      -> PlayPhase  -- phase of the game
-      -> BJAction   -- randomly chosen action to be performed by player at his first free turn
-      -> Writer [BJState] Int
-play' pol cards dCards pCards phs randAct =
-  case phs of
-    Init ->
-      if pTot > 11
-        then do tell [s{didHit = act randAct}]
-                if act randAct  -- Is first (randomly chosen) player action "hit"?
-                  then play' pol (P.tail cards) dCards (P.head cards : pCards) Player randAct
-                  else play' pol cards dCards pCards Dealer randAct
-        else play' pol (P.tail cards) dCards (P.head cards : pCards) Init randAct
+-- | Play out the dealer's hand.
+--
+-- Take as input:
+--   - the current total,
+--   - a flag indicating a usable ace, and
+--   - the accumulated probability so far.
+--
+-- Return a list of pairs, each containing the final tally and its probability.
+playHand :: Integer -> Bool -> Double -> [(Integer, Double)]
+playHand tot ace p =
+  if tot > 16
+    then [(tot, p)]
+    else concat [ playHand tot' ace' (p/13)
+                | card <- [1..10] ++ [10,10,10]
+                , let (tot', ace') = cardSum tot ace card
+                ]
+  
+showFofState :: Show a => (BJState -> a) -> String
+showFofState f = intercalate "\n\n" $ map (showFofState' f) [True, False]
 
-    Player ->
-      do tell [s]
-         if pTot > 21        -- Player go bust yet?
-           then return (-1)
-           else if polHit    -- Does policy dictate a hit?
-                  then play' pol (P.tail cards) dCards (P.head cards : pCards) Player randAct
-                  else play' pol cards dCards pCards Dealer randAct
+showFofState' :: Show a => (BJState -> a) -> Bool -> String
+showFofState' f ace = unlines $
+  (if ace
+     then "With usable ace:"
+     else "No usable ace:")
+  : ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c}" :
+      ( ("\\text{Player's Total} &" ++ intersperse '&' (replicate 10 ' ') ++ " \\\\") :
+        ["\\hline"] ++
+        intersperse "\\hline"
+          ( map ((++ " \\\\") . intercalate " & ")
+                [ (show pTot :) $ map show
+                  [ f s
+                  | dCard <- [1..10]
+                  , let s = stateDef { playerSum  = finite $ pTot - 12
+                                     , usableAce  = ace
+                                     , dealerCard = finite $ dCard - 1
+                                     }
+                  ]
+                | pTot <- [12..21]
+                ]
+          )
+        ++ ["\\hline"]
+        ++ [intercalate " & " $ "\\text{Dealer's Card:} " : [show n | n <- [1..10]]]
+        ++ ["\\end{array}"]
+      )
+    )
 
-    Dealer ->
-      do tell [s]
-         if dTot > 21        -- Dealer go bust yet?
-           then return 1
-           else if dTot < 17        -- Must dealer take a hit?
-                  then play' pol (P.tail cards) (P.head cards : dCards) pCards Dealer randAct
-                  else case compare pTot dTot of
-                         GT -> return   1
-                         EQ -> return   0
-                         _  -> return (-1)
-
-  where (pTot, ace) = cardSum pCards
-        (dTot, _)   = cardSum dCards
-        s'          = stateDef
-                        { playerSum  = pTot
-                        , usableAce  = ace
-                        , dealerCard = P.last dCards
-                        , dealerSum  = dTot
-                        }
-        s           = s'
-                        { polHit = polHit
-                        , didHit = polHit
-                        }
-        polHit      = (act . pol) s'
-
-cardSum :: [Int] -> (Int, Bool)
-cardSum cards =
-  if tot < 12 && 1 `elem` cards
-    then (tot + 10, True)
-    else (tot,      False)
-  where tot = sum cards
-
-showVofState :: (Show a) => Vector 200 a -> String
+showVofState :: (Show a) => Vector Nstates a -> String
 showVofState v = intercalate "\n\n" $ map (showVofState' v) [True, False]
 
-showVofState' :: Show a => Vector 200 a -> Bool -> String
+showVofState' :: Show a => Vector Nstates a -> Bool -> String
 showVofState' v ace = unlines $
   (if ace
      then "With usable ace:"
@@ -236,11 +303,11 @@ showVofState' v ace = unlines $
         intersperse "\\hline"
           ( map ((++ " \\\\") . intercalate " & ")
                 [ (show pTot :) $ map show
-                  [ v `index` enumState s
+                  [ v `index` toFin s
                   | dCard <- [1..10]
-                  , let s = stateDef { playerSum  = pTot
+                  , let s = stateDef { playerSum  = finite $ pTot - 12
                                      , usableAce  = ace
-                                     , dealerCard = dCard
+                                     , dealerCard = finite $ dCard - 1
                                      }
                   ]
                 | pTot <- [12..21]
@@ -257,8 +324,12 @@ showVofState' v ace = unlines $
 ----------------------------------------------------------------------}
 
 data Opts w = Opts
-    { nGames :: w ::: Maybe Int <?>
+    { nGames  :: w ::: Maybe Int <?>
         "The number of games to play."
+    , eps     :: w ::: Maybe Double <?>
+        "Epsilon in epsilon-greedy."
+    , dcy     :: w ::: Maybe Double <?>
+        "The decay rate for epsilon"
     }
     deriving (Generic)
 
@@ -269,117 +340,83 @@ instance ParseRecord (Opts Wrapped)
   main()
 ----------------------------------------------------------------------}
 
+mdFilename   = "other/blackjack.md"
+plotFilename = "img/blackjackPlot.png"
+
 main :: IO ()
 main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A solution to the 'Blackjack' problem (Example 5.3)."
-  let nG = fromMaybe 10000 (nGames o)
-
-  -- Initialize policy and state/action values.
-  let qs  = VS.replicate ((0,0), (0,0))  -- Initialize all state/action values to zero.
-      pol = VS.replicate (BJAction True)
-        // [ (enumState s, BJAction False)
-           | s <- [ stateDef { playerSum = pTot
-                             , usableAce = ace
-                             , dealerCard = dCard
-                             }
-                  | pTot  <- [20, 21]
-                  , ace   <- [False, True]
-                  , dCard <- [1..10]
-                  ]
-           ]
-
+  let nG     = fromMaybe 10000     (nGames o)
+      eps'   = fromMaybe     0.1   (eps    o)
+      beta'  = fromMaybe     0     (dcy    o)
+      
   -- Play many games, updating policy and state/action values after each.
-  (results, _) <- runWriterT $ iterateM' nG optPol (qs, pol)
-  writeFile  "other/blackjack.md" "\n### Final State Action Values (stand, hit)\n\n"
-  appendFile "other/blackjack.md" $ pack
-                                  $ showVofState
-                                  $ VS.map ( toBoth
-                                             $ PrettyFloat
-                                             . uncurry safeDiv
-                                             . (fromIntegral *** fromIntegral)
-                                           )
-                                  $ fst results
-  appendFile "other/blackjack.md" "\n### Final Policy (H = hit)\n\n"
-  appendFile "other/blackjack.md" $ pack
-                                  $ showVofState
-                                  $ snd results
-  appendFile "other/blackjack.md" "\n### Debugging Info\n\n"
-  appendFile "other/blackjack.md" "\n### State Action Visits (stand, hit)\n\n"
-  appendFile "other/blackjack.md" $ pack
-                                  $ showVofState
-                                  $ VS.map ( toBoth snd )
-                                  $ fst results
+  -- (results, _) <- runWriterT $ iterateM' nG optPol (qs, pol)
+  let myHypParams =
+        hypParamsDef
+          { tdStepType = Qlearn
+          , epsilon    = eps'
+          , beta       = beta'
+          , maxIter    = 1       -- Because we're using Monte Carlo (i.e. - ending in a terminal state).
+          , nSteps     = 10      -- No game should require more than 10 hits.
+          , mode       = MC      -- Monte Carlo
+          }
+      -- ress :: [TDRetT MyState MyAction Double (Card MyState) (Card (ActionT MyState))]
+      res  = doTD myHypParams nG
+      qMat = P.last $ qMats  res
+      dbgs = P.last $ debugs res
+      maxN = maximum $ map length $ debugs res
 
-{----------------------------------------------------------------------
-  Monte Carlo optimizer
-----------------------------------------------------------------------}
+  -- Output the results.
+  writeFile  mdFilename "\n### Final Policy (H = hit)\n\n"
+  appendFile mdFilename $ pack $ showFofState $ P.last $ polFuncs res
 
--- | Play one game of Blackjack and return improved state-action value
--- and policy estimates.
---
--- Note that the Q vector contains not only the running expectation for
--- hitting/standing at each state, but also the number of times that
--- particular state-action pair has been visited. This is needed for
--- proper normalization across multiple episodes.
-optPol :: ( Vector 200 ((Int, Integer), (Int, Integer))
-          , Vector 200 BJAction
-          )
-       -> WriterT [[DbgT]]
-            IO ( Vector 200 ((Int, Integer), (Int, Integer))
-               , Vector 200 BJAction
-               )
-optPol (qs, pol) = do
-  randAct <- lift $ rand allActs
-  cards <- shuffleM $ concat [replicate  4  n | n <- [1..9]]
-                           ++ replicate 16 10
-  let ((r, ss), dbgs) = runWriter $ play (appPolV pol) cards randAct
-      ixs             = (nubOn fst . map (enumState &&& didHit) . validStates) ss
-      (qs', pol')     = VS.unzip $ VS.zip qs pol //
-                          [ (i, (q', p'))
-                          | (i, hit) <- ixs
-                          , let q  = qs  `index` i
-                                q' = ( if hit
-                                         then second
-                                         else first
-                                     ) ((+ r) *** (+ 1)) q
-                                p' = case uncurry compare
-                                          $ toBoth ( uncurry (/)
-                                                   . (fromIntegral *** fromIntegral)
-                                                   ) q'
-                                     of
-                                       GT -> BJAction False
-                                       _  -> BJAction True
-                          ]
-  tell [dbgs]
-  return (qs', pol')
+  -- Value/Action changes vs. Iteration
+  appendFile mdFilename "\n### Policy/Value Function Changes vs. Iteration\n\n"
+  toFile def plotFilename $ do
+    layoutlr_title .= "Policy/Value Function Changes vs. Iteration"
+    setColors $ map opaque [blue, red, green, yellow, cyan, magenta, brown, gray, purple, black]
+    plotLeft  ( line "Policy Changes"
+                 [ [ (x,y)
+                   | (x,y) <- zip [(0::Int)..]
+                                  ((winMean 100 $ map fromIntegral $ polXCnts res) :: [Double])
+                   ]
+                 ]
+              )
+    plotRight ( line "Value Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 (winMean 100 $ valErrs res)
+                  ]
+                ]
+              )
+  appendFile mdFilename $ pack $ printf "\n![](%s)\n" plotFilename
 
-{----------------------------------------------------------------------
-  Misc.
-----------------------------------------------------------------------}
+  -- Debugging Info
+  appendFile mdFilename "\n### Debugging Info\n\n"
 
-iterateM' :: Monad m => Int -> (a -> m a) -> a -> m a
-iterateM' 0 _ a = return a
-iterateM' n f a = f a >>= iterateM' (n-1) f
+  appendFile mdFilename $ pack $ printf "**Number of games played:** %d\n\n" nG
 
-toBoth :: (a -> b) -> (a,a) -> (b,b)
-toBoth f (x,y) = (f x, f y)
+  appendFile mdFilename "**Last game sequence:**  \n"
+  appendFile mdFilename $ pack $ unlines $
+    map ( \Dbg{..} ->
+            printf "\tTotal: %2d, Action: %s, Reward: %3.1f  "            
+                   (12 + (getFinite . playerSum) curSt)
+                   (if act == Hit then ("H" :: String) else "S")
+                   (rwd)
+        ) dbgs
+      
+  appendFile mdFilename $ pack $ printf "\n**Max. game length:** %d\n\n" maxN
 
-safeDiv :: (Fractional a, Eq a)
-        => a -> a -> a
-safeDiv x y = if y == 0
-                then 0
-                else x / y
+  appendFile  mdFilename "**Final State Action Values (stand, hit):**\n\n"
+  appendFile mdFilename $ pack $ showVofState
+    $ VS.map (((Pdouble . fst) *** (Pdouble . fst)) . ((`index` 1) &&& (`index` 0))) qMat
 
-newtype PrettyFloat = PrettyFloat Float
-
-instance Show PrettyFloat where
-  show (PrettyFloat x) = printf "%+5.2f" x
-
-nubOn :: Eq b => (a -> b) -> [a] -> [a]
-nubOn _ []     = []
-nubOn f (x:xs) = x : filter ((/= f x) . f) xs
+  appendFile mdFilename "\n**State Action Visits (stand, hit):**\n\n"
+  appendFile mdFilename $ pack $ showVofState
+    $ VS.map ((snd *** snd) . ((`index` 1) &&& (`index` 0))) qMat
 
 \end{code}
 

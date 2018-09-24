@@ -17,8 +17,8 @@ Contents
 
 - [Code](#code)
 - [Output](#output)
-- => [DP Results](#dp-results)
-- => [TD Results](#td-results)
+    - [DP Results](#dp-results)
+    - [TD Results](#td-results)
 - [Debug](#debug)
 
 code
@@ -77,8 +77,8 @@ import Protolude  hiding (show, for, first, second)
 
 import Options.Generic
 
-import Control.Arrow
-import Control.Monad.Writer
+-- import Control.Arrow
+-- import Control.Monad.Writer
 import qualified Data.Vector.Sized   as VS
 import Data.Finite
 import Data.MemoTrie
@@ -288,36 +288,22 @@ main = do
   writeFile mdFilename "\n### DP Results\n\n"
 
   -- Run DP, to generate reference values.
-  let (fs, counts') = P.unzip $ take 20
-                   $ iterate
-                       ( optPol
-                           hypParamsDef
-                             { disc       = gGamma
-                             , epsilon    = 0.1
-                             , maxIter    = 20
-                             }
-                       ) (const (Rt, 0), [])
-      counts = P.tail counts'
-      acts   = map (\f -> map (fst . f) states) fs
-      diffs  = map (map boolToDouble . uncurry (zipWith (/=)))
-                  $ zip acts (P.tail acts)
-      g' :: MyState -> (MyAction, Double)
-      ((_, g'), cnts') = first (fromMaybe (P.error "main: Major failure!")) $
-        runWriter $ withinOnM 0  -- Temporary, to force `nIters` policy improvements.
-                              ( \ (dv, _) ->
-                                  maxAndNonZero dv
-                              ) $ zip diffs (P.tail fs)
-      pol    = fst . g'
-      val    = snd . g'
-      cnts   = cnts'
+  let DPRetT{..} =
+        doDP hypParamsDef
+                { disc    = gGamma
+                , epsilon = 0.1
+                , maxIter = 20
+                }
+              20  -- Hard-wired to 20, because `nIters` is used for TD.
+  
       visits =
-        runEpisode 20 pol (((.) . (.)) (P.head . map fst) nextStates)
+        runEpisode 20 polFunc (((.) . (.)) (P.head . map fst) nextStates)
           termStates $ P.head initStates
 
   appendFile mdFilename "\n#### Final policy\n\n"
-  appendFile mdFilename $ pack $ showFofState pol
+  appendFile mdFilename $ pack $ showFofState polFunc
   appendFile mdFilename "\n#### Final value function\n\n"
-  appendFile mdFilename $ pack $ showFofState (Pdouble . val)
+  appendFile mdFilename $ pack $ showFofState (Pdouble . valFunc)
   appendFile mdFilename "\n#### Trajectory of final policy\n\n"
   appendFile mdFilename $ pack $ showFofState $ \s -> if s `elem` visits
                                                         then (" \\cdot " :: String)
@@ -329,15 +315,15 @@ main = do
     setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
     plot ( line "Policy Changes"
                 [ [ (x,y)
-                  | (x,y) <- zip (map (* (length $ P.head counts)) [(0::Int)..])
-                                 cnts
+                  | (x,y) <- zip (map (* (length $ P.head valXCnts)) [(0::Int)..])
+                                 polXCnts'
                   ]
                 ]
          )
     plot ( line "Value Changes"
                 [ [ (x,y)
                   | (x,y) <- zip [(0::Int)..]
-                                 (concat counts)
+                                 (concat valXCnts)
                   ]
                 ]
          )
@@ -369,14 +355,14 @@ main = do
                          doTD myHypParams{tdStepType = stepT} nIters
             vss  = map valFuncs ress
             ers  = map ( map ( \ v -> (/ dpNorm) . mean $
-                                        [ sqr (v s - val s)
+                                        [ sqr (v s - valFunc s)
                                         | s <- states
                                         ]
                              )
                        ) vss
             -- dbgss = map debugs ress
          in (ers, ress)
-      dpNorm = mean [ sqr (val s)
+      dpNorm = mean [ sqr (valFunc s)
                     | s <- states
                     ]
 

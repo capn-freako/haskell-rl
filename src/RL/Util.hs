@@ -98,14 +98,14 @@ newtype Pfloat = Pfloat { unPfloat :: Float}
   deriving (Eq)
 
 instance Show Pfloat where
-  show x = printf "%4.1f" (unPfloat x)
+  show x = printf "%5.2f" (unPfloat x)
 
 -- | To control the formatting of printed doubles in output matrices.
 newtype Pdouble = Pdouble { unPdouble :: Double }
   deriving (Eq, Ord)
 
 instance Show Pdouble where
-  show x = printf "%4.1f" (unPdouble x)
+  show x = printf "%5.2f" (unPdouble x)
 
 poisson :: Finite 5 -> Finite 12 -> Float
 poisson (Finite lambda) (Finite n') =
@@ -240,8 +240,31 @@ boolToDouble :: Bool -> Double
 boolToDouble True = 1
 boolToDouble _    = 0
 
+-- | Convert a Bool to a Int.
+boolToInteger :: Bool -> Integer
+boolToInteger True = 1
+boolToInteger _    = 0
+
+-- | Convert a Int to a Bool.
+integerToBool :: Integer -> Bool
+integerToBool 1 = True
+integerToBool _ = False
+
 -- | Take every nth element from a list.
 takeEvery :: Int -> [a] -> [a]
 takeEvery _ [] = []
 takeEvery n xs = P.head xs : (takeEvery n $ drop n xs)
 
+-- | Calculate a moving window average over a collection.
+winMean :: Fractional a => Int -> [a] -> [a]
+winMean _ [] = []
+winMean n xs = map (/ (fromIntegral n')) $ initSum : winMean' initSum xs (drop n xs)
+ where
+  n'      = min (length xs) n
+  initSum = sum $ take n' xs
+
+winMean' :: Fractional a => a -> [a] -> [a] -> [a]
+winMean' _   _    []   = []
+winMean' acc subs adds = acc' : (winMean' acc' (P.tail subs) (P.tail adds))
+ where
+  acc' = acc - (P.head subs) + (P.head adds)
