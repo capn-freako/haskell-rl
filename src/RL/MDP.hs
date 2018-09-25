@@ -91,7 +91,7 @@ greedy q = \ s -> argmax (q s) (actions s)
 
 -- | Epsilon-Greedy policy.
 epsGreedy
-  :: RandomGen g
+  :: (RandomGen g, Eq (ActionT s))
   => g       -- Random number generator.
   -> Double  -- Epsilon; should lie in [0, 1).
   -> PolGen s
@@ -99,7 +99,11 @@ epsGreedy gen eps =
   let (x, gen') = random gen
    in if x > eps
         then greedy
-        else const $ P.head . shuffle gen' . actions
+        else \q ->
+               \s ->
+                 let actions' = filter (/= defAct) . actions
+                     defAct   = greedy q s
+                  in fromMaybe defAct $ head $ shuffle gen' $ actions' s
 
 -- * Misc.
 

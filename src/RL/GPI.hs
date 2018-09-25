@@ -263,7 +263,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
     [ ( sNum
       , q `VS.index` sNum VS.// [(aNum, (newVal, visits s a + 1))]
       )
-    | (s, a, ret) <- zip3 sts' acts rets
+    | (s, a, ret) <- zip3 sts' acts' rets
     , let sNum = toFin s
           aNum = toFin a
           newVal =
@@ -281,6 +281,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
   rs'  = reverse $ zipWith (*) gammas $ reverse rwds  -- reversed discounted rewards
   sT   = P.head sts
   sts' = P.tail sts
+  acts' = P.tail acts  
   -- State value function corresponding to Q(s,a) depends on mode.
   v st = case mode of
     MC -> 0  -- We assume we reached a terminal state.
@@ -304,21 +305,22 @@ optQn HypParams{..} (s0, q, gen, _, t) =
   decayFact = (1 + beta * fromIntegral t)
   (sts, acts, rwds, debugs, gen') =
     execState (replicateM (nSteps + 1) go)
-              ([s0], [], [], [], gen)
+              ([s0], [epsGreedy gen epsilon' qf s0], [], [], gen)
   go = do  -- Single state transition.
     (ss, as, rs, dbgs, g) <- get
     let s  = P.head ss
+        a  = P.head as
     if s `elem` termStates
       then return ()
       else do
-            -- Use an epsilon-greedy policy to select next action.
-        let a  = epsGreedy g epsilon' qf s
-            -- Produce a sample next state, obeying the actual distribution.
+        let -- Produce a sample next state, obeying the actual distribution.
             s' = P.head $ shuffle g $
                    concat [ replicate (round $ 100 * p) st
                           | (st, p) <- s'p's
                           ]
             s'p's = nextStates s a
+            -- Use a greedy policy to select the next action.
+            a' = greedy qf s'
             -- Calculate reward.
             r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
             ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
@@ -327,7 +329,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
             (_::Int, g') = random g
             -- TEMPORARY DEBUGGING INFO
             dbg = Dbg s a s' r s'p's
-        put (s' : ss, a : as, r : rs, dbg : dbgs, g')  -- Note the reverse order build-up.
+        put (s' : ss, a' : as, r : rs, dbg : dbgs, g')  -- Note the reverse order build-up.
         return ()
       -- if s' `elem` termStates
       -- if s `elem` termStates

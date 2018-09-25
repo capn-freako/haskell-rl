@@ -206,8 +206,8 @@ hit st@BJState{..} =
 
 stand :: BJState -> [((BJState, Double), Double)]
 stand st@BJState{..} =
-  [ ((st', 0), 1 - pWin)
-  , ((st', 1), pWin)
+  [ ((st', -1), 1 - pWin)
+  , ((st', 1),  pWin)
   ]
   where
     st'  = st{done = True}
@@ -397,7 +397,9 @@ main = do
   -- Debugging Info
   appendFile mdFilename "\n### Debugging Info\n\n"
 
-  appendFile mdFilename $ pack $ printf "**Number of games played:** %d\n\n" nG
+  appendFile mdFilename $ pack $ printf "**Number of games played:** %d  \n" nG
+  appendFile mdFilename $ pack $ printf "**Epsilon:** %f  \n" eps'
+  appendFile mdFilename $ pack $ printf "**Beta:** %f\n\n" beta'
 
   appendFile mdFilename "**Last game sequence:**  \n"
   appendFile mdFilename $ pack $ unlines $
