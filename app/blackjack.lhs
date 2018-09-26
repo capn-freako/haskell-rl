@@ -206,8 +206,9 @@ hit st@BJState{..} =
 
 stand :: BJState -> [((BJState, Double), Double)]
 stand st@BJState{..} =
-  [ ((st', -1), 1 - pWin)
-  , ((st', 1),  pWin)
+  [ ((st', -1), 1 - pWin - pDraw)
+  , ((st',  0), pDraw)
+  , ((st',  1), pWin)
   ]
   where
     st'  = st{done = True}
@@ -216,8 +217,9 @@ stand st@BJState{..} =
       if pTot > 21
         then 0
         else sum . map snd $
-               filter ((\x -> x < pTot || x > 21) . fst) $
-                      playHand init ace 1
+               filter ((\x -> x < pTot || x > 21) . fst) dlrHnds
+    pDraw       = sum . map snd $ filter ((== pTot) . fst) dlrHnds
+    dlrHnds     = map (first (min 22)) $ playHand init ace 1
     (init, ace) = if dealerCard == 0
                     then (11, True)
                     else (getFinite dealerCard + 1, False)
@@ -419,6 +421,9 @@ main = do
   appendFile mdFilename "\n**State Action Visits (stand, hit):**\n\n"
   appendFile mdFilename $ pack $ showVofState
     $ VS.map ((snd *** snd) . ((`index` 1) &&& (`index` 0))) qMat
+
+  -- appendFile mdFilename "\n**Testing State Enumeration:**\n\n"
+  -- appendFile mdFilename $ pack $ showFofState toFin
 
 \end{code}
 

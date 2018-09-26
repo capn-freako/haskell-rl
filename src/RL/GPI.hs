@@ -44,6 +44,7 @@ import Data.List                     (lookup, groupBy, unzip5, zip3)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import System.Random
+import Text.Printf
 import ToolShed.System.Random        (shuffle)
 
 import ConCat.TArr
@@ -280,7 +281,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
   rets = P.tail $ scanl (+) (v sT * disc ^ (length rs')) rs'
   rs'  = reverse $ zipWith (*) gammas $ reverse rwds  -- reversed discounted rewards
   sT   = P.head sts
-  sts' = P.tail sts
+  sts'  = P.tail sts
   acts' = P.tail acts  
   -- State value function corresponding to Q(s,a) depends on mode.
   v st = case mode of
@@ -319,12 +320,12 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                           | (st, p) <- s'p's
                           ]
             s'p's = nextStates s a
-            -- Use a greedy policy to select the next action.
-            a' = greedy qf s'
             -- Calculate reward.
             r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
             ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
                             (lookup s' s'p's)
+            -- Use a greedy policy to select the next action.
+            a' = greedy qf s'
             -- Advance the random number generator.
             (_::Int, g') = random g
             -- TEMPORARY DEBUGGING INFO
