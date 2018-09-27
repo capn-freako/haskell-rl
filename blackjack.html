@@ -171,14 +171,6 @@ finToAct <span class="fu">=</span> \<span class="kw">case</span>
 <span class="co">  Helper functions.</span>
 <span class="co">----------------------------------------------------------------------}</span>
 
-<span class="co">-- | Probabilities of dealer total vs. up card.</span>
-<span class="ot">dlrTots ::</span> <span class="dt">Finite</span> <span class="dv">10</span> <span class="ot">-&gt;</span> [(<span class="dt">Integer</span>, <span class="dt">Double</span>)]
-dlrTots (<span class="dt">Finite</span> n) <span class="fu">=</span> combProb <span class="fu">$</span> map (first (min <span class="dv">22</span>)) tots
- <span class="kw">where</span>
-  tots <span class="fu">=</span> <span class="kw">case</span> n <span class="kw">of</span>
-    <span class="dv">0</span> <span class="ot">-&gt;</span> playHand <span class="dv">11</span>      <span class="dt">True</span>  <span class="dv">1</span>
-    _ <span class="ot">-&gt;</span> playHand (n <span class="fu">+</span> <span class="dv">1</span>) <span class="dt">False</span> <span class="dv">1</span>
-  
 <span class="ot">hit ::</span> <span class="dt">BJState</span> <span class="ot">-&gt;</span> [((<span class="dt">BJState</span>, <span class="dt">Double</span>), <span class="dt">Double</span>)]
 hit st<span class="fu">@</span><span class="dt">BJState</span>{<span class="fu">..</span>} <span class="fu">=</span>
   [ ((nxtSt, <span class="dv">0</span>), <span class="fl">0.0769</span>)           <span class="co">-- 0.0769 = 1/13.</span>
@@ -197,17 +189,17 @@ stand st<span class="fu">@</span><span class="dt">BJState</span>{<span class="fu
   ]
   <span class="kw">where</span>
     st&#39;  <span class="fu">=</span> st{done <span class="fu">=</span> <span class="dt">True</span>}
-    pTot <span class="fu">=</span> getFinite playerSum <span class="fu">+</span> <span class="dv">12</span>
     pWin <span class="fu">=</span>
-      <span class="kw">if</span> pTot <span class="fu">&gt;</span> <span class="dv">21</span>
+      <span class="kw">if</span> playerSum <span class="fu">==</span> <span class="dv">10</span>         <span class="co">-- Player went bust.</span>
         <span class="kw">then</span> <span class="dv">0</span>
-        <span class="kw">else</span> sum <span class="fu">.</span> map snd <span class="fu">$</span>
-               filter ((\x <span class="ot">-&gt;</span> x <span class="fu">&lt;</span> pTot <span class="fu">||</span> x <span class="fu">&gt;</span> <span class="dv">21</span>) <span class="fu">.</span> fst) dlrHnds
-    pDraw       <span class="fu">=</span> sum <span class="fu">.</span> map snd <span class="fu">$</span> filter ((<span class="fu">==</span> pTot) <span class="fu">.</span> fst) dlrHnds
-    dlrHnds     <span class="fu">=</span> map (first (min <span class="dv">22</span>)) <span class="fu">$</span> playHand init ace <span class="dv">1</span>
-    (init, ace) <span class="fu">=</span> <span class="kw">if</span> dealerCard <span class="fu">==</span> <span class="dv">0</span>
-                    <span class="kw">then</span> (<span class="dv">11</span>, <span class="dt">True</span>)
-                    <span class="kw">else</span> (getFinite dealerCard <span class="fu">+</span> <span class="dv">1</span>, <span class="dt">False</span>)
+        <span class="kw">else</span> dlrTotPmfV <span class="ot">`VS.index`</span> dealerCard <span class="ot">`VS.index`</span> (finite <span class="dv">5</span>)  <span class="co">-- P[Dealer went bust]</span>
+           <span class="fu">+</span> <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">5</span>  <span class="co">-- Player&#39;s total &gt; 17?</span>
+               <span class="kw">then</span> dlrTotCmfV <span class="ot">`VS.index`</span> dealerCard <span class="ot">`VS.index`</span> (finite (getFinite playerSum <span class="fu">-</span> <span class="dv">6</span>))
+               <span class="kw">else</span> <span class="dv">0</span>
+    pDraw <span class="fu">=</span>
+      <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">4</span>           <span class="co">-- Player&#39;s total &gt; 16?</span>
+        <span class="kw">then</span> dlrTotPmfV <span class="ot">`VS.index`</span> dealerCard <span class="ot">`VS.index`</span> (finite (getFinite playerSum <span class="fu">-</span> <span class="dv">5</span>))
+        <span class="kw">else</span> <span class="dv">0</span>
 
 <span class="co">-- | Adjust the total count of a hand after taking a card.</span>
 <span class="co">--</span>
@@ -229,6 +221,31 @@ cardSum acc ace card <span class="fu">=</span> (acc&#39;, ace&#39;)
                       <span class="kw">else</span> (acc <span class="fu">+</span> card,      <span class="dt">True</span>)
             _    <span class="ot">-&gt;</span> (acc <span class="fu">+</span> card, <span class="dt">False</span>)
 
+<span class="co">-- | Array of dealer total probabilities.</span>
+<span class="co">--</span>
+<span class="co">-- Rows are indexed by dealer&#39;s up card (0 = ace).</span>
+<span class="co">-- Columns are indexed by hand total (0 = 17, 5 = bust).</span>
+<span class="ot">dlrTotPmfV ::</span> <span class="dt">Vector</span> <span class="dv">10</span> (<span class="dt">Vector</span> <span class="dv">6</span> <span class="dt">Double</span>)
+dlrTotPmfV <span class="fu">=</span> VS.generate <span class="fu">$</span> \r <span class="ot">-&gt;</span>
+  fromMaybe (P.error <span class="st">&quot;dlrTotPmfV: VS.fromList failure!&quot;</span>)
+            <span class="fu">$</span> VS.fromList <span class="fu">$</span> map snd <span class="fu">$</span> dlrTots r
+    
+<span class="co">-- | Array of dealer total cumulative probabilities.</span>
+<span class="co">--</span>
+<span class="co">-- Rows are indexed by dealer&#39;s up card (0 = ace).</span>
+<span class="co">-- Columns are indexed by hand total (0 = 17, 5 = bust).</span>
+<span class="ot">dlrTotCmfV ::</span> <span class="dt">Vector</span> <span class="dv">10</span> (<span class="dt">Vector</span> <span class="dv">6</span> <span class="dt">Double</span>)
+dlrTotCmfV <span class="fu">=</span> VS.generate <span class="fu">$</span> \r <span class="ot">-&gt;</span>
+  VS.postscanl&#39; (<span class="fu">+</span>) <span class="dv">0</span> <span class="fu">$</span> dlrTotPmfV <span class="ot">`VS.index`</span> r
+    
+<span class="co">-- | Probabilities of dealer total vs. up card.</span>
+<span class="ot">dlrTots ::</span> <span class="dt">Finite</span> <span class="dv">10</span> <span class="ot">-&gt;</span> [(<span class="dt">Integer</span>, <span class="dt">Double</span>)]
+dlrTots (<span class="dt">Finite</span> n) <span class="fu">=</span> sortOn fst <span class="fu">$</span> combProb <span class="fu">$</span> map (first (min <span class="dv">22</span>)) tots
+ <span class="kw">where</span>
+  tots <span class="fu">=</span> <span class="kw">case</span> n <span class="kw">of</span>
+    <span class="dv">0</span> <span class="ot">-&gt;</span> playHand <span class="dv">11</span>      <span class="dt">True</span>  <span class="dv">1</span>
+    _ <span class="ot">-&gt;</span> playHand (n <span class="fu">+</span> <span class="dv">1</span>) <span class="dt">False</span> <span class="dv">1</span>
+  
 <span class="co">-- | Play out the dealer&#39;s hand.</span>
 <span class="co">--</span>
 <span class="co">-- Take as input:</span>
@@ -417,8 +434,6 @@ main <span class="fu">=</span> <span class="kw">do</span>
      <span class="kw">in</span> <span class="dt">Pdouble</span> <span class="fu">$</span> <span class="kw">if</span> length targs <span class="fu">&gt;</span> <span class="dv">0</span>
                     <span class="kw">then</span> snd <span class="fu">$</span> P.head <span class="fu">$</span> targs
                     <span class="kw">else</span> <span class="dv">0</span>
-     <span class="co">-- in maximum $ map fst tots</span>
-     <span class="co">-- in length $ filter ((== (getFinite playerSum + 12)) . fst) tots</span>
         </code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="final-policy-h-hit">Final Policy (H = hit)</h3>
@@ -426,23 +441,23 @@ With usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; H &amp;   &amp; H &amp; H &amp; H &amp; H &amp;   &amp; H &amp; H &amp; H \\
+12 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-13 &amp; H &amp;   &amp; H &amp; H &amp;   &amp; H &amp; H &amp; H &amp; H &amp; H \\
+13 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-14 &amp;   &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
+14 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-15 &amp; H &amp;   &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
+15 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
 16 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-17 &amp; H &amp;   &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp;   \\
+17 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-18 &amp; H &amp; H &amp; H &amp; H &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
+18 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H \\
 \hline
-19 &amp; H &amp;   &amp; H &amp;   &amp;   &amp; H &amp; H &amp;   &amp;   &amp; H \\
+19 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
-20 &amp; H &amp;   &amp; H &amp; H &amp; H &amp; H &amp;   &amp;   &amp;   &amp;   \\
+20 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
 21 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
@@ -454,23 +469,23 @@ No usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; H &amp;   &amp; H &amp; H &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   \\
+12 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-13 &amp; H &amp;   &amp; H &amp;   &amp; H &amp; H &amp; H &amp;   &amp; H &amp; H \\
+13 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-14 &amp;   &amp; H &amp; H &amp; H &amp; H &amp;   &amp; H &amp; H &amp; H &amp;   \\
+14 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-15 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp;   \\
+15 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-16 &amp; H &amp; H &amp; H &amp; H &amp;   &amp; H &amp; H &amp; H &amp; H &amp; H \\
+16 &amp; H &amp; H &amp; H &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
 \hline
-17 &amp; H &amp;   &amp; H &amp; H &amp; H &amp;   &amp; H &amp; H &amp; H &amp;   \\
+17 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H \\
 \hline
-18 &amp; H &amp; H &amp; H &amp;   &amp;   &amp; H &amp; H &amp;   &amp;   &amp; H \\
+18 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
-19 &amp; H &amp;   &amp; H &amp; H &amp;   &amp;   &amp;   &amp; H &amp;   &amp; H \\
+19 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
-20 &amp; H &amp;   &amp; H &amp; H &amp;   &amp; H &amp;   &amp;   &amp;   &amp;   \\
+20 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
 21 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
@@ -484,37 +499,36 @@ No usable ace:
 
 </div>
 <h3 id="debugging-info">Debugging Info</h3>
-<p><strong>Number of games played:</strong> 100<br />
+<p><strong>Number of games played:</strong> 500000<br />
 <strong>Epsilon:</strong> 0.5<br />
 <strong>Beta:</strong> 0.0</p>
 <p><strong>Last game sequence:</strong><br />
-Total: 18, Action: H, Reward: 0.0<br />
-Total: 20, Action: S, Reward: 0.6</p>
-<p><strong>Max. game length:</strong> 6</p>
+Total: 20, Action: S, Reward: 0.7</p>
+<p><strong>Max. game length:</strong> 8</p>
 <p><strong>Final State Action Values (stand, hit):</strong></p>
 With usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; ( 0.00, 0.00) &amp; (-0.29,-0.65) &amp; ( 0.00, 0.00) &amp; (-0.21, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.48) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) \\
+12 &amp; (-0.77,-0.21) &amp; (-0.29, 0.15) &amp; (-0.25, 0.18) &amp; (-0.21, 0.19) &amp; (-0.17, 0.22) &amp; (-0.15, 0.23) &amp; (-0.48, 0.25) &amp; (-0.51, 0.17) &amp; (-0.54, 0.08) &amp; (-0.58,-0.05) \\
 \hline
-13 &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.65) &amp; ( 0.00, 0.89) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.58) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.51, 0.93) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) \\
+13 &amp; (-0.77,-0.23) &amp; (-0.29, 0.13) &amp; (-0.25, 0.15) &amp; (-0.21, 0.14) &amp; (-0.17, 0.18) &amp; (-0.15, 0.19) &amp; (-0.48, 0.24) &amp; (-0.51, 0.13) &amp; (-0.54, 0.06) &amp; (-0.58,-0.08) \\
 \hline
-14 &amp; ( 0.00,-0.88) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.17, 0.20) &amp; ( 0.00, 0.00) &amp; (-0.48, 0.93) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) \\
+14 &amp; (-0.77,-0.30) &amp; (-0.29, 0.07) &amp; (-0.25, 0.09) &amp; (-0.21, 0.15) &amp; (-0.17, 0.17) &amp; (-0.15, 0.18) &amp; (-0.48, 0.20) &amp; (-0.51, 0.13) &amp; (-0.54,-0.00) &amp; (-0.58,-0.11) \\
 \hline
-15 &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.15) &amp; (-0.25, 0.89) &amp; ( 0.00, 0.00) &amp; (-0.17, 0.00) &amp; (-0.15, 0.01) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.54, 0.00) &amp; ( 0.00, 0.00) \\
+15 &amp; (-0.77,-0.31) &amp; (-0.29, 0.05) &amp; (-0.25, 0.10) &amp; (-0.21, 0.11) &amp; (-0.17, 0.11) &amp; (-0.15, 0.15) &amp; (-0.48, 0.14) &amp; (-0.51, 0.10) &amp; (-0.54,-0.02) &amp; (-0.58,-0.14) \\
 \hline
-16 &amp; (-0.77, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) \\
+16 &amp; (-0.77,-0.31) &amp; (-0.29, 0.03) &amp; (-0.25, 0.04) &amp; (-0.21, 0.09) &amp; (-0.17, 0.09) &amp; (-0.15, 0.13) &amp; (-0.48, 0.12) &amp; (-0.51, 0.01) &amp; (-0.54,-0.07) &amp; (-0.58,-0.18) \\
 \hline
-17 &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.65) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.01) &amp; (-0.11, 0.00) &amp; (-0.38, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.46,-0.79) \\
+17 &amp; (-0.64,-0.34) &amp; (-0.15, 0.02) &amp; (-0.12, 0.08) &amp; (-0.08, 0.11) &amp; (-0.04, 0.13) &amp; ( 0.01, 0.15) &amp; (-0.11, 0.13) &amp; (-0.38, 0.03) &amp; (-0.42,-0.08) &amp; (-0.46,-0.21) \\
 \hline
-18 &amp; (-0.38, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.20,-0.58) &amp; ( 0.28, 0.01) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.18, 0.00) &amp; ( 0.00, 0.00) \\
+18 &amp; (-0.38,-0.33) &amp; ( 0.12, 0.09) &amp; ( 0.15, 0.10) &amp; ( 0.18, 0.14) &amp; ( 0.20, 0.17) &amp; ( 0.28, 0.23) &amp; ( 0.40, 0.22) &amp; ( 0.11, 0.12) &amp; (-0.18,-0.04) &amp; (-0.24,-0.13) \\
 \hline
-19 &amp; ( 0.00, 0.00) &amp; ( 0.39, 0.00) &amp; ( 0.00, 0.89) &amp; ( 0.42,-0.61) &amp; ( 0.00,-0.58) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.59, 0.00) &amp; ( 0.29, 0.00) &amp; ( 0.00, 0.00) \\
+19 &amp; (-0.12,-0.25) &amp; ( 0.39, 0.16) &amp; ( 0.40, 0.18) &amp; ( 0.42, 0.20) &amp; ( 0.44, 0.25) &amp; ( 0.50, 0.27) &amp; ( 0.62, 0.27) &amp; ( 0.59, 0.20) &amp; ( 0.29, 0.10) &amp; (-0.02,-0.11) \\
 \hline
-20 &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.15) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.74) &amp; ( 0.79, 0.00) &amp; ( 0.00,-0.77) &amp; ( 0.00,-0.68) \\
+20 &amp; ( 0.15,-0.18) &amp; ( 0.64, 0.21) &amp; ( 0.65, 0.26) &amp; ( 0.66, 0.24) &amp; ( 0.67, 0.26) &amp; ( 0.70, 0.30) &amp; ( 0.77, 0.30) &amp; ( 0.79, 0.28) &amp; ( 0.76, 0.18) &amp; ( 0.43, 0.02) \\
 \hline
-21 &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.94, 0.00) &amp; ( 0.89, 0.00) \\
+21 &amp; ( 0.64, 0.00) &amp; ( 0.88, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.90, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.94, 0.00) &amp; ( 0.89, 0.00) \\
 \hline
 \text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
 \end{array}\]</span>
@@ -522,25 +536,25 @@ No usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; (-0.77, 0.00) &amp; (-0.29,-0.65) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.17, 0.00) &amp; ( 0.00,-0.58) &amp; (-0.48,-0.74) &amp; ( 0.00,-0.51) &amp; ( 0.00,-0.77) &amp; ( 0.00,-0.79) \\
+12 &amp; (-0.77,-0.47) &amp; (-0.29,-0.11) &amp; (-0.25,-0.10) &amp; (-0.21,-0.05) &amp; (-0.17,-0.04) &amp; (-0.15,-0.02) &amp; (-0.48,-0.08) &amp; (-0.51,-0.16) &amp; (-0.54,-0.21) &amp; (-0.58,-0.31) \\
 \hline
-13 &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.65) &amp; ( 0.00, 0.00) &amp; (-0.21,-0.61) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.93) &amp; (-0.51,-0.76) &amp; (-0.54, 0.00) &amp; ( 0.00, 0.00) \\
+13 &amp; (-0.77,-0.48) &amp; (-0.29,-0.14) &amp; (-0.25,-0.11) &amp; (-0.21,-0.11) &amp; (-0.17,-0.07) &amp; (-0.15,-0.05) &amp; (-0.48,-0.09) &amp; (-0.51,-0.16) &amp; (-0.54,-0.24) &amp; (-0.58,-0.32) \\
 \hline
-14 &amp; ( 0.00,-0.88) &amp; ( 0.00, 0.88) &amp; (-0.25, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.58) &amp; (-0.48, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.79) \\
+14 &amp; (-0.77,-0.52) &amp; (-0.29,-0.19) &amp; (-0.25,-0.18) &amp; (-0.21,-0.14) &amp; (-0.17,-0.13) &amp; (-0.15,-0.10) &amp; (-0.48,-0.16) &amp; (-0.51,-0.21) &amp; (-0.54,-0.31) &amp; (-0.58,-0.37) \\
 \hline
-15 &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.21, 0.39) &amp; (-0.17, 0.00) &amp; ( 0.00, 0.00) &amp; (-0.48, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.29) &amp; (-0.58,-0.79) \\
+15 &amp; (-0.77,-0.54) &amp; (-0.29,-0.21) &amp; (-0.25,-0.19) &amp; (-0.21,-0.16) &amp; (-0.17,-0.15) &amp; (-0.15,-0.12) &amp; (-0.48,-0.21) &amp; (-0.51,-0.25) &amp; (-0.54,-0.34) &amp; (-0.58,-0.42) \\
 \hline
-16 &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.14) &amp; (-0.17,-0.58) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.93) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.94) &amp; ( 0.00, 0.00) \\
+16 &amp; (-0.77,-0.55) &amp; (-0.29,-0.24) &amp; (-0.25,-0.23) &amp; (-0.21,-0.24) &amp; (-0.17,-0.19) &amp; (-0.15,-0.15) &amp; (-0.48,-0.27) &amp; (-0.51,-0.30) &amp; (-0.54,-0.37) &amp; (-0.58,-0.44) \\
 \hline
-17 &amp; ( 0.00, 0.00) &amp; (-0.15,-0.65) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.53) &amp; ( 0.00, 0.00) &amp; ( 0.01,-0.58) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.15) &amp; ( 0.00,-0.79) \\
+17 &amp; (-0.64,-0.58) &amp; (-0.15,-0.29) &amp; (-0.12,-0.30) &amp; (-0.08,-0.26) &amp; (-0.04,-0.22) &amp; ( 0.01,-0.22) &amp; (-0.11,-0.28) &amp; (-0.38,-0.32) &amp; (-0.42,-0.39) &amp; (-0.46,-0.46) \\
 \hline
-18 &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.64) &amp; ( 0.00, 0.00) &amp; ( 0.18,-0.61) &amp; ( 0.00,-0.58) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.76) &amp; (-0.18,-0.77) &amp; ( 0.00, 0.00) \\
+18 &amp; (-0.38,-0.62) &amp; ( 0.12,-0.33) &amp; ( 0.15,-0.31) &amp; ( 0.18,-0.28) &amp; ( 0.20,-0.27) &amp; ( 0.28,-0.27) &amp; ( 0.40,-0.37) &amp; ( 0.11,-0.38) &amp; (-0.18,-0.43) &amp; (-0.24,-0.52) \\
 \hline
-19 &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.65) &amp; ( 0.00, 0.89) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.58) &amp; ( 0.00,-0.58) &amp; ( 0.00,-0.74) &amp; ( 0.00, 0.00) &amp; ( 0.29, 0.00) &amp; ( 0.00, 0.00) \\
+19 &amp; (-0.12,-0.68) &amp; ( 0.39,-0.42) &amp; ( 0.40,-0.41) &amp; ( 0.42,-0.38) &amp; ( 0.44,-0.39) &amp; ( 0.50,-0.38) &amp; ( 0.62,-0.47) &amp; ( 0.59,-0.49) &amp; ( 0.29,-0.52) &amp; (-0.02,-0.55) \\
 \hline
-20 &amp; ( 0.00, 0.00) &amp; ( 0.64,-0.65) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.58) &amp; ( 0.00, 0.00) &amp; ( 0.00,-0.74) &amp; ( 0.00,-0.76) &amp; ( 0.76,-0.77) &amp; ( 0.00,-0.79) \\
+20 &amp; ( 0.15,-0.88) &amp; ( 0.64,-0.65) &amp; ( 0.65,-0.63) &amp; ( 0.66,-0.61) &amp; ( 0.67,-0.58) &amp; ( 0.70,-0.58) &amp; ( 0.77,-0.74) &amp; ( 0.79,-0.76) &amp; ( 0.76,-0.77) &amp; ( 0.43,-0.79) \\
 \hline
-21 &amp; ( 0.00, 0.00) &amp; ( 0.88, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.00, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.94, 0.00) &amp; ( 0.89, 0.00) \\
+21 &amp; ( 0.64, 0.00) &amp; ( 0.88, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.90, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.94, 0.00) &amp; ( 0.89, 0.00) \\
 \hline
 \text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
 \end{array}\]</span>
@@ -549,25 +563,25 @@ With usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; (0,0) &amp; (1,2) &amp; (0,0) &amp; (1,0) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (0,0) \\
+12 &amp; (1274,1259) &amp; (1215,1207) &amp; (1228,1182) &amp; (1242,1312) &amp; (1256,1309) &amp; (1258,1277) &amp; (1252,1239) &amp; (1220,1230) &amp; (1260,1255) &amp; (1199,1247) \\
 \hline
-13 &amp; (0,0) &amp; (0,1) &amp; (0,2) &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (1,1) &amp; (0,0) &amp; (0,0) \\
+13 &amp; (1305,1375) &amp; (1255,1399) &amp; (1271,1353) &amp; (1183,1384) &amp; (1256,1326) &amp; (1311,1346) &amp; (1211,1392) &amp; (1275,1299) &amp; (1206,1352) &amp; (1237,1303) \\
 \hline
-14 &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (1,1) &amp; (0,0) &amp; (2,1) &amp; (0,0) &amp; (0,0) &amp; (0,0) \\
+14 &amp; (1296,1406) &amp; (1219,1490) &amp; (1295,1420) &amp; (1210,1440) &amp; (1202,1445) &amp; (1311,1495) &amp; (1276,1423) &amp; (1300,1438) &amp; (1274,1449) &amp; (1319,1388) \\
 \hline
-15 &amp; (0,0) &amp; (0,1) &amp; (1,1) &amp; (0,0) &amp; (1,0) &amp; (1,1) &amp; (0,0) &amp; (0,0) &amp; (2,0) &amp; (0,0) \\
+15 &amp; (1238,1528) &amp; (1248,1616) &amp; (1222,1612) &amp; (1204,1530) &amp; (1291,1578) &amp; (1226,1545) &amp; (1183,1562) &amp; (1239,1581) &amp; (1284,1543) &amp; (1302,1666) \\
 \hline
-16 &amp; (1,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) \\
+16 &amp; (1256,1700) &amp; (1170,1708) &amp; (1278,1695) &amp; (1211,1661) &amp; (1211,1689) &amp; (1259,1650) &amp; (1250,1715) &amp; (1274,1618) &amp; (1250,1602) &amp; (1219,1646) \\
 \hline
-17 &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (1,0) &amp; (1,0) &amp; (0,0) &amp; (1,1) \\
+17 &amp; (1342,1780) &amp; (1234,1738) &amp; (1209,1855) &amp; (1297,1777) &amp; (1229,1847) &amp; (1284,1814) &amp; (1206,1875) &amp; (1256,1823) &amp; (1218,1790) &amp; (1249,1824) \\
 \hline
-18 &amp; (2,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (2,1) &amp; (1,1) &amp; (0,0) &amp; (0,0) &amp; (1,0) &amp; (0,0) \\
+18 &amp; (1240,1927) &amp; (1874,1319) &amp; (2001,1293) &amp; (1954,1268) &amp; (1992,1291) &amp; (2077,1242) &amp; (1962,1269) &amp; (1645,1534) &amp; (1261,1964) &amp; (1306,1958) \\
 \hline
-19 &amp; (0,0) &amp; (1,0) &amp; (0,1) &amp; (1,1) &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (1,0) &amp; (1,0) &amp; (0,0) \\
+19 &amp; (2119,1244) &amp; (2034,1224) &amp; (2036,1280) &amp; (2041,1329) &amp; (2105,1196) &amp; (2039,1275) &amp; (2069,1282) &amp; (2080,1274) &amp; (2061,1252) &amp; (2089,1272) \\
 \hline
-20 &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (1,0) &amp; (0,1) &amp; (0,2) \\
+20 &amp; (2165,1309) &amp; (2184,1215) &amp; (2125,1197) &amp; (2102,1302) &amp; (2159,1218) &amp; (2171,1194) &amp; (2172,1281) &amp; (2216,1260) &amp; (2249,1201) &amp; (2230,1177) \\
 \hline
-21 &amp; (0,0) &amp; (0,0) &amp; (3,0) &amp; (0,0) &amp; (1,0) &amp; (0,0) &amp; (0,0) &amp; (1,0) &amp; (1,0) &amp; (1,0) \\
+21 &amp; (3532,0) &amp; (3522,0) &amp; (3429,0) &amp; (3533,0) &amp; (3629,0) &amp; (3450,0) &amp; (3562,0) &amp; (3496,0) &amp; (3574,0) &amp; (3569,0) \\
 \hline
 \text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
 \end{array}\]</span>
@@ -575,25 +589,25 @@ No usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; (1,0) &amp; (1,1) &amp; (0,0) &amp; (0,0) &amp; (1,0) &amp; (0,1) &amp; (1,1) &amp; (0,1) &amp; (0,1) &amp; (0,1) \\
+12 &amp; (1222,2645) &amp; (1263,2471) &amp; (1265,2588) &amp; (1439,2481) &amp; (1291,2560) &amp; (1268,2486) &amp; (1239,2532) &amp; (1259,2494) &amp; (1226,2605) &amp; (1226,2630) \\
 \hline
-13 &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (1,1) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (1,1) &amp; (1,0) &amp; (0,0) \\
+13 &amp; (1305,2733) &amp; (1241,2647) &amp; (1359,2623) &amp; (1277,2643) &amp; (1281,2606) &amp; (1316,2563) &amp; (1237,2723) &amp; (1308,2662) &amp; (1238,2822) &amp; (1216,2709) \\
 \hline
-14 &amp; (0,1) &amp; (0,1) &amp; (2,0) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (2,0) &amp; (0,0) &amp; (0,0) &amp; (0,1) \\
+14 &amp; (1350,2779) &amp; (1266,2681) &amp; (1298,2749) &amp; (1327,2764) &amp; (1303,2656) &amp; (1301,2693) &amp; (1274,2744) &amp; (1231,2777) &amp; (1312,2796) &amp; (1241,2889) \\
 \hline
-15 &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (1,3) &amp; (1,0) &amp; (0,0) &amp; (1,0) &amp; (0,0) &amp; (0,1) &amp; (1,1) \\
+15 &amp; (1244,3000) &amp; (1267,2908) &amp; (1242,2862) &amp; (1250,2870) &amp; (1597,2421) &amp; (1575,2472) &amp; (1276,2976) &amp; (1254,2848) &amp; (1255,2997) &amp; (1269,3025) \\
 \hline
-16 &amp; (0,0) &amp; (0,0) &amp; (0,0) &amp; (0,2) &amp; (2,1) &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (0,1) &amp; (0,0) \\
+16 &amp; (1210,3137) &amp; (1253,2975) &amp; (1967,2400) &amp; (2908,1455) &amp; (2986,1248) &amp; (3023,1291) &amp; (1248,3015) &amp; (1278,2967) &amp; (1252,3050) &amp; (1282,3035) \\
 \hline
-17 &amp; (0,0) &amp; (1,1) &amp; (0,0) &amp; (0,2) &amp; (0,0) &amp; (2,1) &amp; (0,0) &amp; (0,0) &amp; (0,3) &amp; (0,1) \\
+17 &amp; (1268,3189) &amp; (3197,1264) &amp; (3056,1227) &amp; (3058,1236) &amp; (2933,1289) &amp; (2997,1247) &amp; (3160,1293) &amp; (1332,2961) &amp; (1330,3155) &amp; (1890,2596) \\
 \hline
-18 &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (1,1) &amp; (0,1) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (1,1) &amp; (0,0) \\
+18 &amp; (3368,1213) &amp; (2987,1276) &amp; (2904,1234) &amp; (2810,1239) &amp; (2821,1259) &amp; (2797,1228) &amp; (3058,1226) &amp; (3158,1205) &amp; (3299,1314) &amp; (3378,1227) \\
 \hline
-19 &amp; (0,0) &amp; (0,1) &amp; (0,1) &amp; (0,0) &amp; (0,1) &amp; (0,1) &amp; (0,1) &amp; (0,0) &amp; (2,0) &amp; (0,0) \\
+19 &amp; (3152,1229) &amp; (2927,1227) &amp; (2899,1277) &amp; (2940,1317) &amp; (2811,1276) &amp; (2850,1295) &amp; (2985,1217) &amp; (3140,1238) &amp; (3247,1194) &amp; (3198,1251) \\
 \hline
-20 &amp; (0,0) &amp; (1,1) &amp; (0,0) &amp; (0,0) &amp; (0,1) &amp; (0,0) &amp; (0,1) &amp; (0,2) &amp; (1,2) &amp; (0,1) \\
+20 &amp; (3189,1197) &amp; (2960,1260) &amp; (2932,1284) &amp; (2861,1208) &amp; (2823,1280) &amp; (2832,1125) &amp; (3007,1225) &amp; (3230,1226) &amp; (3172,1216) &amp; (3193,1226) \\
 \hline
-21 &amp; (0,0) &amp; (1,0) &amp; (1,0) &amp; (3,0) &amp; (0,0) &amp; (0,0) &amp; (2,0) &amp; (1,0) &amp; (4,0) &amp; (1,0) \\
+21 &amp; (3968,0) &amp; (3903,0) &amp; (3870,0) &amp; (3799,0) &amp; (3659,0) &amp; (3667,0) &amp; (3979,0) &amp; (4038,0) &amp; (4032,0) &amp; (4049,0) \\
 \hline
 \text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
 \end{array}\]</span>

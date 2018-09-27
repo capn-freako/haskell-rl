@@ -195,14 +195,6 @@ finToAct = \case
   Helper functions.
 ----------------------------------------------------------------------}
 
--- | Probabilities of dealer total vs. up card.
-dlrTots :: Finite 10 -> [(Integer, Double)]
-dlrTots (Finite n) = combProb $ map (first (min 22)) tots
- where
-  tots = case n of
-    0 -> playHand 11      True  1
-    _ -> playHand (n + 1) False 1
-  
 hit :: BJState -> [((BJState, Double), Double)]
 hit st@BJState{..} =
   [ ((nxtSt, 0), 0.0769)           -- 0.0769 = 1/13.
@@ -221,17 +213,17 @@ stand st@BJState{..} =
   ]
   where
     st'  = st{done = True}
-    pTot = getFinite playerSum + 12
     pWin =
-      if pTot > 21
+      if playerSum == 10         -- Player went bust.
         then 0
-        else sum . map snd $
-               filter ((\x -> x < pTot || x > 21) . fst) dlrHnds
-    pDraw       = sum . map snd $ filter ((== pTot) . fst) dlrHnds
-    dlrHnds     = map (first (min 22)) $ playHand init ace 1
-    (init, ace) = if dealerCard == 0
-                    then (11, True)
-                    else (getFinite dealerCard + 1, False)
+        else dlrTotPmfV `VS.index` dealerCard `VS.index` (finite 5)  -- P[Dealer went bust]
+           + if playerSum > 5  -- Player's total > 17?
+               then dlrTotCmfV `VS.index` dealerCard `VS.index` (finite (getFinite playerSum - 6))
+               else 0
+    pDraw =
+      if playerSum > 4           -- Player's total > 16?
+        then dlrTotPmfV `VS.index` dealerCard `VS.index` (finite (getFinite playerSum - 5))
+        else 0
 
 -- | Adjust the total count of a hand after taking a card.
 --
@@ -253,6 +245,31 @@ cardSum acc ace card = (acc', ace')
                       else (acc + card,      True)
             _    -> (acc + card, False)
 
+-- | Array of dealer total probabilities.
+--
+-- Rows are indexed by dealer's up card (0 = ace).
+-- Columns are indexed by hand total (0 = 17, 5 = bust).
+dlrTotPmfV :: Vector 10 (Vector 6 Double)
+dlrTotPmfV = VS.generate $ \r ->
+  fromMaybe (P.error "dlrTotPmfV: VS.fromList failure!")
+            $ VS.fromList $ map snd $ dlrTots r
+    
+-- | Array of dealer total cumulative probabilities.
+--
+-- Rows are indexed by dealer's up card (0 = ace).
+-- Columns are indexed by hand total (0 = 17, 5 = bust).
+dlrTotCmfV :: Vector 10 (Vector 6 Double)
+dlrTotCmfV = VS.generate $ \r ->
+  VS.postscanl' (+) 0 $ dlrTotPmfV `VS.index` r
+    
+-- | Probabilities of dealer total vs. up card.
+dlrTots :: Finite 10 -> [(Integer, Double)]
+dlrTots (Finite n) = sortOn fst $ combProb $ map (first (min 22)) tots
+ where
+  tots = case n of
+    0 -> playHand 11      True  1
+    _ -> playHand (n + 1) False 1
+  
 -- | Play out the dealer's hand.
 --
 -- Take as input:
