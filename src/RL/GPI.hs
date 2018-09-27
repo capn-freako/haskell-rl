@@ -227,8 +227,6 @@ type OptQT s g =
   , Integer
   )
 
-type Unop a = a -> a
-
 {- | Yields a single episodic action-value improvement iteration, using n-step TD.
 
 @'HypParams'@ field overrides:

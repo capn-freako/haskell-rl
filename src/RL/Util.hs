@@ -46,6 +46,8 @@ nat = natVal (Proxy @n)
 int :: forall n. KnownNat n => Int
 int = fromIntegral (nat @n)
 
+type Unop a = a -> a
+
 -- | Apply the matrix representation of a two argument function.
 --
 -- The first argument is assumed to index the rows of the matrix.

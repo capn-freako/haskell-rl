@@ -25,6 +25,8 @@ import Data.List.Extras.Argmax       (argmax)
 import System.Random
 import ToolShed.System.Random        (shuffle)
 
+import RL.Util
+
 -- | Markov Decision Process (MDP) (finite discrete)
 --
 -- Laws:
@@ -111,7 +113,8 @@ epsGreedy gen eps =
 -- like terms and summing their probabilities.
 combProb
   :: (Eq a, Ord a)
-  => [(a, Double)] -> [(a, Double)]
+  -- => [(a, Double)] -> [(a, Double)]
+  => Unop [(a, Double)]  
 combProb =
   map ((fst . P.head) &&& (sum . map snd))
   . groupBy ((==)    `on` fst)

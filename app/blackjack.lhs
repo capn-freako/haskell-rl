@@ -70,6 +70,7 @@ import qualified Data.Vector.Sized as VS
 import Control.Arrow          ((***), (&&&))
 import Data.MemoTrie
 import Data.Finite
+import Data.Finite.Internal
 import Data.Text              (pack)
 import Data.Vector.Sized      (Vector, index)
 import Graphics.Rendering.Chart.Easy hiding   (Wrapped, Unwrapped, Empty, Iso, Vector, index)
@@ -194,6 +195,14 @@ finToAct = \case
   Helper functions.
 ----------------------------------------------------------------------}
 
+-- | Probabilities of dealer total vs. up card.
+dlrTots :: Finite 10 -> [(Integer, Double)]
+dlrTots (Finite n) = combProb $ map (first (min 22)) tots
+ where
+  tots = case n of
+    0 -> playHand 11      True  1
+    _ -> playHand (n + 1) False 1
+  
 hit :: BJState -> [((BJState, Double), Double)]
 hit st@BJState{..} =
   [ ((nxtSt, 0), 0.0769)           -- 0.0769 = 1/13.
@@ -260,7 +269,7 @@ playHand tot ace p =
                 | card <- [1..10] ++ [10,10,10]
                 , let (tot', ace') = cardSum tot ace card
                 ]
-  
+
 showFofState :: Show a => (BJState -> a) -> String
 showFofState f = intercalate "\n\n" $ map (showFofState' f) [True, False]
 
@@ -282,7 +291,7 @@ showFofState' f ace = unlines $
                                      , dealerCard = finite $ dCard - 1
                                      }
                   ]
-                | pTot <- [12..21]
+                | pTot <- [12..22]
                 ]
           )
         ++ ["\\hline"]
@@ -425,6 +434,14 @@ main = do
   -- appendFile mdFilename "\n**Testing State Enumeration:**\n\n"
   -- appendFile mdFilename $ pack $ showFofState toFin
 
+  appendFile mdFilename "\n**Probability of Dealer Total vs. Up Card:**\n\n"
+  appendFile mdFilename $ pack $ showFofState $ \BJState{..} ->
+    let tots  = dlrTots dealerCard
+        targs = filter ((== (getFinite playerSum + 12)) . fst) tots
+     in Pdouble $ if length targs > 0
+                    then snd $ P.head $ targs
+                    else 0
+        
 \end{code}
 
 output
