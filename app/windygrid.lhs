@@ -91,7 +91,7 @@ import ConCat.Isomorphism
 import ConCat.TArr
 
 import RL.GPI
-import RL.MDP
+import RL.Markov
 import RL.Util
 \end{code}
 
@@ -117,13 +117,17 @@ type Na = 9
 
 type MyState = (Finite NNumRows, Finite NNumCols)
 
-instance MDP MyState where
-  type ActionT MyState = MyAction
+instance IsState MyState where
   states =
     [ ((finite . fromIntegral) r, (finite . fromIntegral) c)
     | r <- [0..(gNumRows - 1)]
     , c <- [0..(gNumCols - 1)]
     ]
+  termStates = [(3,7)]
+  initStates = [(3,0)]
+
+instance MDP MyState where
+  type ActionT MyState = MyAction
   actions = const [Up, Dn, Rt, Lt, UL, UR, DL, DR, NM]
   jointPMF s@(r,c) act =
     [ ((s', rwd), 0.3333)
@@ -161,8 +165,6 @@ instance MDP MyState where
               then  0
               else -1
     ]
-  termStates = [(3,7)]
-  initStates = [(3,0)]
 
 data MyAction = Up
               | Dn
@@ -396,6 +398,9 @@ main = do
 
   appendFile mdFilename "\n## debug\n\n"
 
+  -- DEBUGGING
+  print $ length resss
+  
   appendFile mdFilename "\n#### State Visits\n\n"
   let qM = P.last $ qMats $ P.last $ P.last resss
       qS = VS.map (VS.sum . VS.map snd) qM

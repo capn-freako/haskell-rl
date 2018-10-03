@@ -28,6 +28,7 @@ code
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
+{-# OPTIONS_GHC -cpp #-}
 \end{code}
 
 [pragmas](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html)
@@ -67,7 +68,7 @@ import Options.Generic
 
 import qualified Data.Vector.Sized as VS
 
-import Control.Arrow          ((***), (&&&))
+-- import Control.Arrow          ((***), (&&&))
 import Data.MemoTrie
 import Data.Finite
 import Data.Finite.Internal
@@ -80,7 +81,7 @@ import Text.Printf
 import ConCat.TArr
 import ConCat.Isomorphism
 
-import RL.MDP
+import RL.Markov
 import RL.GPI
 import RL.Util
 \end{code}
@@ -125,19 +126,27 @@ finToSt n =
          then P.error "finToSt: Blew out a Finite 11!"
          else BJState (finite pSum) (integerToBool ace) (finite dCard) (integerToBool done)
 
+instance HasTrie BJState where
+  newtype (BJState :->: b) = BJStateTrie { unBJStateTrie :: Reg BJState :->: b } 
+  trie      = trieGeneric      BJStateTrie 
+  untrie    = untrieGeneric    unBJStateTrie
+  enumerate = enumerateGeneric unBJStateTrie
+
 -- | The @'MDP'@ instance for @'BJState'@.
+instance IsState BJState where
+  states     = allStates
+  termStates = filter (\BJState{..} -> done == True)                   allStates
+  initStates = filter (\BJState{..} -> done /= True && playerSum < 10) allStates
+
 instance MDP BJState where
   type ActionT BJState = BJAction
-  states  = allStates
   actions = \BJState{..} ->
     if playerSum > 8 || done == True  -- If we're made or bust then we have to stand.
       then [Stand]
       else [Hit, Stand]
-  jointPMF st act = case act of
+  jointPMF st = \case
     Hit -> hit   st
     _   -> stand st
-  termStates = filter (\BJState{..} -> done == True)                   allStates
-  initStates = filter (\BJState{..} -> done /= True && playerSum < 10) allStates
 
 allStates :: [BJState]
 allStates =
@@ -164,7 +173,7 @@ type Nacts = 2
 
 data BJAction = Hit
               | Stand
-  deriving (Eq, Generic)
+  deriving (Eq, Ord, Generic)
 
 instance Show BJAction where
   show = \case
@@ -221,7 +230,7 @@ stand st@BJState{..} =
                then dlrTotCmfV `VS.index` dealerCard `VS.index` (finite (getFinite playerSum - 6))
                else 0
     pDraw =
-      if playerSum > 4           -- Player's total > 16?
+      if playerSum > 4 && playerSum < 10  -- Player's total > 16 and < 22?
         then dlrTotPmfV `VS.index` dealerCard `VS.index` (finite (getFinite playerSum - 5))
         else 0
 
@@ -308,7 +317,7 @@ showFofState' f ace = unlines $
                                      , dealerCard = finite $ dCard - 1
                                      }
                   ]
-                | pTot <- [12..22]
+                | pTot <- [12..21]
                 ]
           )
         ++ ["\\hline"]
@@ -347,6 +356,17 @@ showVofState' v ace = unlines $
       )
     )
 
+showGame :: [Dbg BJState BJAction Double] -> String
+showGame [] = "\n"
+showGame (x : xs) = showStep x ++ (showGame xs)
+
+showStep :: Dbg BJState BJAction Double -> String
+showStep Dbg{..} =
+  printf "Total: %2d, Action: %s, Reward: %3.1f  \n"            
+         (12 + (getFinite . playerSum) curSt)
+         (if act == Hit then ("H" :: String) else "S")
+         (rwd)
+
 {----------------------------------------------------------------------
   Command line options defintions.
 ----------------------------------------------------------------------}
@@ -379,7 +399,45 @@ main = do
   let nG     = fromMaybe 10000     (nGames o)
       eps'   = fromMaybe     0.1   (eps    o)
       beta'  = fromMaybe     0     (dcy    o)
-      
+
+#if 1
+  -- Apply DP.
+  let DPRetT{..} =
+        doDP
+          hypParamsDef
+            { maxIter = 10  -- 10 policy evaluation iterations per improvement iteration.
+            }
+          nG
+
+  -- Output the results.
+  writeFile  mdFilename "\n### Final Policy (H = hit)\n\n"
+  appendFile mdFilename $ pack $ showFofState $ polFunc
+
+  appendFile mdFilename "\n### Final Value Function\n\n"
+  appendFile mdFilename $ pack $ showFofState $ Pdouble . valFunc
+  
+  -- Value/Action changes vs. Iteration
+  appendFile mdFilename "\n#### Policy/Value Function Changes vs. Iteration\n\n"
+  toFile def plotFilename $ do
+    layout_title .= "Policy/Value Function Changes vs. Iteration"
+    setColors $ map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
+    plot ( line "Policy Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip (map (* (length $ P.head valXCnts)) [(0::Int)..])
+                                 polXCnts'
+                  ]
+                ]
+         )
+    plot ( line "Value Changes"
+                [ [ (x,y)
+                  | (x,y) <- zip [(0::Int)..]
+                                 (concat valXCnts)
+                  ]
+                ]
+         )
+  appendFile mdFilename $ pack $ printf "\n![](%s)\n" plotFilename
+
+#else
   -- Play many games, updating policy and state/action values after each.
   -- (results, _) <- runWriterT $ iterateM' nG optPol (qs, pol)
   let myHypParams =
@@ -394,8 +452,29 @@ main = do
       -- ress :: [TDRetT MyState MyAction Double (Card MyState) (Card (ActionT MyState))]
       res  = doTD myHypParams nG
       qMat = P.last $ qMats  res
-      dbgs = P.last $ debugs res
       maxN = maximum $ map length $ debugs res
+      dbgs = P.head $ filter ((== maxN) . length) $ debugs res
+      tsts :: [[Dbg BJState BJAction Double]]
+      tsts =
+        filter
+          (any ( \dbg ->
+                   let s = curSt dbg
+                    in playerSum  s == 0      -- 12
+                    && usableAce  s == False
+                    && dealerCard s == 5      -- 6
+                    && act dbg      == Hit
+               )
+          ) $ debugs res
+      tstsTotRwd  = sum $ map (rwd . P.last) tsts
+      tstsMeanRwd = tstsTotRwd / (fromIntegral . length) tsts
+      tstsIncrements =
+        map ( getFinite . playerSum . curSt
+            . P.head . P.tail
+            . dropWhile ( \x ->
+                            playerSum (curSt x) /= 0 ||
+                            usableAce (curSt x) /= False
+                        )
+            ) tsts
 
   -- Output the results.
   writeFile  mdFilename "\n### Final Policy (H = hit)\n\n"
@@ -429,7 +508,28 @@ main = do
   appendFile mdFilename $ pack $ printf "**Epsilon:** %f  \n" eps'
   appendFile mdFilename $ pack $ printf "**Beta:** %f\n\n" beta'
 
-  appendFile mdFilename "**Last game sequence:**  \n"
+  -- appendFile mdFilename "**12/6 game sequences:**\n\n"
+  -- appendFile mdFilename $ pack $ concat $ map showGame tsts
+
+  appendFile mdFilename $ pack $ printf
+    "**Mean reward from hitting hard 12 w/ dealer showing 6:** %4.2f\n\n" tstsMeanRwd
+
+  appendFile mdFilename
+    "**# of occurences of drawn card when hitting hard 12 when dealer shows a 6:**\n\n"
+  appendFile mdFilename
+    "| Card: | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |\n"
+  appendFile mdFilename
+    "| -----:| - | - | - | - | - | - | - | - | - | -- |\n"
+  appendFile mdFilename
+    "|    #: | "
+  appendFile mdFilename $ pack $ intercalate " | "
+    [ show n
+    | x <- [1..10]
+    , let n = length $ filter (== x) tstsIncrements
+    ]
+  appendFile mdFilename " |\n\n"
+
+  appendFile mdFilename "**Longest game sequence:**  \n"
   appendFile mdFilename $ pack $ unlines $
     map ( \Dbg{..} ->
             printf "\tTotal: %2d, Action: %s, Reward: %3.1f  "            
@@ -458,7 +558,23 @@ main = do
      in Pdouble $ if length targs > 0
                     then snd $ P.head $ targs
                     else 0
-        
+
+  appendFile mdFilename "\n**Contents of Dealer Total PMF vs. Up Card:**\n\n"
+  appendFile mdFilename $ pack $ showFofState $ \BJState{..} ->
+      Pdouble $ if playerSum > 4
+                    then dlrTotPmfV `VS.index` dealerCard
+                                    `VS.index` (finite (getFinite playerSum - 5))
+                    else 0
+
+  appendFile mdFilename "\n**Contents of Dealer Total CMF vs. Up Card:**\n\n"
+  appendFile mdFilename $ pack $ showFofState $ \BJState{..} ->
+      Pdouble $ if playerSum > 4
+                    then dlrTotCmfV `VS.index` dealerCard
+                                    `VS.index` (finite (getFinite playerSum - 5))
+                    else 0
+
+#endif
+
 \end{code}
 
 output

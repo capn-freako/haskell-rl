@@ -28,10 +28,11 @@ import GHC.TypeLits
 import qualified Data.Vector.Sized   as VS
 import Data.Vector.Sized             (Vector)
 
+import Control.Arrow                 ((&&&))
 import Control.Monad.Writer
 import Data.Finite
 import Data.Finite.Internal
-import Data.List                     ((!!))
+import Data.List                     ((!!), groupBy)
 import Statistics.Distribution       (density)
 import Statistics.Distribution.Gamma (gammaDistr)
 import Text.Printf
@@ -270,3 +271,13 @@ winMean' _   _    []   = []
 winMean' acc subs adds = acc' : (winMean' acc' (P.tail subs) (P.tail adds))
  where
   acc' = acc - (P.head subs) + (P.head adds)
+
+-- | Eliminate duplicates from a probability distribution, by combining
+-- like terms and summing their probabilities.
+combProb
+  :: (Eq a, Ord a)
+  => Unop [(a, Double)]  
+combProb =
+  map ((fst . P.head) &&& (sum . map snd))
+  . groupBy ((==)    `on` fst)
+  . sortBy  (compare `on` fst)

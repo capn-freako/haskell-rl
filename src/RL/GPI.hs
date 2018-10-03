@@ -40,16 +40,16 @@ import Data.Vector.Sized             (Vector)
 -- import Control.Monad.Loops
 import Control.Monad.Writer
 import Data.Finite
-import Data.List                     (lookup, groupBy, unzip5, zip3)
+import Data.List                     (groupBy, unzip5, zip3)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import System.Random
-import Text.Printf
+-- import Text.Printf
 import ToolShed.System.Random        (shuffle)
 
 import ConCat.TArr
 
-import RL.MDP
+import RL.Markov
 import RL.Util
 
 {----------------------------------------------------------------------
@@ -253,11 +253,9 @@ optQn
 optQn HypParams{..} (s0, q, gen, _, t) =
   (sN, q VS.// qUpdates, gen', reverse debugs, t + (fromIntegral . length) sts)
  where
-  sN = if mode == MC
+  sN = if mode == MC || length sts < 2
          then sT
-         else if nSteps > 0
-                then (P.last . P.init) sts
-                else sT
+         else (P.last . P.init) sts
   qUpdates =
     [ ( sNum
       , q `VS.index` sNum VS.// [(aNum, (newVal, visits s a + 1))]
@@ -302,6 +300,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
   alpha'    = alpha   / decayFact
   epsilon'  = epsilon / decayFact
   decayFact = (1 + beta * fromIntegral t)
+  -- TODO: Add a hyper-parameter to control exploring starts.
   (sts, acts, rwds, debugs, gen') =
     execState (replicateM (nSteps + 1) go)
               ([s0], [epsGreedy gen epsilon' qf s0], [], [], gen)
@@ -318,17 +317,28 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                           | (st, p) <- s'p's
                           ]
             s'p's = nextStates s a
+            -- Advance the random number generator.
+            (_::Int, g') = random g
             -- Calculate reward.
-            r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
-            ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
-                            (lookup s' s'p's)
+            -- r = sum [ r' * p
+            --         | ((s', r'), p) <- jointPMF s a
+            --         ]
+            r   = P.head $ shuffle g' $
+                    concat [ replicate (round $ 100 * p) r'
+                           | (r', p) <- r'p's
+                           ]
+            r'p's = rewards s a s'
+            -- r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
+            -- ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
+            --                 (lookup s' s'p's)
+            -- ps' = sum $ map snd $ filter ((== s') . fst) s'p's
             -- Use a greedy policy to select the next action.
             a' = greedy qf s'
             -- Advance the random number generator.
-            (_::Int, g') = random g
+            (_::Int, g'') = random g'
             -- TEMPORARY DEBUGGING INFO
             dbg = Dbg s a s' r s'p's
-        put (s' : ss, a' : as, r : rs, dbg : dbgs, g')  -- Note the reverse order build-up.
+        put (s' : ss, a' : as, r : rs, dbg : dbgs, g'')  -- Note the reverse order build-up.
         return ()
       -- if s' `elem` termStates
       -- if s `elem` termStates

@@ -94,7 +94,7 @@ import ConCat.Isomorphism
 import ConCat.TArr
 
 import RL.GPI
-import RL.MDP
+import RL.Markov
 import RL.Util
 \end{code}
 
@@ -159,14 +159,16 @@ finToState (Finite n) = MyState{..} where
 
 type MyAction = Finite (NMaxOrder + 1)
 
-instance MDP MyState where
-  type ActionT MyState = MyAction
+instance IsState MyState where
   states =
     [ MyState{..}
     | onHand  <- map finite [0..(2 * gMaxOnHand)]
     , onOrder <- map finite [0..gMaxOrder]
     , epoch   <- map finite [0..(gLeadTime - 1)]
     ]
+  
+instance MDP MyState where
+  type ActionT MyState = MyAction
   actions MyState{..} = map finite $
     if getFinite epoch `mod` gLeadTime /= 0
       then [0]

@@ -1,5 +1,5 @@
 name:          haskell-rl
-version:       4.0
+version:       5.0
 synopsis:      Haskell library for doing reinforcement learning.
 description:   See readme.md for description.
 category:      project
@@ -17,11 +17,20 @@ extra-source-files:
   index.html
   rentalcars.html
   rentalcars2.html
+  blackjack.html
+  gambler.html
+  inventory.html
+  tictactoe.html
+  windygrid.html
   stack.yaml
   other/lhs.css
   other/header.md
   app/windygrid.lhs
   app/inventory.lhs
+  app/blackjack.lhs
+  app/gambler.lhs
+  app/rentalcars.lhs
+  app/tictactoe.lhs
 
 library
   default-language:
@@ -33,7 +42,7 @@ library
   hs-source-dirs: src
   exposed-modules:
     RL.GPI
-    RL.MDP
+    RL.Markov
     RL.Util
   build-depends:
     base >= 4.7 && < 5

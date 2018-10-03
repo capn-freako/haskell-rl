@@ -73,7 +73,7 @@ Original date: June 28, 2018</p>
 <span class="kw">import </span><span class="dt">ConCat.TArr</span>
 
 <span class="kw">import </span><span class="dt">RL.GPI</span>
-<span class="kw">import </span><span class="dt">RL.MDP</span>
+<span class="kw">import </span><span class="dt">RL.Markov</span>
 <span class="kw">import </span><span class="dt">RL.Util</span></code></pre></div>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
@@ -97,13 +97,17 @@ gNumCols <span class="fu">=</span> int <span class="fu">@</span><span class="dt"
 
 <span class="kw">type</span> <span class="dt">MyState</span> <span class="fu">=</span> (<span class="dt">Finite</span> <span class="dt">NNumRows</span>, <span class="dt">Finite</span> <span class="dt">NNumCols</span>)
 
-<span class="kw">instance</span> <span class="dt">MDP</span> <span class="dt">MyState</span> <span class="kw">where</span>
-  <span class="kw">type</span> <span class="dt">ActionT</span> <span class="dt">MyState</span> <span class="fu">=</span> <span class="dt">MyAction</span>
+<span class="kw">instance</span> <span class="dt">IsState</span> <span class="dt">MyState</span> <span class="kw">where</span>
   states <span class="fu">=</span>
     [ ((finite <span class="fu">.</span> fromIntegral) r, (finite <span class="fu">.</span> fromIntegral) c)
     <span class="fu">|</span> r <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gNumRows <span class="fu">-</span> <span class="dv">1</span>)]
     , c <span class="ot">&lt;-</span> [<span class="dv">0</span><span class="fu">..</span>(gNumCols <span class="fu">-</span> <span class="dv">1</span>)]
     ]
+  termStates <span class="fu">=</span> [(<span class="dv">3</span>,<span class="dv">7</span>)]
+  initStates <span class="fu">=</span> [(<span class="dv">3</span>,<span class="dv">0</span>)]
+
+<span class="kw">instance</span> <span class="dt">MDP</span> <span class="dt">MyState</span> <span class="kw">where</span>
+  <span class="kw">type</span> <span class="dt">ActionT</span> <span class="dt">MyState</span> <span class="fu">=</span> <span class="dt">MyAction</span>
   actions <span class="fu">=</span> const [<span class="dt">Up</span>, <span class="dt">Dn</span>, <span class="dt">Rt</span>, <span class="dt">Lt</span>, <span class="dt">UL</span>, <span class="dt">UR</span>, <span class="dt">DL</span>, <span class="dt">DR</span>, <span class="dt">NM</span>]
   jointPMF s<span class="fu">@</span>(r,c) act <span class="fu">=</span>
     [ ((s&#39;, rwd), <span class="fl">0.3333</span>)
@@ -141,8 +145,6 @@ gNumCols <span class="fu">=</span> int <span class="fu">@</span><span class="dt"
               <span class="kw">then</span>  <span class="dv">0</span>
               <span class="kw">else</span> <span class="fu">-</span><span class="dv">1</span>
     ]
-  termStates <span class="fu">=</span> [(<span class="dv">3</span>,<span class="dv">7</span>)]
-  initStates <span class="fu">=</span> [(<span class="dv">3</span>,<span class="dv">0</span>)]
 
 <span class="kw">data</span> <span class="dt">MyAction</span> <span class="fu">=</span> <span class="dt">Up</span>
               <span class="fu">|</span> <span class="dt">Dn</span>
@@ -376,6 +378,9 @@ main <span class="fu">=</span> <span class="kw">do</span>
 
   appendFile mdFilename <span class="st">&quot;\n## debug\n\n&quot;</span>
 
+  <span class="co">-- DEBUGGING</span>
+  print <span class="fu">$</span> length resss
+  
   appendFile mdFilename <span class="st">&quot;\n#### State Visits\n\n&quot;</span>
   <span class="kw">let</span> qM <span class="fu">=</span> P.last <span class="fu">$</span> qMats <span class="fu">$</span> P.last <span class="fu">$</span> P.last resss
       qS <span class="fu">=</span> VS.map (VS.sum <span class="fu">.</span> VS.map snd) qM
@@ -440,19 +445,19 @@ S &amp; \searrow  &amp; \downarrow  &amp; \searrow  &amp; \searrow  &amp; \searr
 <h4 id="final-value-function">Final value function</h4>
 <span class="math display">\[\begin{array}{|c|c|c|c|c|c|c|c|c|c|}
 \hline
--12.5 &amp; -12.5 &amp; -12.5 &amp; -13.1 &amp; -12.2 &amp; -11.3 &amp; -10.3 &amp; -9.3 &amp; -8.3 &amp; -7.6 \\
+-12.52 &amp; -12.52 &amp; -12.52 &amp; -13.06 &amp; -12.21 &amp; -11.25 &amp; -10.28 &amp; -9.28 &amp; -8.28 &amp; -7.61 \\
 \hline
--11.5 &amp; -11.5 &amp; -11.5 &amp; -12.5 &amp; -11.8 &amp; -11.1 &amp; -10.2 &amp; -9.1 &amp; -7.6 &amp; -6.6 \\
+-11.52 &amp; -11.52 &amp; -11.52 &amp; -12.52 &amp; -11.75 &amp; -11.14 &amp; -10.20 &amp; -9.06 &amp; -7.61 &amp; -6.61 \\
 \hline
--10.5 &amp; -10.5 &amp; -10.5 &amp; -11.5 &amp; -10.7 &amp; -9.9 &amp; -9.9 &amp; -8.5 &amp; -6.5 &amp; -5.6 \\
+-10.52 &amp; -10.52 &amp; -10.52 &amp; -11.52 &amp; -10.75 &amp; -9.88 &amp; -9.93 &amp; -8.47 &amp; -6.51 &amp; -5.61 \\
 \hline
-S &amp; -9.5 &amp; -9.5 &amp; -10.1 &amp; -9.1 &amp; -8.2 &amp; -6.5 &amp; G &amp; -5.2 &amp; -4.6 \\
+S &amp; -9.53 &amp; -9.53 &amp; -10.10 &amp; -9.07 &amp; -8.22 &amp; -6.51 &amp; G &amp; -5.23 &amp; -4.61 \\
 \hline
--10.0 &amp; -9.0 &amp; -8.5 &amp; -8.6 &amp; -7.5 &amp; -6.1 &amp; -5.2 &amp; -5.2 &amp; -3.6 &amp; -4.6 \\
+-9.96 &amp; -8.96 &amp; -8.53 &amp; -8.62 &amp; -7.50 &amp; -6.12 &amp; -5.23 &amp; -5.23 &amp; -3.62 &amp; -4.61 \\
 \hline
--10.0 &amp; -9.0 &amp; -8.0 &amp; -7.5 &amp; -6.3 &amp; -5.2 &amp; -3.6 &amp; -3.6 &amp; -3.6 &amp; -4.6 \\
+-9.96 &amp; -8.96 &amp; -7.96 &amp; -7.53 &amp; -6.29 &amp; -5.15 &amp; -3.62 &amp; -3.62 &amp; -3.62 &amp; -4.61 \\
 \hline
--10.0 &amp; -9.0 &amp; -8.0 &amp; -7.0 &amp; -5.8 &amp; -4.6 &amp; -3.6 &amp; -3.6 &amp; -3.6 &amp; -4.6 \\
+-9.96 &amp; -8.96 &amp; -7.96 &amp; -6.96 &amp; -5.79 &amp; -4.61 &amp; -3.62 &amp; -3.62 &amp; -3.62 &amp; -4.61 \\
 \hline
 \end{array}\]</span>
 <h4 id="trajectory-of-final-policy">Trajectory of final policy</h4>
@@ -490,19 +495,19 @@ line: alpha=0.5</p>
 <h4 id="state-visits">State Visits</h4>
 <span class="math display">\[\begin{array}{|c|c|c|c|c|c|c|c|c|c|}
 \hline
-185 &amp; 210 &amp; 261 &amp; 320 &amp; 529 &amp; 1184 &amp; 1578 &amp; 3141 &amp; 22022 &amp; 21960 \\
+213 &amp; 263 &amp; 319 &amp; 448 &amp; 824 &amp; 4062 &amp; 4714 &amp; 6024 &amp; 16196 &amp; 17937 \\
 \hline
-218 &amp; 253 &amp; 238 &amp; 298 &amp; 268 &amp; 468 &amp; 526 &amp; 16896 &amp; 11621 &amp; 31177 \\
+260 &amp; 286 &amp; 270 &amp; 344 &amp; 521 &amp; 1818 &amp; 726 &amp; 2786 &amp; 5811 &amp; 19651 \\
 \hline
-431 &amp; 291 &amp; 547 &amp; 288 &amp; 858 &amp; 338 &amp; 517 &amp; 19935 &amp; 32840 &amp; 1505 \\
+329 &amp; 565 &amp; 393 &amp; 595 &amp; 533 &amp; 4551 &amp; 2195 &amp; 15892 &amp; 7518 &amp; 21107 \\
 \hline
-S &amp; 678 &amp; 403 &amp; 539 &amp; 1499 &amp; 849 &amp; 1980 &amp; G &amp; 599 &amp; 921 \\
+S &amp; 857 &amp; 520 &amp; 748 &amp; 447 &amp; 4668 &amp; 5843 &amp; G &amp; 230 &amp; 20230 \\
 \hline
-351 &amp; 19876 &amp; 2619 &amp; 2985 &amp; 1868 &amp; 5068 &amp; 12640 &amp; 15750 &amp; 397 &amp; 558 \\
+467 &amp; 19859 &amp; 1026 &amp; 707 &amp; 12988 &amp; 12722 &amp; 11431 &amp; 21818 &amp; 250 &amp; 19424 \\
 \hline
-267 &amp; 440 &amp; 29493 &amp; 494 &amp; 13167 &amp; 12727 &amp; 12743 &amp; 8555 &amp; 155 &amp; 308 \\
+367 &amp; 29196 &amp; 644 &amp; 38804 &amp; 25670 &amp; 8865 &amp; 9772 &amp; 12039 &amp; 18262 &amp; 593 \\
 \hline
-180 &amp; 264 &amp; 325 &amp; 36358 &amp; 24062 &amp; 20326 &amp; 10678 &amp; 17 &amp; 74 &amp; 167 \\
+240 &amp; 360 &amp; 38644 &amp; 494 &amp; 19534 &amp; 8527 &amp; 5859 &amp; 69 &amp; 134 &amp; 215 \\
 \hline
 \end{array}\]</span>
 <hr />

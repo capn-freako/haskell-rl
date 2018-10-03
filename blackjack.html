@@ -16,7 +16,8 @@ Original date: May 17, 2018</p>
 <h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
 <div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span>
 <span class="ot">{-# OPTIONS_GHC -Wno-missing-signatures #-}</span>
-<span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></code></pre></div>
+<span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span>
+<span class="ot">{-# OPTIONS_GHC -cpp #-}</span></code></pre></div>
 <h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
 <div class="sourceCode"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span>
 <span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span>
@@ -60,7 +61,7 @@ Original date: May 17, 2018</p>
 <span class="kw">import </span><span class="dt">ConCat.TArr</span>
 <span class="kw">import </span><span class="dt">ConCat.Isomorphism</span>
 
-<span class="kw">import </span><span class="dt">RL.MDP</span>
+<span class="kw">import </span><span class="dt">RL.Markov</span>
 <span class="kw">import </span><span class="dt">RL.GPI</span>
 <span class="kw">import </span><span class="dt">RL.Util</span></code></pre></div>
 <h2 id="code-1">code</h2>
@@ -101,19 +102,27 @@ finToSt n <span class="fu">=</span>
          <span class="kw">then</span> P.error <span class="st">&quot;finToSt: Blew out a Finite 11!&quot;</span>
          <span class="kw">else</span> <span class="dt">BJState</span> (finite pSum) (integerToBool ace) (finite dCard) (integerToBool done)
 
+<span class="kw">instance</span> <span class="dt">HasTrie</span> <span class="dt">BJState</span> <span class="kw">where</span>
+  <span class="kw">newtype</span> (<span class="dt">BJState</span> <span class="fu">:-&gt;:</span> b) <span class="fu">=</span> <span class="dt">BJStateTrie</span> {<span class="ot"> unBJStateTrie ::</span> <span class="dt">Reg</span> <span class="dt">BJState</span> <span class="fu">:-&gt;:</span> b } 
+  trie      <span class="fu">=</span> trieGeneric      <span class="dt">BJStateTrie</span> 
+  untrie    <span class="fu">=</span> untrieGeneric    unBJStateTrie
+  enumerate <span class="fu">=</span> enumerateGeneric unBJStateTrie
+
 <span class="co">-- | The @&#39;MDP&#39;@ instance for @&#39;BJState&#39;@.</span>
+<span class="kw">instance</span> <span class="dt">IsState</span> <span class="dt">BJState</span> <span class="kw">where</span>
+  states     <span class="fu">=</span> allStates
+  termStates <span class="fu">=</span> filter (\<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> done <span class="fu">==</span> <span class="dt">True</span>)                   allStates
+  initStates <span class="fu">=</span> filter (\<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> done <span class="fu">/=</span> <span class="dt">True</span> <span class="fu">&amp;&amp;</span> playerSum <span class="fu">&lt;</span> <span class="dv">10</span>) allStates
+
 <span class="kw">instance</span> <span class="dt">MDP</span> <span class="dt">BJState</span> <span class="kw">where</span>
   <span class="kw">type</span> <span class="dt">ActionT</span> <span class="dt">BJState</span> <span class="fu">=</span> <span class="dt">BJAction</span>
-  states  <span class="fu">=</span> allStates
   actions <span class="fu">=</span> \<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
     <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">8</span> <span class="fu">||</span> done <span class="fu">==</span> <span class="dt">True</span>  <span class="co">-- If we&#39;re made or bust then we have to stand.</span>
       <span class="kw">then</span> [<span class="dt">Stand</span>]
       <span class="kw">else</span> [<span class="dt">Hit</span>, <span class="dt">Stand</span>]
-  jointPMF st act <span class="fu">=</span> <span class="kw">case</span> act <span class="kw">of</span>
+  jointPMF st <span class="fu">=</span> \<span class="kw">case</span>
     <span class="dt">Hit</span> <span class="ot">-&gt;</span> hit   st
     _   <span class="ot">-&gt;</span> stand st
-  termStates <span class="fu">=</span> filter (\<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> done <span class="fu">==</span> <span class="dt">True</span>)                   allStates
-  initStates <span class="fu">=</span> filter (\<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span> done <span class="fu">/=</span> <span class="dt">True</span> <span class="fu">&amp;&amp;</span> playerSum <span class="fu">&lt;</span> <span class="dv">10</span>) allStates
 
 <span class="ot">allStates ::</span> [<span class="dt">BJState</span>]
 allStates <span class="fu">=</span>
@@ -140,7 +149,7 @@ stateDef <span class="fu">=</span> <span class="dt">BJState</span>
 
 <span class="kw">data</span> <span class="dt">BJAction</span> <span class="fu">=</span> <span class="dt">Hit</span>
               <span class="fu">|</span> <span class="dt">Stand</span>
-  <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Generic</span>)
+  <span class="kw">deriving</span> (<span class="dt">Eq</span>, <span class="dt">Ord</span>, <span class="dt">Generic</span>)
 
 <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">BJAction</span> <span class="kw">where</span>
   show <span class="fu">=</span> \<span class="kw">case</span>
@@ -197,7 +206,7 @@ stand st<span class="fu">@</span><span class="dt">BJState</span>{<span class="fu
                <span class="kw">then</span> dlrTotCmfV <span class="ot">`VS.index`</span> dealerCard <span class="ot">`VS.index`</span> (finite (getFinite playerSum <span class="fu">-</span> <span class="dv">6</span>))
                <span class="kw">else</span> <span class="dv">0</span>
     pDraw <span class="fu">=</span>
-      <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">4</span>           <span class="co">-- Player&#39;s total &gt; 16?</span>
+      <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">4</span> <span class="fu">&amp;&amp;</span> playerSum <span class="fu">&lt;</span> <span class="dv">10</span>  <span class="co">-- Player&#39;s total &gt; 16 and &lt; 22?</span>
         <span class="kw">then</span> dlrTotPmfV <span class="ot">`VS.index`</span> dealerCard <span class="ot">`VS.index`</span> (finite (getFinite playerSum <span class="fu">-</span> <span class="dv">5</span>))
         <span class="kw">else</span> <span class="dv">0</span>
 
@@ -284,7 +293,7 @@ showFofState&#39; f ace <span class="fu">=</span> unlines <span class="fu">$</sp
                                      , dealerCard <span class="fu">=</span> finite <span class="fu">$</span> dCard <span class="fu">-</span> <span class="dv">1</span>
                                      }
                   ]
-                <span class="fu">|</span> pTot <span class="ot">&lt;-</span> [<span class="dv">12</span><span class="fu">..</span><span class="dv">22</span>]
+                <span class="fu">|</span> pTot <span class="ot">&lt;-</span> [<span class="dv">12</span><span class="fu">..</span><span class="dv">21</span>]
                 ]
           )
         <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]
@@ -323,6 +332,17 @@ showVofState&#39; v ace <span class="fu">=</span> unlines <span class="fu">$</sp
       )
     )
 
+<span class="ot">showGame ::</span> [<span class="dt">Dbg</span> <span class="dt">BJState</span> <span class="dt">BJAction</span> <span class="dt">Double</span>] <span class="ot">-&gt;</span> <span class="dt">String</span>
+showGame [] <span class="fu">=</span> <span class="st">&quot;\n&quot;</span>
+showGame (x <span class="fu">:</span> xs) <span class="fu">=</span> showStep x <span class="fu">++</span> (showGame xs)
+
+<span class="ot">showStep ::</span> <span class="dt">Dbg</span> <span class="dt">BJState</span> <span class="dt">BJAction</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> <span class="dt">String</span>
+showStep <span class="dt">Dbg</span>{<span class="fu">..</span>} <span class="fu">=</span>
+  printf <span class="st">&quot;Total: %2d, Action: %s, Reward: %3.1f  \n&quot;</span>            
+         (<span class="dv">12</span> <span class="fu">+</span> (getFinite <span class="fu">.</span> playerSum) curSt)
+         (<span class="kw">if</span> act <span class="fu">==</span> <span class="dt">Hit</span> <span class="kw">then</span> (<span class="st">&quot;H&quot;</span><span class="ot"> ::</span> <span class="dt">String</span>) <span class="kw">else</span> <span class="st">&quot;S&quot;</span>)
+         (rwd)
+
 <span class="co">{----------------------------------------------------------------------</span>
 <span class="co">  Command line options defintions.</span>
 <span class="co">----------------------------------------------------------------------}</span>
@@ -355,7 +375,45 @@ main <span class="fu">=</span> <span class="kw">do</span>
   <span class="kw">let</span> nG     <span class="fu">=</span> fromMaybe <span class="dv">10000</span>     (nGames o)
       eps&#39;   <span class="fu">=</span> fromMaybe     <span class="fl">0.1</span>   (eps    o)
       beta&#39;  <span class="fu">=</span> fromMaybe     <span class="dv">0</span>     (dcy    o)
-      
+
+<span class="ot">#if 1</span>
+  <span class="co">-- Apply DP.</span>
+  <span class="kw">let</span> <span class="dt">DPRetT</span>{<span class="fu">..</span>} <span class="fu">=</span>
+        doDP
+          hypParamsDef
+            { maxIter <span class="fu">=</span> <span class="dv">10</span>  <span class="co">-- 10 policy evaluation iterations per improvement iteration.</span>
+            }
+          nG
+
+  <span class="co">-- Output the results.</span>
+  writeFile  mdFilename <span class="st">&quot;\n### Final Policy (H = hit)\n\n&quot;</span>
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> polFunc
+
+  appendFile mdFilename <span class="st">&quot;\n### Final Value Function\n\n&quot;</span>
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> <span class="dt">Pdouble</span> <span class="fu">.</span> valFunc
+  
+  <span class="co">-- Value/Action changes vs. Iteration</span>
+  appendFile mdFilename <span class="st">&quot;\n#### Policy/Value Function Changes vs. Iteration\n\n&quot;</span>
+  toFile def plotFilename <span class="fu">$</span> <span class="kw">do</span>
+    layout_title <span class="fu">.=</span> <span class="st">&quot;Policy/Value Function Changes vs. Iteration&quot;</span>
+    setColors <span class="fu">$</span> map opaque [blue, green, red, yellow, cyan, magenta, brown, gray, purple, black]
+    plot ( line <span class="st">&quot;Policy Changes&quot;</span>
+                [ [ (x,y)
+                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip (map (<span class="fu">*</span> (length <span class="fu">$</span> P.head valXCnts)) [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>])
+                                 polXCnts&#39;
+                  ]
+                ]
+         )
+    plot ( line <span class="st">&quot;Value Changes&quot;</span>
+                [ [ (x,y)
+                  <span class="fu">|</span> (x,y) <span class="ot">&lt;-</span> zip [(<span class="dv">0</span><span class="ot">::</span><span class="dt">Int</span>)<span class="fu">..</span>]
+                                 (concat valXCnts)
+                  ]
+                ]
+         )
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;\n![](%s)\n&quot;</span> plotFilename
+
+<span class="ot">#else</span>
   <span class="co">-- Play many games, updating policy and state/action values after each.</span>
   <span class="co">-- (results, _) &lt;- runWriterT $ iterateM&#39; nG optPol (qs, pol)</span>
   <span class="kw">let</span> myHypParams <span class="fu">=</span>
@@ -370,8 +428,29 @@ main <span class="fu">=</span> <span class="kw">do</span>
       <span class="co">-- ress :: [TDRetT MyState MyAction Double (Card MyState) (Card (ActionT MyState))]</span>
       res  <span class="fu">=</span> doTD myHypParams nG
       qMat <span class="fu">=</span> P.last <span class="fu">$</span> qMats  res
-      dbgs <span class="fu">=</span> P.last <span class="fu">$</span> debugs res
       maxN <span class="fu">=</span> maximum <span class="fu">$</span> map length <span class="fu">$</span> debugs res
+      dbgs <span class="fu">=</span> P.head <span class="fu">$</span> filter ((<span class="fu">==</span> maxN) <span class="fu">.</span> length) <span class="fu">$</span> debugs res
+<span class="ot">      tsts ::</span> [[<span class="dt">Dbg</span> <span class="dt">BJState</span> <span class="dt">BJAction</span> <span class="dt">Double</span>]]
+      tsts <span class="fu">=</span>
+        filter
+          (any ( \dbg <span class="ot">-&gt;</span>
+                   <span class="kw">let</span> s <span class="fu">=</span> curSt dbg
+                    <span class="kw">in</span> playerSum  s <span class="fu">==</span> <span class="dv">0</span>      <span class="co">-- 12</span>
+                    <span class="fu">&amp;&amp;</span> usableAce  s <span class="fu">==</span> <span class="dt">False</span>
+                    <span class="fu">&amp;&amp;</span> dealerCard s <span class="fu">==</span> <span class="dv">5</span>      <span class="co">-- 6</span>
+                    <span class="fu">&amp;&amp;</span> act dbg      <span class="fu">==</span> <span class="dt">Hit</span>
+               )
+          ) <span class="fu">$</span> debugs res
+      tstsTotRwd  <span class="fu">=</span> sum <span class="fu">$</span> map (rwd <span class="fu">.</span> P.last) tsts
+      tstsMeanRwd <span class="fu">=</span> tstsTotRwd <span class="fu">/</span> (fromIntegral <span class="fu">.</span> length) tsts
+      tstsIncrements <span class="fu">=</span>
+        map ( getFinite <span class="fu">.</span> playerSum <span class="fu">.</span> curSt
+            <span class="fu">.</span> P.head <span class="fu">.</span> P.tail
+            <span class="fu">.</span> dropWhile ( \x <span class="ot">-&gt;</span>
+                            playerSum (curSt x) <span class="fu">/=</span> <span class="dv">0</span> <span class="fu">||</span>
+                            usableAce (curSt x) <span class="fu">/=</span> <span class="dt">False</span>
+                        )
+            ) tsts
 
   <span class="co">-- Output the results.</span>
   writeFile  mdFilename <span class="st">&quot;\n### Final Policy (H = hit)\n\n&quot;</span>
@@ -405,7 +484,28 @@ main <span class="fu">=</span> <span class="kw">do</span>
   appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;**Epsilon:** %f  \n&quot;</span> eps&#39;
   appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf <span class="st">&quot;**Beta:** %f\n\n&quot;</span> beta&#39;
 
-  appendFile mdFilename <span class="st">&quot;**Last game sequence:**  \n&quot;</span>
+  <span class="co">-- appendFile mdFilename &quot;**12/6 game sequences:**\n\n&quot;</span>
+  <span class="co">-- appendFile mdFilename $ pack $ concat $ map showGame tsts</span>
+
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> printf
+    <span class="st">&quot;**Mean reward from hitting hard 12 w/ dealer showing 6:** %4.2f\n\n&quot;</span> tstsMeanRwd
+
+  appendFile mdFilename
+    <span class="st">&quot;**# of occurences of drawn card when hitting hard 12 when dealer shows a 6:**\n\n&quot;</span>
+  appendFile mdFilename
+    <span class="st">&quot;| Card: | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |\n&quot;</span>
+  appendFile mdFilename
+    <span class="st">&quot;| -----:| - | - | - | - | - | - | - | - | - | -- |\n&quot;</span>
+  appendFile mdFilename
+    <span class="st">&quot;|    #: | &quot;</span>
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> intercalate <span class="st">&quot; | &quot;</span>
+    [ show n
+    <span class="fu">|</span> x <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="fu">..</span><span class="dv">10</span>]
+    , <span class="kw">let</span> n <span class="fu">=</span> length <span class="fu">$</span> filter (<span class="fu">==</span> x) tstsIncrements
+    ]
+  appendFile mdFilename <span class="st">&quot; |\n\n&quot;</span>
+
+  appendFile mdFilename <span class="st">&quot;**Longest game sequence:**  \n&quot;</span>
   appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> unlines <span class="fu">$</span>
     map ( \<span class="dt">Dbg</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
             printf <span class="st">&quot;\tTotal: %2d, Action: %s, Reward: %3.1f  &quot;</span>            
@@ -434,7 +534,22 @@ main <span class="fu">=</span> <span class="kw">do</span>
      <span class="kw">in</span> <span class="dt">Pdouble</span> <span class="fu">$</span> <span class="kw">if</span> length targs <span class="fu">&gt;</span> <span class="dv">0</span>
                     <span class="kw">then</span> snd <span class="fu">$</span> P.head <span class="fu">$</span> targs
                     <span class="kw">else</span> <span class="dv">0</span>
-        </code></pre></div>
+
+  appendFile mdFilename <span class="st">&quot;\n**Contents of Dealer Total PMF vs. Up Card:**\n\n&quot;</span>
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> \<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
+      <span class="dt">Pdouble</span> <span class="fu">$</span> <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">4</span>
+                    <span class="kw">then</span> dlrTotPmfV <span class="ot">`VS.index`</span> dealerCard
+                                    <span class="ot">`VS.index`</span> (finite (getFinite playerSum <span class="fu">-</span> <span class="dv">5</span>))
+                    <span class="kw">else</span> <span class="dv">0</span>
+
+  appendFile mdFilename <span class="st">&quot;\n**Contents of Dealer Total CMF vs. Up Card:**\n\n&quot;</span>
+  appendFile mdFilename <span class="fu">$</span> pack <span class="fu">$</span> showFofState <span class="fu">$</span> \<span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span>
+      <span class="dt">Pdouble</span> <span class="fu">$</span> <span class="kw">if</span> playerSum <span class="fu">&gt;</span> <span class="dv">4</span>
+                    <span class="kw">then</span> dlrTotCmfV <span class="ot">`VS.index`</span> dealerCard
+                                    <span class="ot">`VS.index`</span> (finite (getFinite playerSum <span class="fu">-</span> <span class="dv">5</span>))
+                    <span class="kw">else</span> <span class="dv">0</span>
+
+<span class="ot">#endif</span></code></pre></div>
 <h2 id="output">output</h2>
 <h3 id="final-policy-h-hit">Final Policy (H = hit)</h3>
 With usable ace:
@@ -453,7 +568,7 @@ With usable ace:
 \hline
 17 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
 \hline
-18 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H \\
+18 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H \\
 \hline
 19 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
@@ -461,25 +576,23 @@ With usable ace:
 \hline
 21 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
-22 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
-\hline
 \text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
 \end{array}\]</span>
 No usable ace:
 <span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
 \text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
 \hline
-12 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
+12 &amp; H &amp; H &amp; H &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
 \hline
-13 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
+13 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
 \hline
-14 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
+14 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
 \hline
-15 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\
+15 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
 \hline
-16 &amp; H &amp; H &amp; H &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
+16 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H &amp; H \\
 \hline
-17 &amp; H &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp; H &amp; H &amp; H \\
+17 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
 18 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
@@ -489,185 +602,66 @@ No usable ace:
 \hline
 21 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
 \hline
-22 &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   &amp;   \\
+\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
+\end{array}\]</span>
+<h3 id="final-value-function">Final Value Function</h3>
+With usable ace:
+<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
+\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
+\hline
+12 &amp; -0.27 &amp;  0.08 &amp;  0.10 &amp;  0.13 &amp;  0.16 &amp;  0.19 &amp;  0.17 &amp;  0.10 &amp;  0.00 &amp; -0.13 \\
+\hline
+13 &amp; -0.30 &amp;  0.05 &amp;  0.07 &amp;  0.10 &amp;  0.13 &amp;  0.16 &amp;  0.12 &amp;  0.05 &amp; -0.04 &amp; -0.16 \\
+\hline
+14 &amp; -0.32 &amp;  0.02 &amp;  0.05 &amp;  0.08 &amp;  0.11 &amp;  0.14 &amp;  0.08 &amp;  0.01 &amp; -0.08 &amp; -0.19 \\
+\hline
+15 &amp; -0.35 &amp; -0.00 &amp;  0.03 &amp;  0.06 &amp;  0.09 &amp;  0.12 &amp;  0.04 &amp; -0.03 &amp; -0.11 &amp; -0.23 \\
+\hline
+16 &amp; -0.38 &amp; -0.02 &amp;  0.01 &amp;  0.04 &amp;  0.07 &amp;  0.10 &amp; -0.00 &amp; -0.07 &amp; -0.15 &amp; -0.26 \\
+\hline
+17 &amp; -0.39 &amp; -0.00 &amp;  0.03 &amp;  0.06 &amp;  0.09 &amp;  0.13 &amp;  0.05 &amp; -0.07 &amp; -0.15 &amp; -0.25 \\
+\hline
+18 &amp; -0.34 &amp;  0.12 &amp;  0.15 &amp;  0.18 &amp;  0.20 &amp;  0.28 &amp;  0.40 &amp;  0.11 &amp; -0.10 &amp; -0.20 \\
+\hline
+19 &amp; -0.12 &amp;  0.39 &amp;  0.40 &amp;  0.42 &amp;  0.44 &amp;  0.50 &amp;  0.62 &amp;  0.59 &amp;  0.29 &amp; -0.02 \\
+\hline
+20 &amp;  0.15 &amp;  0.64 &amp;  0.65 &amp;  0.66 &amp;  0.67 &amp;  0.70 &amp;  0.77 &amp;  0.79 &amp;  0.76 &amp;  0.43 \\
+\hline
+21 &amp;  0.64 &amp;  0.88 &amp;  0.89 &amp;  0.89 &amp;  0.89 &amp;  0.90 &amp;  0.93 &amp;  0.93 &amp;  0.94 &amp;  0.89 \\
 \hline
 \text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
 \end{array}\]</span>
-<h3 id="policyvalue-function-changes-vs.-iteration">Policy/Value Function Changes vs. Iteration</h3>
+No usable ace:
+<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
+\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
+\hline
+12 &amp; -0.52 &amp; -0.25 &amp; -0.23 &amp; -0.21 &amp; -0.17 &amp; -0.15 &amp; -0.21 &amp; -0.27 &amp; -0.34 &amp; -0.42 \\
+\hline
+13 &amp; -0.55 &amp; -0.29 &amp; -0.25 &amp; -0.21 &amp; -0.17 &amp; -0.15 &amp; -0.27 &amp; -0.32 &amp; -0.39 &amp; -0.46 \\
+\hline
+14 &amp; -0.58 &amp; -0.29 &amp; -0.25 &amp; -0.21 &amp; -0.17 &amp; -0.15 &amp; -0.32 &amp; -0.37 &amp; -0.43 &amp; -0.50 \\
+\hline
+15 &amp; -0.61 &amp; -0.29 &amp; -0.25 &amp; -0.21 &amp; -0.17 &amp; -0.15 &amp; -0.37 &amp; -0.42 &amp; -0.47 &amp; -0.54 \\
+\hline
+16 &amp; -0.64 &amp; -0.29 &amp; -0.25 &amp; -0.21 &amp; -0.17 &amp; -0.15 &amp; -0.41 &amp; -0.46 &amp; -0.51 &amp; -0.57 \\
+\hline
+17 &amp; -0.64 &amp; -0.15 &amp; -0.12 &amp; -0.08 &amp; -0.04 &amp;  0.01 &amp; -0.11 &amp; -0.38 &amp; -0.42 &amp; -0.46 \\
+\hline
+18 &amp; -0.38 &amp;  0.12 &amp;  0.15 &amp;  0.18 &amp;  0.20 &amp;  0.28 &amp;  0.40 &amp;  0.11 &amp; -0.18 &amp; -0.24 \\
+\hline
+19 &amp; -0.12 &amp;  0.39 &amp;  0.40 &amp;  0.42 &amp;  0.44 &amp;  0.50 &amp;  0.62 &amp;  0.59 &amp;  0.29 &amp; -0.02 \\
+\hline
+20 &amp;  0.15 &amp;  0.64 &amp;  0.65 &amp;  0.66 &amp;  0.67 &amp;  0.70 &amp;  0.77 &amp;  0.79 &amp;  0.76 &amp;  0.43 \\
+\hline
+21 &amp;  0.64 &amp;  0.88 &amp;  0.89 &amp;  0.89 &amp;  0.89 &amp;  0.90 &amp;  0.93 &amp;  0.93 &amp;  0.94 &amp;  0.89 \\
+\hline
+\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
+\end{array}\]</span>
+<h4 id="policyvalue-function-changes-vs.-iteration">Policy/Value Function Changes vs. Iteration</h4>
 <div class="figure">
 <img src="img/blackjackPlot.png" />
 
 </div>
-<h3 id="debugging-info">Debugging Info</h3>
-<p><strong>Number of games played:</strong> 500000<br />
-<strong>Epsilon:</strong> 0.5<br />
-<strong>Beta:</strong> 0.0</p>
-<p><strong>Last game sequence:</strong><br />
-Total: 20, Action: S, Reward: 0.7</p>
-<p><strong>Max. game length:</strong> 8</p>
-<p><strong>Final State Action Values (stand, hit):</strong></p>
-With usable ace:
-<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
-\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
-\hline
-12 &amp; (-0.77,-0.21) &amp; (-0.29, 0.15) &amp; (-0.25, 0.18) &amp; (-0.21, 0.19) &amp; (-0.17, 0.22) &amp; (-0.15, 0.23) &amp; (-0.48, 0.25) &amp; (-0.51, 0.17) &amp; (-0.54, 0.08) &amp; (-0.58,-0.05) \\
-\hline
-13 &amp; (-0.77,-0.23) &amp; (-0.29, 0.13) &amp; (-0.25, 0.15) &amp; (-0.21, 0.14) &amp; (-0.17, 0.18) &amp; (-0.15, 0.19) &amp; (-0.48, 0.24) &amp; (-0.51, 0.13) &amp; (-0.54, 0.06) &amp; (-0.58,-0.08) \\
-\hline
-14 &amp; (-0.77,-0.30) &amp; (-0.29, 0.07) &amp; (-0.25, 0.09) &amp; (-0.21, 0.15) &amp; (-0.17, 0.17) &amp; (-0.15, 0.18) &amp; (-0.48, 0.20) &amp; (-0.51, 0.13) &amp; (-0.54,-0.00) &amp; (-0.58,-0.11) \\
-\hline
-15 &amp; (-0.77,-0.31) &amp; (-0.29, 0.05) &amp; (-0.25, 0.10) &amp; (-0.21, 0.11) &amp; (-0.17, 0.11) &amp; (-0.15, 0.15) &amp; (-0.48, 0.14) &amp; (-0.51, 0.10) &amp; (-0.54,-0.02) &amp; (-0.58,-0.14) \\
-\hline
-16 &amp; (-0.77,-0.31) &amp; (-0.29, 0.03) &amp; (-0.25, 0.04) &amp; (-0.21, 0.09) &amp; (-0.17, 0.09) &amp; (-0.15, 0.13) &amp; (-0.48, 0.12) &amp; (-0.51, 0.01) &amp; (-0.54,-0.07) &amp; (-0.58,-0.18) \\
-\hline
-17 &amp; (-0.64,-0.34) &amp; (-0.15, 0.02) &amp; (-0.12, 0.08) &amp; (-0.08, 0.11) &amp; (-0.04, 0.13) &amp; ( 0.01, 0.15) &amp; (-0.11, 0.13) &amp; (-0.38, 0.03) &amp; (-0.42,-0.08) &amp; (-0.46,-0.21) \\
-\hline
-18 &amp; (-0.38,-0.33) &amp; ( 0.12, 0.09) &amp; ( 0.15, 0.10) &amp; ( 0.18, 0.14) &amp; ( 0.20, 0.17) &amp; ( 0.28, 0.23) &amp; ( 0.40, 0.22) &amp; ( 0.11, 0.12) &amp; (-0.18,-0.04) &amp; (-0.24,-0.13) \\
-\hline
-19 &amp; (-0.12,-0.25) &amp; ( 0.39, 0.16) &amp; ( 0.40, 0.18) &amp; ( 0.42, 0.20) &amp; ( 0.44, 0.25) &amp; ( 0.50, 0.27) &amp; ( 0.62, 0.27) &amp; ( 0.59, 0.20) &amp; ( 0.29, 0.10) &amp; (-0.02,-0.11) \\
-\hline
-20 &amp; ( 0.15,-0.18) &amp; ( 0.64, 0.21) &amp; ( 0.65, 0.26) &amp; ( 0.66, 0.24) &amp; ( 0.67, 0.26) &amp; ( 0.70, 0.30) &amp; ( 0.77, 0.30) &amp; ( 0.79, 0.28) &amp; ( 0.76, 0.18) &amp; ( 0.43, 0.02) \\
-\hline
-21 &amp; ( 0.64, 0.00) &amp; ( 0.88, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.90, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.94, 0.00) &amp; ( 0.89, 0.00) \\
-\hline
-\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
-\end{array}\]</span>
-No usable ace:
-<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
-\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
-\hline
-12 &amp; (-0.77,-0.47) &amp; (-0.29,-0.11) &amp; (-0.25,-0.10) &amp; (-0.21,-0.05) &amp; (-0.17,-0.04) &amp; (-0.15,-0.02) &amp; (-0.48,-0.08) &amp; (-0.51,-0.16) &amp; (-0.54,-0.21) &amp; (-0.58,-0.31) \\
-\hline
-13 &amp; (-0.77,-0.48) &amp; (-0.29,-0.14) &amp; (-0.25,-0.11) &amp; (-0.21,-0.11) &amp; (-0.17,-0.07) &amp; (-0.15,-0.05) &amp; (-0.48,-0.09) &amp; (-0.51,-0.16) &amp; (-0.54,-0.24) &amp; (-0.58,-0.32) \\
-\hline
-14 &amp; (-0.77,-0.52) &amp; (-0.29,-0.19) &amp; (-0.25,-0.18) &amp; (-0.21,-0.14) &amp; (-0.17,-0.13) &amp; (-0.15,-0.10) &amp; (-0.48,-0.16) &amp; (-0.51,-0.21) &amp; (-0.54,-0.31) &amp; (-0.58,-0.37) \\
-\hline
-15 &amp; (-0.77,-0.54) &amp; (-0.29,-0.21) &amp; (-0.25,-0.19) &amp; (-0.21,-0.16) &amp; (-0.17,-0.15) &amp; (-0.15,-0.12) &amp; (-0.48,-0.21) &amp; (-0.51,-0.25) &amp; (-0.54,-0.34) &amp; (-0.58,-0.42) \\
-\hline
-16 &amp; (-0.77,-0.55) &amp; (-0.29,-0.24) &amp; (-0.25,-0.23) &amp; (-0.21,-0.24) &amp; (-0.17,-0.19) &amp; (-0.15,-0.15) &amp; (-0.48,-0.27) &amp; (-0.51,-0.30) &amp; (-0.54,-0.37) &amp; (-0.58,-0.44) \\
-\hline
-17 &amp; (-0.64,-0.58) &amp; (-0.15,-0.29) &amp; (-0.12,-0.30) &amp; (-0.08,-0.26) &amp; (-0.04,-0.22) &amp; ( 0.01,-0.22) &amp; (-0.11,-0.28) &amp; (-0.38,-0.32) &amp; (-0.42,-0.39) &amp; (-0.46,-0.46) \\
-\hline
-18 &amp; (-0.38,-0.62) &amp; ( 0.12,-0.33) &amp; ( 0.15,-0.31) &amp; ( 0.18,-0.28) &amp; ( 0.20,-0.27) &amp; ( 0.28,-0.27) &amp; ( 0.40,-0.37) &amp; ( 0.11,-0.38) &amp; (-0.18,-0.43) &amp; (-0.24,-0.52) \\
-\hline
-19 &amp; (-0.12,-0.68) &amp; ( 0.39,-0.42) &amp; ( 0.40,-0.41) &amp; ( 0.42,-0.38) &amp; ( 0.44,-0.39) &amp; ( 0.50,-0.38) &amp; ( 0.62,-0.47) &amp; ( 0.59,-0.49) &amp; ( 0.29,-0.52) &amp; (-0.02,-0.55) \\
-\hline
-20 &amp; ( 0.15,-0.88) &amp; ( 0.64,-0.65) &amp; ( 0.65,-0.63) &amp; ( 0.66,-0.61) &amp; ( 0.67,-0.58) &amp; ( 0.70,-0.58) &amp; ( 0.77,-0.74) &amp; ( 0.79,-0.76) &amp; ( 0.76,-0.77) &amp; ( 0.43,-0.79) \\
-\hline
-21 &amp; ( 0.64, 0.00) &amp; ( 0.88, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.89, 0.00) &amp; ( 0.90, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.93, 0.00) &amp; ( 0.94, 0.00) &amp; ( 0.89, 0.00) \\
-\hline
-\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
-\end{array}\]</span>
-<p><strong>State Action Visits (stand, hit):</strong></p>
-With usable ace:
-<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
-\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
-\hline
-12 &amp; (1274,1259) &amp; (1215,1207) &amp; (1228,1182) &amp; (1242,1312) &amp; (1256,1309) &amp; (1258,1277) &amp; (1252,1239) &amp; (1220,1230) &amp; (1260,1255) &amp; (1199,1247) \\
-\hline
-13 &amp; (1305,1375) &amp; (1255,1399) &amp; (1271,1353) &amp; (1183,1384) &amp; (1256,1326) &amp; (1311,1346) &amp; (1211,1392) &amp; (1275,1299) &amp; (1206,1352) &amp; (1237,1303) \\
-\hline
-14 &amp; (1296,1406) &amp; (1219,1490) &amp; (1295,1420) &amp; (1210,1440) &amp; (1202,1445) &amp; (1311,1495) &amp; (1276,1423) &amp; (1300,1438) &amp; (1274,1449) &amp; (1319,1388) \\
-\hline
-15 &amp; (1238,1528) &amp; (1248,1616) &amp; (1222,1612) &amp; (1204,1530) &amp; (1291,1578) &amp; (1226,1545) &amp; (1183,1562) &amp; (1239,1581) &amp; (1284,1543) &amp; (1302,1666) \\
-\hline
-16 &amp; (1256,1700) &amp; (1170,1708) &amp; (1278,1695) &amp; (1211,1661) &amp; (1211,1689) &amp; (1259,1650) &amp; (1250,1715) &amp; (1274,1618) &amp; (1250,1602) &amp; (1219,1646) \\
-\hline
-17 &amp; (1342,1780) &amp; (1234,1738) &amp; (1209,1855) &amp; (1297,1777) &amp; (1229,1847) &amp; (1284,1814) &amp; (1206,1875) &amp; (1256,1823) &amp; (1218,1790) &amp; (1249,1824) \\
-\hline
-18 &amp; (1240,1927) &amp; (1874,1319) &amp; (2001,1293) &amp; (1954,1268) &amp; (1992,1291) &amp; (2077,1242) &amp; (1962,1269) &amp; (1645,1534) &amp; (1261,1964) &amp; (1306,1958) \\
-\hline
-19 &amp; (2119,1244) &amp; (2034,1224) &amp; (2036,1280) &amp; (2041,1329) &amp; (2105,1196) &amp; (2039,1275) &amp; (2069,1282) &amp; (2080,1274) &amp; (2061,1252) &amp; (2089,1272) \\
-\hline
-20 &amp; (2165,1309) &amp; (2184,1215) &amp; (2125,1197) &amp; (2102,1302) &amp; (2159,1218) &amp; (2171,1194) &amp; (2172,1281) &amp; (2216,1260) &amp; (2249,1201) &amp; (2230,1177) \\
-\hline
-21 &amp; (3532,0) &amp; (3522,0) &amp; (3429,0) &amp; (3533,0) &amp; (3629,0) &amp; (3450,0) &amp; (3562,0) &amp; (3496,0) &amp; (3574,0) &amp; (3569,0) \\
-\hline
-\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
-\end{array}\]</span>
-No usable ace:
-<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
-\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
-\hline
-12 &amp; (1222,2645) &amp; (1263,2471) &amp; (1265,2588) &amp; (1439,2481) &amp; (1291,2560) &amp; (1268,2486) &amp; (1239,2532) &amp; (1259,2494) &amp; (1226,2605) &amp; (1226,2630) \\
-\hline
-13 &amp; (1305,2733) &amp; (1241,2647) &amp; (1359,2623) &amp; (1277,2643) &amp; (1281,2606) &amp; (1316,2563) &amp; (1237,2723) &amp; (1308,2662) &amp; (1238,2822) &amp; (1216,2709) \\
-\hline
-14 &amp; (1350,2779) &amp; (1266,2681) &amp; (1298,2749) &amp; (1327,2764) &amp; (1303,2656) &amp; (1301,2693) &amp; (1274,2744) &amp; (1231,2777) &amp; (1312,2796) &amp; (1241,2889) \\
-\hline
-15 &amp; (1244,3000) &amp; (1267,2908) &amp; (1242,2862) &amp; (1250,2870) &amp; (1597,2421) &amp; (1575,2472) &amp; (1276,2976) &amp; (1254,2848) &amp; (1255,2997) &amp; (1269,3025) \\
-\hline
-16 &amp; (1210,3137) &amp; (1253,2975) &amp; (1967,2400) &amp; (2908,1455) &amp; (2986,1248) &amp; (3023,1291) &amp; (1248,3015) &amp; (1278,2967) &amp; (1252,3050) &amp; (1282,3035) \\
-\hline
-17 &amp; (1268,3189) &amp; (3197,1264) &amp; (3056,1227) &amp; (3058,1236) &amp; (2933,1289) &amp; (2997,1247) &amp; (3160,1293) &amp; (1332,2961) &amp; (1330,3155) &amp; (1890,2596) \\
-\hline
-18 &amp; (3368,1213) &amp; (2987,1276) &amp; (2904,1234) &amp; (2810,1239) &amp; (2821,1259) &amp; (2797,1228) &amp; (3058,1226) &amp; (3158,1205) &amp; (3299,1314) &amp; (3378,1227) \\
-\hline
-19 &amp; (3152,1229) &amp; (2927,1227) &amp; (2899,1277) &amp; (2940,1317) &amp; (2811,1276) &amp; (2850,1295) &amp; (2985,1217) &amp; (3140,1238) &amp; (3247,1194) &amp; (3198,1251) \\
-\hline
-20 &amp; (3189,1197) &amp; (2960,1260) &amp; (2932,1284) &amp; (2861,1208) &amp; (2823,1280) &amp; (2832,1125) &amp; (3007,1225) &amp; (3230,1226) &amp; (3172,1216) &amp; (3193,1226) \\
-\hline
-21 &amp; (3968,0) &amp; (3903,0) &amp; (3870,0) &amp; (3799,0) &amp; (3659,0) &amp; (3667,0) &amp; (3979,0) &amp; (4038,0) &amp; (4032,0) &amp; (4049,0) \\
-\hline
-\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
-\end{array}\]</span>
-<p><strong>Probability of Dealer Total vs. Up Card:</strong></p>
-With usable ace:
-<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
-\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
-\hline
-12 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-13 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-14 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-15 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-16 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-17 &amp;  0.13 &amp;  0.14 &amp;  0.14 &amp;  0.13 &amp;  0.12 &amp;  0.17 &amp;  0.37 &amp;  0.13 &amp;  0.12 &amp;  0.11 \\
-\hline
-18 &amp;  0.13 &amp;  0.13 &amp;  0.13 &amp;  0.13 &amp;  0.12 &amp;  0.11 &amp;  0.14 &amp;  0.36 &amp;  0.12 &amp;  0.11 \\
-\hline
-19 &amp;  0.13 &amp;  0.13 &amp;  0.13 &amp;  0.12 &amp;  0.12 &amp;  0.11 &amp;  0.08 &amp;  0.13 &amp;  0.35 &amp;  0.11 \\
-\hline
-20 &amp;  0.13 &amp;  0.12 &amp;  0.12 &amp;  0.12 &amp;  0.11 &amp;  0.10 &amp;  0.08 &amp;  0.07 &amp;  0.12 &amp;  0.34 \\
-\hline
-21 &amp;  0.36 &amp;  0.12 &amp;  0.11 &amp;  0.11 &amp;  0.11 &amp;  0.10 &amp;  0.07 &amp;  0.07 &amp;  0.06 &amp;  0.11 \\
-\hline
-22 &amp;  0.12 &amp;  0.35 &amp;  0.37 &amp;  0.39 &amp;  0.42 &amp;  0.42 &amp;  0.26 &amp;  0.24 &amp;  0.23 &amp;  0.21 \\
-\hline
-\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
-\end{array}\]</span>
-No usable ace:
-<span class="math display">\[\begin{array}{c|c|c|c|c|c|c|c|c|c}
-\text{Player&#39;s Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp;  \\
-\hline
-12 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-13 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-14 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-15 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-16 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 &amp;  0.00 \\
-\hline
-17 &amp;  0.13 &amp;  0.14 &amp;  0.14 &amp;  0.13 &amp;  0.12 &amp;  0.17 &amp;  0.37 &amp;  0.13 &amp;  0.12 &amp;  0.11 \\
-\hline
-18 &amp;  0.13 &amp;  0.13 &amp;  0.13 &amp;  0.13 &amp;  0.12 &amp;  0.11 &amp;  0.14 &amp;  0.36 &amp;  0.12 &amp;  0.11 \\
-\hline
-19 &amp;  0.13 &amp;  0.13 &amp;  0.13 &amp;  0.12 &amp;  0.12 &amp;  0.11 &amp;  0.08 &amp;  0.13 &amp;  0.35 &amp;  0.11 \\
-\hline
-20 &amp;  0.13 &amp;  0.12 &amp;  0.12 &amp;  0.12 &amp;  0.11 &amp;  0.10 &amp;  0.08 &amp;  0.07 &amp;  0.12 &amp;  0.34 \\
-\hline
-21 &amp;  0.36 &amp;  0.12 &amp;  0.11 &amp;  0.11 &amp;  0.11 &amp;  0.10 &amp;  0.07 &amp;  0.07 &amp;  0.06 &amp;  0.11 \\
-\hline
-22 &amp;  0.12 &amp;  0.35 &amp;  0.37 &amp;  0.39 &amp;  0.42 &amp;  0.42 &amp;  0.26 &amp;  0.24 &amp;  0.23 &amp;  0.21 \\
-\hline
-\text{Dealer&#39;s Card:}  &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10
-\end{array}\]</span>
 <hr />
 <div class="footer">
 <p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
