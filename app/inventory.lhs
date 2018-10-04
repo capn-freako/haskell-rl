@@ -234,7 +234,7 @@ data Opts w = Opts
     { nIter :: w ::: Maybe Int <?>
         "The number of policy improvement iterations."
     , nEval :: w ::: Maybe Int <?>
-        "The 'n' in n-step TD."
+        "The maximum number of steps per episode."
     , nStep :: w ::: Maybe Int <?>
         "The 'n' in n-step TD."
     , eps   :: w ::: Maybe Double <?>

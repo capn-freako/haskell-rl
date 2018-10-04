@@ -131,6 +131,11 @@ data DPRetT s a r = DPRetT
   }
 
 -- | Abstract type of return value from @'doTD'@ function.
+--
+-- TODO:
+-- 1. Consider removing the last field, `qMats`, as that would eliminate
+--    the need for `m` and `n` and this type would no longer be inherently
+--    discrete.
 data TDRetT s a r m n = TDRetT
   { valFuncs :: [s -> r]
   , polFuncs :: [s -> a]
@@ -323,22 +328,22 @@ optQn HypParams{..} (s0, q, gen, _, t) =
             -- r = sum [ r' * p
             --         | ((s', r'), p) <- jointPMF s a
             --         ]
-            r   = P.head $ shuffle g' $
-                    concat [ replicate (round $ 100 * p) r'
-                           | (r', p) <- r'p's
-                           ]
-            r'p's = rewards s a s'
-            -- r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
+            -- r   = P.head $ shuffle g' $
+            --         concat [ replicate (round $ 100 * p) r'
+            --                | (r', p) <- r'p's
+            --                ]
+            -- r'p's = rewards s a s'
+            r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
             -- ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
             --                 (lookup s' s'p's)
-            -- ps' = sum $ map snd $ filter ((== s') . fst) s'p's
+            ps' = sum $ map snd $ filter ((== s') . fst) s'p's
             -- Use a greedy policy to select the next action.
             a' = greedy qf s'
             -- Advance the random number generator.
-            (_::Int, g'') = random g'
+            -- (_::Int, g'') = random g'
             -- TEMPORARY DEBUGGING INFO
             dbg = Dbg s a s' r s'p's
-        put (s' : ss, a' : as, r : rs, dbg : dbgs, g'')  -- Note the reverse order build-up.
+        put (s' : ss, a' : as, r : rs, dbg : dbgs, g')  -- Note the reverse order build-up.
         return ()
       -- if s' `elem` termStates
       -- if s `elem` termStates
