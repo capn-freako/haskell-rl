@@ -265,7 +265,8 @@ optQn HypParams{..} (s0, q, gen, _, t) =
     [ ( sNum
       , q `VS.index` sNum VS.// [(aNum, (newVal, visits s a + 1))]
       )
-    | (s, a, ret) <- zip3 sts' acts' rets
+    -- | (s, a, ret) <- zip3 sts' acts' rets
+    | (s, a, ret) <- [P.last $ zip3 sts' acts' rets]
     , let sNum = toFin s
           aNum = toFin a
           newVal =
@@ -293,12 +294,11 @@ optQn HypParams{..} (s0, q, gen, _, t) =
         Qlearn   -> qf st $ greedy qf st                  -- Uses greedy policy.
         ExpSarsa ->  -- E[Q(s', a')]
           sum [ p * qf st a
-              | a <- as
+              | a <- actions st
               , let p = if a == greedy qf st
                            then 1 - epsilon'
-                           else epsilon' / fromIntegral (lActs - 1)
-              ] where as    = actions st
-                      lActs = length acts
+                           else epsilon' / fromIntegral (length acts - 1)
+              ]
   gammas    = scanl (*) 1 $ repeat disc      -- [1, disc, disc^2, ...]
   qf        = ((<$>) . (<$>)) fst $ appFm q  -- From augmented matrix representation of Q(s,a) to actual function.
   visits    = ((<$>) . (<$>)) snd $ appFm q  -- # of visits/adjustments to particular (s,a) pair.
