@@ -37,14 +37,12 @@ import Protolude  hiding (show, for)
 import qualified Data.Vector.Sized   as VS
 import Data.Vector.Sized             (Vector)
 
--- import Control.Monad.Loops
 import Control.Monad.Writer
 import Data.Finite
-import Data.List                     (groupBy, unzip5, zip3)
+import Data.List                     (groupBy, unzip5, zip3, nub)
 import Data.List.Extras.Argmax       (argmax)
 import Data.MemoTrie
 import System.Random
--- import Text.Printf
 import ToolShed.System.Random        (shuffle)
 
 import ConCat.TArr
@@ -203,7 +201,6 @@ doTD hParams@HypParams{..} nIters = TDRetT vs ps pDiffs vErrs dbgss qs where
                           iterate (optQn hParams) (s, q, g, [], t)
           q' = P.last q's
       put (q', P.last g's, P.last t's)
-      -- return (q', P.last dbgs)
       return (q', concat dbgs)
   -- Calculate policies and count differences between adjacent pairs.
   ps     = map (\q -> \s -> argmax (appFm q s) $ actions s) qs
@@ -246,6 +243,18 @@ temporal difference (TD) error correction:
 y = f(x) \\\\
 z = g(y)
 \\]
+
+-- \[
+-- \begin{eqnarray}
+-- \bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\\\
+-- \bar{x}^{N+1} &=& \frac{x_0 + x_1 + ... + x_N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& \frac{N \cdot bar{x}^N + x_N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& \frac{(N+1) \cdot bar{x}^N - bar{x}^N + x_N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& bar{x}^N + \frac{x_N - bar{x}^N}{N+1} \\\\
+-- \bar{x}^{N+1} &=& bar{x}^N + \frac{1}{N+1} \cdot \left( x_N - bar{x}^N \right) \\\\
+-- \end{eqnarray}
+-- \]
+--
 
 -}
 optQn
@@ -292,13 +301,14 @@ optQn HypParams{..} (s0, q, gen, _, t) =
       case tdStepType of
         Sarsa    -> qf st $ epsGreedy gen epsilon' qf st  -- Uses epsilon-greedy policy.
         Qlearn   -> qf st $ greedy qf st                  -- Uses greedy policy.
-        ExpSarsa ->  -- E[Q(s', a')]
+        ExpSarsa ->                                       -- E[Q(s', a')]
           sum [ p * qf st a
-              | a <- actions st
+              | a <- as
               , let p = if a == greedy qf st
                            then 1 - epsilon'
-                           else epsilon' / fromIntegral (length acts - 1)
-              ]
+                           else epsilon' / lenAs
+              ] where as    = nub $ actions st
+                      lenAs = fromIntegral (length as - 1)
   gammas    = scanl (*) 1 $ repeat disc      -- [1, disc, disc^2, ...]
   qf        = ((<$>) . (<$>)) fst $ appFm q  -- From augmented matrix representation of Q(s,a) to actual function.
   visits    = ((<$>) . (<$>)) snd $ appFm q  -- # of visits/adjustments to particular (s,a) pair.
@@ -322,45 +332,17 @@ optQn HypParams{..} (s0, q, gen, _, t) =
                           | (st, p) <- s'p's
                           ]
             s'p's = nextStates s a
-            -- Advance the random number generator.
-            (_::Int, g') = random g
             -- Calculate reward.
-            -- r = sum [ r' * p
-            --         | ((s', r'), p) <- jointPMF s a
-            --         ]
-            -- r   = P.head $ shuffle g' $
-            --         concat [ replicate (round $ 100 * p) r'
-            --                | (r', p) <- r'p's
-            --                ]
-            -- r'p's = rewards s a s'
             r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
-            -- ps' = fromMaybe (P.error "RL.GPI.optQn.go: Lookup failure at line 199!")
-            --                 (lookup s' s'p's)
             ps' = sum $ map snd $ filter ((== s') . fst) s'p's
             -- Use a greedy policy to select the next action.
             a' = greedy qf s'
             -- Advance the random number generator.
-            -- (_::Int, g'') = random g'
+            (_::Int, g') = random g
             -- TEMPORARY DEBUGGING INFO
             dbg = Dbg s a s' r s'p's
         put (s' : ss, a' : as, r : rs, dbg : dbgs, g')  -- Note the reverse order build-up.
         return ()
-      -- if s' `elem` termStates
-      -- if s `elem` termStates
-      --   then Nothing              -- Short circuit remaining computation,
-      --   else Just (s, a, r, dbg)  -- if we've reached a terminal state.
-
--- \[
--- \begin{eqnarray}
--- \bar{x}^N     &=& \frac{x_0 + x_1 + ... + x_{N-1}}{N} \\\\
--- \bar{x}^{N+1} &=& \frac{x_0 + x_1 + ... + x_N}{N+1} \\\\
--- \bar{x}^{N+1} &=& \frac{N \cdot bar{x}^N + x_N}{N+1} \\\\
--- \bar{x}^{N+1} &=& \frac{(N+1) \cdot bar{x}^N - bar{x}^N + x_N}{N+1} \\\\
--- \bar{x}^{N+1} &=& bar{x}^N + \frac{x_N - bar{x}^N}{N+1} \\\\
--- \bar{x}^{N+1} &=& bar{x}^N + \frac{1}{N+1} \cdot \left( x_N - bar{x}^N \right) \\\\
--- \end{eqnarray}
--- \]
---
 
 -- | Yields a single policy improvment iteration.
 --
