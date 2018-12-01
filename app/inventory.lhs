@@ -170,11 +170,9 @@ instance IsState MyState where
 instance MDP MyState where
   type ActionT MyState = MyAction
   actions MyState{..} = map finite $
-    -- if getFinite epoch `mod` gLeadTime /= 0
     if epoch == 0    
       then [0..gMaxOrder]
-      -- else [0]
-      else replicate (fromIntegral gMaxOrder + 1) 0
+      else [0]
   jointPMF MyState{..} a =
     [ ((s', r), p)
     | demand <- [0..gMaxDemand]
@@ -366,15 +364,13 @@ main = do
     forM_ (zip (P.init erss) [PointShapeCircle, PointShapePlus]) $ \ (ers, ptShape) -> do
       setColors $ map opaque [blue, green, red]
       setShapes [ptShape]
-      -- forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] ers) $ \ (lbl, er) ->
-      forM_ (zip ["Sarsa", "Qlearn"] ers) $ \ (lbl, er) ->        
+      forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] ers) $ \ (lbl, er) ->
            plot ( points lbl
                          [ (x,y)
                          | (x,y) <- takeEvery (nIters `div` 100) $ zip [(0::Int)..] er
                          ]
                 )
-    -- forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] (P.last erss)) $ \ (lbl, er) ->
-    forM_ (zip ["Sarsa", "Qlearn"] (P.last erss)) $ \ (lbl, er) ->      
+    forM_ (zip ["Sarsa", "Qlearn", "ExpSarsa"] (P.last erss)) $ \ (lbl, er) ->
          plot ( line lbl
                        [[ (x,y)
                         | (x,y) <- zip [(0::Int)..] er

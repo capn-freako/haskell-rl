@@ -267,31 +267,51 @@ optQn
 optQn HypParams{..} (s0, q, gen, _, t) =
   (sN, q VS.// qUpdates, gen', reverse debugs, t + (fromIntegral . length) sts)
  where
-  sN = if mode == MC || length sts < 2
-         then sT
-         else (P.last . P.init) sts
-  qUpdates =
-    [ ( sNum
-      , q `VS.index` sNum VS.// [(aNum, (newVal, visits s a + 1))]
-      )
-    -- | (s, a, ret) <- zip3 sts' acts' rets
-    | (s, a, ret) <- [P.last $ zip3 sts' acts' rets]
-    , let sNum = toFin s
-          aNum = toFin a
-          newVal =
-            if s `elem` termStates
-              then 0
-              else oldVal + errGain * (ret - oldVal)
-          oldVal = qf s a
-          errGain =
-            case mode of
-              MC -> 1 / (1 + (fromIntegral $ visits s a))  -- See discussion on mean calculation above.
-              _  -> alpha'
-    ]
+  (sN, qUpdates) =
+    case mode of
+      TD ->
+        ( if length sts < 2
+            then sT
+            else (P.last . P.init) sts
+        , if length rets > 0
+            then let sNum = toFin s0
+                     aNum = toFin a0
+                     upDt =
+                       ( newVal s0 a0 (P.last rets)
+                       , visits s0 a0 + 1
+                       )
+                  in [(sNum, q `VS.index` sNum VS.// [(aNum, upDt)])]
+                     
+            else []
+        )
+      MC ->
+        ( sT
+        , [ (sNum, q `VS.index` sNum VS.// [(aNum, upDt)])
+          | (s, a, ret) <- zip3 sts' acts' rets
+          , let sNum = toFin s
+                aNum = toFin a
+                upDt =
+                  ( newVal s a ret
+                  , visits s a + 1
+                  )
+          ]
+        )
+      -- _  -> P.error "optQn: Unknown simulation mode!"
+  a0 = epsGreedy gen epsilon' qf s0
+  newVal s a r =
+    if s `elem` termStates
+      then 0
+      else oldVal + errGain * (r - oldVal)
+   where
+    oldVal = qf s a
+    errGain =
+      case mode of
+        MC -> 1 / (1 + (fromIntegral $ visits s a))  -- See discussion on mean calculation above.
+        _  -> alpha'
   -- Returns are much easier to calculate with reversed rewards.
-  rets = P.tail $ scanl (+) (v sT * disc ^ (length rs')) rs'
-  rs'  = reverse $ zipWith (*) gammas $ reverse rwds  -- reversed discounted rewards
-  sT   = P.head sts
+  rets  = P.tail $ scanl (+) (v sT * disc ^ (length rs')) rs'
+  rs'   = reverse $ zipWith (*) gammas $ reverse rwds  -- reversed discounted rewards
+  sT    = P.head sts
   sts'  = P.tail sts
   acts' = P.tail acts  
   -- State value function corresponding to Q(s,a) depends on mode.
@@ -318,7 +338,7 @@ optQn HypParams{..} (s0, q, gen, _, t) =
   -- TODO: Add a hyper-parameter to control exploring starts.
   (sts, acts, rwds, debugs, gen') =
     execState (replicateM (nSteps + 1) go)
-              ([s0], [epsGreedy gen epsilon' qf s0], [], [], gen)
+              ([s0], [a0], [], [], gen)
   go = do  -- Single state transition.
     (ss, as, rs, dbgs, g) <- get
     let s  = P.head ss
@@ -335,8 +355,9 @@ optQn HypParams{..} (s0, q, gen, _, t) =
             -- Calculate reward.
             r   = (/ ps') . sum . map (uncurry (*)) $ rewards s a s'
             ps' = sum $ map snd $ filter ((== s') . fst) s'p's
-            -- Use a greedy policy to select the next action.
-            a' = greedy qf s'
+            -- Select next action, using policy.
+            -- a' = epsGreedy g epsilon' qf s'
+            a' = greedy qf s'            
             -- Advance the random number generator.
             (_::Int, g') = random g
             -- TEMPORARY DEBUGGING INFO

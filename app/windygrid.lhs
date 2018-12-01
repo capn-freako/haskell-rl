@@ -399,7 +399,7 @@ main = do
   appendFile mdFilename "\n## debug\n\n"
 
   -- DEBUGGING
-  print $ length resss
+  -- print $ length resss
   
   appendFile mdFilename "\n#### State Visits\n\n"
   let qM = P.last $ qMats $ P.last $ P.last resss

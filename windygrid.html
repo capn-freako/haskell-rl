@@ -379,7 +379,7 @@ main <span class="fu">=</span> <span class="kw">do</span>
   appendFile mdFilename <span class="st">&quot;\n## debug\n\n&quot;</span>
 
   <span class="co">-- DEBUGGING</span>
-  print <span class="fu">$</span> length resss
+  <span class="co">-- print $ length resss</span>
   
   appendFile mdFilename <span class="st">&quot;\n#### State Visits\n\n&quot;</span>
   <span class="kw">let</span> qM <span class="fu">=</span> P.last <span class="fu">$</span> qMats <span class="fu">$</span> P.last <span class="fu">$</span> P.last resss
@@ -495,19 +495,19 @@ line: alpha=0.5</p>
 <h4 id="state-visits">State Visits</h4>
 <span class="math display">\[\begin{array}{|c|c|c|c|c|c|c|c|c|c|}
 \hline
-213 &amp; 263 &amp; 319 &amp; 448 &amp; 824 &amp; 4062 &amp; 4714 &amp; 6024 &amp; 16196 &amp; 17937 \\
+338 &amp; 344 &amp; 442 &amp; 625 &amp; 3826 &amp; 7693 &amp; 9640 &amp; 11144 &amp; 11534 &amp; 7854 \\
 \hline
-260 &amp; 286 &amp; 270 &amp; 344 &amp; 521 &amp; 1818 &amp; 726 &amp; 2786 &amp; 5811 &amp; 19651 \\
+366 &amp; 376 &amp; 372 &amp; 366 &amp; 3164 &amp; 2136 &amp; 225 &amp; 809 &amp; 462 &amp; 10710 \\
 \hline
-329 &amp; 565 &amp; 393 &amp; 595 &amp; 533 &amp; 4551 &amp; 2195 &amp; 15892 &amp; 7518 &amp; 21107 \\
+481 &amp; 529 &amp; 405 &amp; 742 &amp; 3167 &amp; 275 &amp; 140 &amp; 2100 &amp; 310 &amp; 9928 \\
 \hline
-S &amp; 857 &amp; 520 &amp; 748 &amp; 447 &amp; 4668 &amp; 5843 &amp; G &amp; 230 &amp; 20230 \\
+S &amp; 8955 &amp; 920 &amp; 8476 &amp; 346 &amp; 223 &amp; 118 &amp; G &amp; 294 &amp; 9251 \\
 \hline
-467 &amp; 19859 &amp; 1026 &amp; 707 &amp; 12988 &amp; 12722 &amp; 11431 &amp; 21818 &amp; 250 &amp; 19424 \\
+783 &amp; 1393 &amp; 8765 &amp; 456 &amp; 400 &amp; 235 &amp; 96 &amp; 5898 &amp; 8311 &amp; 832 \\
 \hline
-367 &amp; 29196 &amp; 644 &amp; 38804 &amp; 25670 &amp; 8865 &amp; 9772 &amp; 12039 &amp; 18262 &amp; 593 \\
+468 &amp; 803 &amp; 861 &amp; 601 &amp; 373 &amp; 166 &amp; 58 &amp; 4105 &amp; 212 &amp; 531 \\
 \hline
-240 &amp; 360 &amp; 38644 &amp; 494 &amp; 19534 &amp; 8527 &amp; 5859 &amp; 69 &amp; 134 &amp; 215 \\
+389 &amp; 475 &amp; 758 &amp; 698 &amp; 281 &amp; 121 &amp; 25 &amp; 8 &amp; 96 &amp; 280 \\
 \hline
 \end{array}\]</span>
 <hr />
