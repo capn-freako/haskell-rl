@@ -7,10 +7,10 @@ haskell-rl : Gambler's Problem (Ex. 4.9)
 
 This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides a solution to Exercise 4.9 in _Reinforcement Learning_ by Sutton & Barto.
 
-Original author: [David Banas](mailto:David.Banas@target.com)  
+Original author: [David Banas](mailto:capn.freako@gmail.com)  
 Original date:   May 10, 2018
 
-Copyright &copy; 2018 Target Corp.; all rights reserved World wide.
+Copyright &copy; 2018 David Banas; all rights reserved World wide.
 
 Contents
 ---

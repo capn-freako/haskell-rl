@@ -2,7 +2,7 @@
 -- |
 -- Module      :  RL.MDP
 -- Description :  Markov Decision Process
--- Copyright   :  (c) Target Corp., 2018
+-- Copyright   :  (c) David Banas, 2018
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  :  David.Banas@target.com

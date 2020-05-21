@@ -7,10 +7,10 @@ haskell-rl : Blackjack Problem (Example 5.3)
 
 This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides a solution to Example 5.3 in _Reinforcement Learning_ by Sutton & Barto.
 
-Original author: [David Banas](mailto:David.Banas@target.com)  
+Original author: [David Banas](mailto:capn.freako@gmail.com)  
 Original date:   May 17, 2018
 
-Copyright &copy; 2018 Target Corp.; all rights reserved World wide.
+Copyright &copy; 2018 David Banas; all rights reserved World wide.
 
 Contents
 ---

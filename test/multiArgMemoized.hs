@@ -3,7 +3,7 @@
 -- Original author: David Banas <David.Banas@target.com>
 -- Original date:   May 9, 2018
 --
--- Copyright (c) 2018 Target Corp.; all rights reserved World wide.
+-- Copyright (c) 2018 David Banas; all rights reserved World wide.
 
 module Test where
 

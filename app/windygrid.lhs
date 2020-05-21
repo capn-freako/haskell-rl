@@ -7,10 +7,10 @@ haskell-rl : Stochastically Windy Gridworld
 
 This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides a solution to Ex. 6.10 - _Windy Gridworld w/ King's Moves and Stochastic Wind_.
 
-Original author: [David Banas](mailto:David.Banas@target.com)  
+Original author: [David Banas](mailto:capn.freako@gmail.com)  
 Original date:   June 28, 2018
 
-Copyright &copy; 2018 Target Corp.; all rights reserved World wide.
+Copyright &copy; 2018 David Banas; all rights reserved World wide.
 
 Contents
 ---

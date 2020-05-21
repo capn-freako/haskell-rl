@@ -7,10 +7,10 @@ haskell-rl : Inventory Optimization for Single Store, Single Item Case
 
 This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides a solution to ordering optimization for the "toy" case of a single store selling a single item.
 
-Original author: [David Banas](mailto:David.Banas@target.com)  
+Original author: [David Banas](mailto:capn.freako@gmail.com)  
 Original date:   June 14, 2018
 
-Copyright &copy; 2018 Target Corp.; all rights reserved World wide.
+Copyright &copy; 2018 David Banas; all rights reserved World wide.
 
 Contents
 ---

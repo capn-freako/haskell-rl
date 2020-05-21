@@ -3,12 +3,12 @@ version:       4.0
 synopsis:      Haskell library for doing reinforcement learning.
 description:   See readme.md for description.
 category:      project
-homepage:      https://git.target.com/RedOptHaskell/haskell-rl/wiki
+homepage:      https://github.com/capn-freako/haskell-rl
 license:       BSD3
 license-file:  LICENSE
 author:        David Banas
-maintainer:    David.Banas@target.com
-copyright:     Copyright (c) 2018 Target Corp.; all rights reserved World wide.
+maintainer:    capn.freako@gmail.com
+copyright:     Copyright (c) 2018 David Banas; all rights reserved World wide.
 build-type:    Simple
 cabal-version: >=1.14
 
@@ -87,7 +87,7 @@ library
     TypeFamilies,
     TypeOperators
 
-executable haskell-rl-example
+executable example
   default-language:
     Haskell2010
   ghc-options:
@@ -452,4 +452,4 @@ source-repository head
   type:
     git
   location:
-    https://git.target.com/RedOptHaskell/haskell-rl
+    https://github.com/capn-freako/haskell-rl

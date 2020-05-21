@@ -7,10 +7,10 @@ haskell-rl : Tic-Tac-Toe
 
 This [literate Haskell](https://wiki.haskell.org/Literate_programming) document provides solutions to some of the exercises at the end of Ch. 1 in [Reinforcement Learning: An Introduction](http://incompleteideas.net/book/the-book-2nd.html), by Sutton and Barto.
 
-Original author: [David Banas](mailto:David.Banas@target.com)  
+Original author: [David Banas](mailto:capn.freako@gmail.com)  
 Original date:   March 30, 2018
 
-Copyright &copy; 2018 Target Corp.; all rights reserved World wide.
+Copyright &copy; 2018 David Banas; all rights reserved World wide.
 
 Contents
 ---
