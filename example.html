@@ -1,0 +1,55 @@
+<pre class="include"><code>other/header.md</code></pre>
+<h1 id="haskell-rl">haskell-rl</h1>
+<h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span></a>
+<a class="sourceLine" id="cb2-2" data-line-number="2"><span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></a></code></pre></div>
+<h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" data-line-number="1"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></a>
+<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></a>
+<a class="sourceLine" id="cb3-3" data-line-number="3"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></a>
+<a class="sourceLine" id="cb3-4" data-line-number="4"><span class="ot">{-# LANGUAGE DataKinds #-}</span></a>
+<a class="sourceLine" id="cb3-5" data-line-number="5"><span class="ot">{-# LANGUAGE DeriveGeneric #-}</span></a>
+<a class="sourceLine" id="cb3-6" data-line-number="6"><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></a>
+<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="ot">{-# LANGUAGE TypeOperators #-}</span></a>
+<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></a></code></pre></div>
+<h2 id="libraries"><a href="https://www.stackage.org/">libraries</a></h2>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/protolude">protolude</a></li>
+<li><a href="https://www.stackage.org/package/optparse-generic">optparse-generic</a></li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="kw">import</span> <span class="dt">Protolude</span></a>
+<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="kw">import</span> <span class="dt">Options.Generic</span></a></code></pre></div>
+<h2 id="code">code</h2>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
+</ul>
+<div class="sourceCode" id="cb5"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb5-1" data-line-number="1"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
+<a class="sourceLine" id="cb5-2" data-line-number="2">    {<span class="ot"> number ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Integer</span> <span class="fu">&lt;?&gt;</span> <span class="st">&quot;The number you want to product to&quot;</span></a>
+<a class="sourceLine" id="cb5-3" data-line-number="3">    }</a>
+<a class="sourceLine" id="cb5-4" data-line-number="4">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
+<a class="sourceLine" id="cb5-5" data-line-number="5"></a>
+<a class="sourceLine" id="cb5-6" data-line-number="6"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
+<a class="sourceLine" id="cb5-7" data-line-number="7"></a>
+<a class="sourceLine" id="cb5-8" data-line-number="8"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
+<a class="sourceLine" id="cb5-9" data-line-number="9">main <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb5-10" data-line-number="10"><span class="ot">    o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span> unwrapRecord <span class="st">&quot;an example app for readme-lhs&quot;</span></a>
+<a class="sourceLine" id="cb5-11" data-line-number="11">    <span class="kw">let</span> n <span class="fu">=</span> fromMaybe <span class="dv">10</span> (number o)</a>
+<a class="sourceLine" id="cb5-12" data-line-number="12">    <span class="kw">let</span> answer <span class="fu">=</span> product [<span class="dv">1</span><span class="fu">..</span>n]</a>
+<a class="sourceLine" id="cb5-13" data-line-number="13">    putStrLn (show answer <span class="fu">&lt;&gt;</span> <span class="st">&quot; 👍&quot;</span><span class="ot"> ::</span> <span class="dt">Text</span>)</a>
+<a class="sourceLine" id="cb5-14" data-line-number="14">    writeFile <span class="st">&quot;other/answer.md&quot;</span></a>
+<a class="sourceLine" id="cb5-15" data-line-number="15">        (<span class="st">&quot;$\\prod_{i=1}^{&quot;</span> <span class="fu">&lt;&gt;</span> show n <span class="fu">&lt;&gt;</span> <span class="st">&quot;} i = &quot;</span> <span class="fu">&lt;&gt;</span></a>
+<a class="sourceLine" id="cb5-16" data-line-number="16">         show answer <span class="fu">&lt;&gt;</span> <span class="st">&quot;$&quot;</span>)</a></code></pre></div>
+<h2 id="output">output</h2>
+<pre class="include"><code>other/answer.md</code></pre>
+<h2 id="tests">tests</h2>
+<ul class="incremental">
+<li><a href="https://www.stackage.org/package/doctest">doctest</a></li>
+</ul>
+<div class="sourceCode" id="cb7"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb7-1" data-line-number="1"><span class="co">-- | doctests</span></a>
+<a class="sourceLine" id="cb7-2" data-line-number="2"><span class="co">-- &gt;&gt;&gt; let n = 10</span></a>
+<a class="sourceLine" id="cb7-3" data-line-number="3"><span class="co">-- &gt;&gt;&gt; product [1..n]</span></a>
+<a class="sourceLine" id="cb7-4" data-line-number="4"><span class="co">-- 3628800</span></a></code></pre></div>
+<hr />
+<div class="footer">
+<p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>
+</div>
