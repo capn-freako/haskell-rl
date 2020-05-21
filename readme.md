@@ -49,7 +49,7 @@ Examples
 
 The following examples are available:
 
-- [tictactoe](https://github.com/capn-freako/haskell-rl/tictactoe.html)
+- [tictactoe](https://capn-freako.github.io/haskell-rl/tictactoe.html)
 - [rentalcars](https://github.com/capn-freako/haskell-rl/rentalcars.html)
 - [gambler](https://github.com/capn-freako/haskell-rl/gambler.html)
 - [blackjack](https://github.com/capn-freako/haskell-rl/blackjack.html)
