@@ -1,5 +1,5 @@
 ```include
-other/header.md
+other/header.html
 ```
 
 haskell-rl : Stochastically Windy Gridworld
