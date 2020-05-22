@@ -1,5 +1,5 @@
 ```include
-other/header.md
+other/header.html
 ```
 
 _haskell-rl_ : Reinforcement Learning in Haskell
@@ -37,7 +37,7 @@ Contents
 
 - [Description](#description)
 - [Examples](#examples)
-- [more info...](https://github.com/capn-freako/haskell-rl/wiki)
+- [more info...](https://capn-freako.github.io/haskell-rl/wiki)
 
 Description
 ---
@@ -50,12 +50,11 @@ Examples
 The following examples are available:
 
 - [tictactoe](https://capn-freako.github.io/haskell-rl/tictactoe.html)
-- [tictactoe](other/tictactoe.md)
-- [rentalcars](https://github.com/capn-freako/haskell-rl/rentalcars.html)
-- [gambler](https://github.com/capn-freako/haskell-rl/gambler.html)
-- [blackjack](https://github.com/capn-freako/haskell-rl/blackjack.html)
-- [inventory](https://github.com/capn-freako/haskell-rl/inventory.html)
-- [windygrid](https://github.com/capn-freako/haskell-rl/windygrid.html)
+- [rentalcars](https://capn-freako.github.io/haskell-rl/rentalcars.html)
+- [gambler](https://capn-freako.github.io/haskell-rl/gambler.html)
+- [blackjack](https://capn-freako.github.io/haskell-rl/blackjack.html)
+- [inventory](https://capn-freako.github.io/haskell-rl/inventory.html)
+- [windygrid](https://capn-freako.github.io/haskell-rl/windygrid.html)
 
 Each example above was created from a [literate Haskell](https://wiki.haskell.org/Literate_programming) source file, which you can find in the [_app_ directory of this repository](https://github.com/capn-freako/haskell-rl/tree/master/app), and contains:
 
