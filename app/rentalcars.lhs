@@ -1,6 +1,8 @@
-```include
-other/header.md
-```
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 
 haskell-rl : Rental Car Problem (Ex. 4.7 from Sutton & Bartow)
 ===
@@ -180,7 +182,7 @@ showFofState g = unlines
     ( ("\\text{cars at loc. 1} &" ++ intersperse '&' (replicate 21 ' ') ++ " \\\\") :
       ["\\hline"] ++
       intersperse "\\hline"
-        ( map ((++ " \\\\") . intercalate " & ")
+        ( map ((++ " \\\\\\\\") . intercalate " & ")
               [ (show m :) $ map show
                 [ g (finite m, finite n)
                 | n <- [0..20]

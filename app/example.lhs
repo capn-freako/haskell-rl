@@ -1,6 +1,8 @@
-```include
-other/header.md
-```
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 
 haskell-rl
 ===
@@ -58,8 +60,8 @@ main = do
     let answer = product [1..n]
     putStrLn (show answer <> " 👍" :: Text)
     writeFile "other/answer.md"
-        ("$\\prod_{i=1}^{" <> show n <> "} i = " <>
-         show answer <> "$")
+        ("\\(\\prod_{i=1}^{" <> show n <> "} i = " <>
+         show answer <> "\\)")
 \end{code}
 
 output

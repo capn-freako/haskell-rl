@@ -1,6 +1,8 @@
-```include
-other/header.md
-```
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 
 haskell-rl : Blackjack Problem (Example 5.3)
 ===
@@ -230,11 +232,12 @@ showVofState' v ace = unlines $
   (if ace
      then "With usable ace:"
      else "No usable ace:")
-  : ( "\\begin{array}{c|c|c|c|c|c|c|c|c|c}" :
-      ( ("\\text{Player's Total} &" ++ intersperse '&' (replicate 10 ' ') ++ " \\\\") :
+  : ( "$$" :
+      "\\begin{array}{c|c|c|c|c|c|c|c|c|c}" :
+      ( ("\\text{Player's Total} &" ++ intersperse '&' (replicate 10 ' ') ++ " \\\\\\\\") :
         ["\\hline"] ++
         intersperse "\\hline"
-          ( map ((++ " \\\\") . intercalate " & ")
+          ( map ((++ " \\\\\\\\") . intercalate " & ")
                 [ (show pTot :) $ map show
                   [ v `index` enumState s
                   | dCard <- [1..10]
@@ -249,6 +252,7 @@ showVofState' v ace = unlines $
         ++ ["\\hline"]
         ++ [intercalate " & " $ "\\text{Dealer's Card:} " : [show n | n <- [1..10]]]
         ++ ["\\end{array}"]
+        ++ ["$$"]
       )
     )
 
@@ -274,7 +278,7 @@ main = do
   -- Process command line options.
   o :: Opts Unwrapped <-
     unwrapRecord "A solution to the 'Blackjack' problem (Example 5.3)."
-  let nG = fromMaybe 10000 (nGames o)
+  let nG = fromMaybe 1000000 (nGames o)
 
   -- Initialize policy and state/action values.
   let qs  = VS.replicate ((0,0), (0,0))  -- Initialize all state/action values to zero.

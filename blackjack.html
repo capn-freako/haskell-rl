@@ -1,4 +1,8 @@
-<pre class="include"><code>other/header.md</code></pre>
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 <h1 id="haskell-rl-blackjack-problem-example-5.3">haskell-rl : Blackjack Problem (Example 5.3)</h1>
 <p>This <a href="https://wiki.haskell.org/Literate_programming">literate Haskell</a> document provides a solution to Example 5.3 in <em>Reinforcement Learning</em> by Sutton &amp; Barto.</p>
 <p>Original author: <a href="mailto:capn.freako@gmail.com">David Banas</a><br />
@@ -11,20 +15,20 @@ Original date: May 17, 2018</p>
 </ul>
 <h2 id="code">code</h2>
 <h2 id="ghc-options"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/flags.html#flag-reference">ghc options</a></h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="ot">{-# OPTIONS_GHC -Wall #-}</span></a>
-<a class="sourceLine" id="cb2-2" data-line-number="2"><span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></a></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell literate"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="ot">{-# OPTIONS_GHC -Wall #-}</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="ot">{-# OPTIONS_GHC -fno-warn-type-defaults #-}</span></span></code></pre></div>
 <h2 id="pragmas"><a href="https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/lang.html">pragmas</a></h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" data-line-number="1"><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></a>
-<a class="sourceLine" id="cb3-2" data-line-number="2"><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></a>
-<a class="sourceLine" id="cb3-3" data-line-number="3"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></a>
-<a class="sourceLine" id="cb3-4" data-line-number="4"><span class="ot">{-# LANGUAGE DataKinds #-}</span></a>
-<a class="sourceLine" id="cb3-5" data-line-number="5"><span class="ot">{-# LANGUAGE DeriveGeneric #-}</span></a>
-<a class="sourceLine" id="cb3-6" data-line-number="6"><span class="ot">{-# LANGUAGE FlexibleContexts #-}</span></a>
-<a class="sourceLine" id="cb3-7" data-line-number="7"><span class="ot">{-# LANGUAGE RecordWildCards #-}</span></a>
-<a class="sourceLine" id="cb3-8" data-line-number="8"><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></a>
-<a class="sourceLine" id="cb3-9" data-line-number="9"><span class="ot">{-# LANGUAGE TypeOperators #-}</span></a>
-<a class="sourceLine" id="cb3-10" data-line-number="10"><span class="ot">{-# LANGUAGE TypeFamilies #-}</span></a>
-<a class="sourceLine" id="cb3-11" data-line-number="11"><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></a></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell literate"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="co">-- doctest doesn&#39;t look at the cabal file, so you need pragmas here</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="ot">{-# LANGUAGE NoImplicitPrelude #-}</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="ot">{-# LANGUAGE DataKinds #-}</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="ot">{-# LANGUAGE DeriveGeneric #-}</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="ot">{-# LANGUAGE FlexibleContexts #-}</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a><span class="ot">{-# LANGUAGE RecordWildCards #-}</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a><span class="ot">{-# LANGUAGE ScopedTypeVariables #-}</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a><span class="ot">{-# LANGUAGE TypeOperators #-}</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a><span class="ot">{-# LANGUAGE TypeFamilies #-}</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a><span class="ot">{-# LANGUAGE FlexibleInstances #-}</span></span></code></pre></div>
 <h2 id="libraries"><a href="https://www.stackage.org/">libraries</a></h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/protolude">protolude</a></li>
@@ -34,327 +38,338 @@ Original date: May 17, 2018</p>
 <li><a href="https://www.stackage.org/package/Chart">Chart</a></li>
 <li><a href="https://www.stackage.org/package/Chart-cairo">Chart-cairo</a></li>
 </ul>
-<div class="sourceCode" id="cb4"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Prelude</span> <span class="kw">as</span> <span class="dt">P</span></a>
-<a class="sourceLine" id="cb4-2" data-line-number="2"><span class="kw">import</span> <span class="dt">Prelude</span> (unlines, <span class="dt">Show</span>(..), <span class="dt">String</span>, error, (!!))</a>
-<a class="sourceLine" id="cb4-3" data-line-number="3"></a>
-<a class="sourceLine" id="cb4-4" data-line-number="4"><span class="kw">import</span> <span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for)</a>
-<a class="sourceLine" id="cb4-5" data-line-number="5"><span class="kw">import</span> <span class="dt">Options.Generic</span></a>
-<a class="sourceLine" id="cb4-6" data-line-number="6"></a>
-<a class="sourceLine" id="cb4-7" data-line-number="7"><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span> <span class="kw">as</span> <span class="dt">VS</span></a>
-<a class="sourceLine" id="cb4-8" data-line-number="8"></a>
-<a class="sourceLine" id="cb4-9" data-line-number="9"><span class="kw">import</span> <span class="dt">Control.Arrow</span>          ((&amp;&amp;&amp;), (***))</a>
-<a class="sourceLine" id="cb4-10" data-line-number="10"><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></a>
-<a class="sourceLine" id="cb4-11" data-line-number="11"><span class="kw">import</span> <span class="dt">Data.Vector.Sized</span>      (<span class="dt">Vector</span>, (//), index)</a>
-<a class="sourceLine" id="cb4-12" data-line-number="12"><span class="kw">import</span> <span class="dt">Data.Finite</span></a>
-<a class="sourceLine" id="cb4-13" data-line-number="13"><span class="kw">import</span> <span class="dt">Data.Text</span>              (pack)</a>
-<a class="sourceLine" id="cb4-14" data-line-number="14"><span class="kw">import</span> <span class="dt">System.Random.Shuffle</span></a>
-<a class="sourceLine" id="cb4-15" data-line-number="15"><span class="kw">import</span> <span class="dt">Text.Printf</span></a>
-<a class="sourceLine" id="cb4-16" data-line-number="16"><span class="kw">import</span> <span class="dt">Useful.IO</span>              (rand)</a></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell literate"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Prelude</span> <span class="kw">as</span> <span class="dt">P</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Prelude</span> (unlines, <span class="dt">Show</span>(..), <span class="dt">String</span>, error, (!!))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Protolude</span>  <span class="kw">hiding</span> (show, for)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Options.Generic</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Vector.Sized</span> <span class="kw">as</span> <span class="dt">VS</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Control.Arrow</span>          ((&amp;&amp;&amp;), (***))</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Control.Monad.Writer</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Data.Vector.Sized</span>      (<span class="dt">Vector</span>, (//), index)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Data.Finite</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Data.Text</span>              (pack)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">System.Random.Shuffle</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Text.Printf</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">Useful.IO</span>              (rand)</span></code></pre></div>
 <h2 id="code-1">code</h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/hoogle">hoogle</a></li>
 </ul>
-<div class="sourceCode" id="cb5"><pre class="sourceCode literate haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb5-1" data-line-number="1"></a>
-<a class="sourceLine" id="cb5-2" data-line-number="2"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb5-3" data-line-number="3"><span class="co">  Problem specific definitions</span></a>
-<a class="sourceLine" id="cb5-4" data-line-number="4"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb5-5" data-line-number="5"></a>
-<a class="sourceLine" id="cb5-6" data-line-number="6"><span class="kw">data</span> <span class="dt">BJState</span> <span class="fu">=</span> <span class="dt">BJState</span></a>
-<a class="sourceLine" id="cb5-7" data-line-number="7">  {<span class="ot"> playerSum  ::</span> <span class="dt">Int</span>   <span class="co">-- 12 - 21</span></a>
-<a class="sourceLine" id="cb5-8" data-line-number="8">  ,<span class="ot"> usableAce  ::</span> <span class="dt">Bool</span></a>
-<a class="sourceLine" id="cb5-9" data-line-number="9">  ,<span class="ot"> dealerCard ::</span> <span class="dt">Int</span>   <span class="co">-- 1 - 10</span></a>
-<a class="sourceLine" id="cb5-10" data-line-number="10">  ,<span class="ot"> dealerSum  ::</span> <span class="dt">Int</span>   <span class="co">-- For debugging only; not used for learning.</span></a>
-<a class="sourceLine" id="cb5-11" data-line-number="11">  ,<span class="ot"> polHit     ::</span> <span class="dt">Bool</span>  <span class="co">-- For debugging only; not used for learning.</span></a>
-<a class="sourceLine" id="cb5-12" data-line-number="12">  ,<span class="ot"> didHit     ::</span> <span class="dt">Bool</span></a>
-<a class="sourceLine" id="cb5-13" data-line-number="13">  } <span class="kw">deriving</span> (<span class="dt">Show</span>)</a>
-<a class="sourceLine" id="cb5-14" data-line-number="14"></a>
-<a class="sourceLine" id="cb5-15" data-line-number="15"><span class="ot">stateDef ::</span> <span class="dt">BJState</span></a>
-<a class="sourceLine" id="cb5-16" data-line-number="16">stateDef <span class="fu">=</span> <span class="dt">BJState</span></a>
-<a class="sourceLine" id="cb5-17" data-line-number="17">  { playerSum  <span class="fu">=</span> <span class="dv">12</span></a>
-<a class="sourceLine" id="cb5-18" data-line-number="18">  , usableAce  <span class="fu">=</span> <span class="dt">False</span></a>
-<a class="sourceLine" id="cb5-19" data-line-number="19">  , dealerCard <span class="fu">=</span> <span class="dv">1</span></a>
-<a class="sourceLine" id="cb5-20" data-line-number="20">  , dealerSum  <span class="fu">=</span> <span class="dv">12</span></a>
-<a class="sourceLine" id="cb5-21" data-line-number="21">  , polHit     <span class="fu">=</span> <span class="dt">False</span></a>
-<a class="sourceLine" id="cb5-22" data-line-number="22">  , didHit     <span class="fu">=</span> <span class="dt">False</span></a>
-<a class="sourceLine" id="cb5-23" data-line-number="23">  }</a>
-<a class="sourceLine" id="cb5-24" data-line-number="24"></a>
-<a class="sourceLine" id="cb5-25" data-line-number="25"><span class="kw">newtype</span> <span class="dt">BJAction</span> <span class="fu">=</span> <span class="dt">BJAction</span> {<span class="ot"> act ::</span> <span class="dt">Bool</span> }  <span class="co">-- Hit?</span></a>
-<a class="sourceLine" id="cb5-26" data-line-number="26"></a>
-<a class="sourceLine" id="cb5-27" data-line-number="27"><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">BJAction</span> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb5-28" data-line-number="28">  show (<span class="dt">BJAction</span> x) <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-29" data-line-number="29">    <span class="kw">if</span> x <span class="kw">then</span> <span class="st">&quot;H&quot;</span></a>
-<a class="sourceLine" id="cb5-30" data-line-number="30">         <span class="kw">else</span> <span class="st">&quot; &quot;</span></a>
-<a class="sourceLine" id="cb5-31" data-line-number="31"></a>
-<a class="sourceLine" id="cb5-32" data-line-number="32"><span class="ot">allActs ::</span> [<span class="dt">BJAction</span>]</a>
-<a class="sourceLine" id="cb5-33" data-line-number="33">allActs <span class="fu">=</span> map <span class="dt">BJAction</span> [<span class="dt">False</span>, <span class="dt">True</span>]</a>
-<a class="sourceLine" id="cb5-34" data-line-number="34"></a>
-<a class="sourceLine" id="cb5-35" data-line-number="35"><span class="kw">type</span> <span class="dt">BJPolicy</span> <span class="fu">=</span> <span class="dt">BJState</span> <span class="ot">-&gt;</span> <span class="dt">BJAction</span></a>
-<a class="sourceLine" id="cb5-36" data-line-number="36"></a>
-<a class="sourceLine" id="cb5-37" data-line-number="37"><span class="ot">appPolV ::</span> <span class="dt">Vector</span> <span class="dv">200</span> <span class="dt">BJAction</span> <span class="ot">-&gt;</span> <span class="dt">BJPolicy</span></a>
-<a class="sourceLine" id="cb5-38" data-line-number="38">appPolV v <span class="fu">=</span> \s <span class="ot">-&gt;</span> v <span class="ot">`index`</span> enumState s</a>
-<a class="sourceLine" id="cb5-39" data-line-number="39"></a>
-<a class="sourceLine" id="cb5-40" data-line-number="40"><span class="ot">enumState ::</span> <span class="dt">BJState</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">200</span></a>
-<a class="sourceLine" id="cb5-41" data-line-number="41">enumState s<span class="fu">@</span><span class="dt">BJState</span>{<span class="fu">..</span>} <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-42" data-line-number="42">  <span class="kw">let</span> offset <span class="fu">=</span> (dealerCard <span class="fu">-</span> <span class="dv">1</span>) <span class="fu">*</span> <span class="dv">10</span> <span class="fu">+</span> playerSum <span class="fu">-</span> <span class="dv">12</span></a>
-<a class="sourceLine" id="cb5-43" data-line-number="43">   <span class="kw">in</span> <span class="kw">if</span> offset <span class="fu">&lt;</span> <span class="dv">0</span></a>
-<a class="sourceLine" id="cb5-44" data-line-number="44">        <span class="kw">then</span> error (show s)</a>
-<a class="sourceLine" id="cb5-45" data-line-number="45">        <span class="kw">else</span> <span class="kw">if</span> usableAce</a>
-<a class="sourceLine" id="cb5-46" data-line-number="46">               <span class="kw">then</span> finite <span class="fu">.</span> fromIntegral <span class="fu">$</span> <span class="dv">100</span> <span class="fu">+</span> offset</a>
-<a class="sourceLine" id="cb5-47" data-line-number="47">               <span class="kw">else</span> finite <span class="fu">.</span> fromIntegral <span class="fu">$</span> offset</a>
-<a class="sourceLine" id="cb5-48" data-line-number="48"></a>
-<a class="sourceLine" id="cb5-49" data-line-number="49"><span class="ot">validStates ::</span> [<span class="dt">BJState</span>] <span class="ot">-&gt;</span> [<span class="dt">BJState</span>]</a>
-<a class="sourceLine" id="cb5-50" data-line-number="50">validStates <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-51" data-line-number="51">  filter ( \ <span class="dt">BJState</span>{<span class="fu">..</span>} <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb5-52" data-line-number="52">                playerSum  <span class="fu">&gt;=</span> <span class="dv">12</span> <span class="fu">&amp;&amp;</span> playerSum  <span class="fu">&lt;=</span> <span class="dv">21</span></a>
-<a class="sourceLine" id="cb5-53" data-line-number="53">             <span class="fu">&amp;&amp;</span> dealerCard <span class="fu">&gt;=</span> <span class="dv">1</span>  <span class="fu">&amp;&amp;</span> dealerCard <span class="fu">&lt;=</span> <span class="dv">10</span></a>
-<a class="sourceLine" id="cb5-54" data-line-number="54">         )</a>
-<a class="sourceLine" id="cb5-55" data-line-number="55"></a>
-<a class="sourceLine" id="cb5-56" data-line-number="56"><span class="kw">data</span> <span class="dt">DbgT</span> <span class="fu">=</span> <span class="dt">DbgT</span></a>
-<a class="sourceLine" id="cb5-57" data-line-number="57">  {<span class="ot"> upCard ::</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb5-58" data-line-number="58">  ,<span class="ot"> states ::</span> [<span class="dt">BJState</span>]</a>
-<a class="sourceLine" id="cb5-59" data-line-number="59">  ,<span class="ot"> reward ::</span> <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb5-60" data-line-number="60">  }</a>
-<a class="sourceLine" id="cb5-61" data-line-number="61"></a>
-<a class="sourceLine" id="cb5-62" data-line-number="62"><span class="ot">play ::</span> <span class="dt">BJPolicy</span> <span class="ot">-&gt;</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">BJAction</span> <span class="ot">-&gt;</span> <span class="dt">Writer</span> [<span class="dt">DbgT</span>] (<span class="dt">Int</span>, [<span class="dt">BJState</span>])</a>
-<a class="sourceLine" id="cb5-63" data-line-number="63">play pol cards randAct <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-64" data-line-number="64">  <span class="kw">do</span> <span class="kw">let</span> (r, ss) <span class="fu">|</span> pTot <span class="fu">==</span> <span class="dv">21</span> <span class="fu">=</span> <span class="kw">if</span> dTot <span class="fu">==</span> <span class="dv">21</span></a>
-<a class="sourceLine" id="cb5-65" data-line-number="65">                                  <span class="kw">then</span> (<span class="dv">0</span>, [])</a>
-<a class="sourceLine" id="cb5-66" data-line-number="66">                                  <span class="kw">else</span> (<span class="dv">1</span>, [])</a>
-<a class="sourceLine" id="cb5-67" data-line-number="67">                 <span class="fu">|</span> dTot <span class="fu">==</span> <span class="dv">21</span> <span class="fu">=</span> (<span class="fu">-</span><span class="dv">1</span>, [])</a>
-<a class="sourceLine" id="cb5-68" data-line-number="68">                 <span class="fu">|</span> otherwise <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-69" data-line-number="69">                   runWriter <span class="fu">$</span> play&#39; pol (drop <span class="dv">4</span> cards) dCards pCards <span class="dt">Init</span> randAct</a>
-<a class="sourceLine" id="cb5-70" data-line-number="70">     tell [ <span class="dt">DbgT</span> { upCard <span class="fu">=</span> cards <span class="fu">!!</span> <span class="dv">2</span></a>
-<a class="sourceLine" id="cb5-71" data-line-number="71">                 , states <span class="fu">=</span> ss</a>
-<a class="sourceLine" id="cb5-72" data-line-number="72">                 , reward <span class="fu">=</span> r</a>
-<a class="sourceLine" id="cb5-73" data-line-number="73">                 }</a>
-<a class="sourceLine" id="cb5-74" data-line-number="74">          ]</a>
-<a class="sourceLine" id="cb5-75" data-line-number="75">     return (r, ss)</a>
-<a class="sourceLine" id="cb5-76" data-line-number="76">  <span class="kw">where</span> (pTot, _) <span class="fu">=</span> cardSum pCards</a>
-<a class="sourceLine" id="cb5-77" data-line-number="77">        (dTot, _) <span class="fu">=</span> cardSum dCards</a>
-<a class="sourceLine" id="cb5-78" data-line-number="78">        dCards    <span class="fu">=</span> take <span class="dv">2</span> <span class="fu">$</span> drop <span class="dv">2</span> cards</a>
-<a class="sourceLine" id="cb5-79" data-line-number="79">        pCards    <span class="fu">=</span> take <span class="dv">2</span> cards</a>
-<a class="sourceLine" id="cb5-80" data-line-number="80"></a>
-<a class="sourceLine" id="cb5-81" data-line-number="81"><span class="kw">data</span> <span class="dt">PlayPhase</span> <span class="fu">=</span> <span class="dt">Init</span>    <span class="co">-- Bringing player&#39;s sum &gt; 11.</span></a>
-<a class="sourceLine" id="cb5-82" data-line-number="82">               <span class="fu">|</span> <span class="dt">Player</span>  <span class="co">-- Player is hitting/standing.</span></a>
-<a class="sourceLine" id="cb5-83" data-line-number="83">               <span class="fu">|</span> <span class="dt">Dealer</span>  <span class="co">-- Dealer is hitting/standing.</span></a>
-<a class="sourceLine" id="cb5-84" data-line-number="84"></a>
-<a class="sourceLine" id="cb5-85" data-line-number="85"><span class="ot">play&#39; ::</span> <span class="dt">BJPolicy</span>   <span class="co">-- current policy</span></a>
-<a class="sourceLine" id="cb5-86" data-line-number="86">      <span class="ot">-&gt;</span> [<span class="dt">Int</span>]      <span class="co">-- remaining deck of cards</span></a>
-<a class="sourceLine" id="cb5-87" data-line-number="87">      <span class="ot">-&gt;</span> [<span class="dt">Int</span>]      <span class="co">-- dealer&#39;s cards</span></a>
-<a class="sourceLine" id="cb5-88" data-line-number="88">      <span class="ot">-&gt;</span> [<span class="dt">Int</span>]      <span class="co">-- player&#39;s cards</span></a>
-<a class="sourceLine" id="cb5-89" data-line-number="89">      <span class="ot">-&gt;</span> <span class="dt">PlayPhase</span>  <span class="co">-- phase of the game</span></a>
-<a class="sourceLine" id="cb5-90" data-line-number="90">      <span class="ot">-&gt;</span> <span class="dt">BJAction</span>   <span class="co">-- randomly chosen action to be performed by player at his first free turn</span></a>
-<a class="sourceLine" id="cb5-91" data-line-number="91">      <span class="ot">-&gt;</span> <span class="dt">Writer</span> [<span class="dt">BJState</span>] <span class="dt">Int</span></a>
-<a class="sourceLine" id="cb5-92" data-line-number="92">play&#39; pol cards dCards pCards phs randAct <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-93" data-line-number="93">  <span class="kw">case</span> phs <span class="kw">of</span></a>
-<a class="sourceLine" id="cb5-94" data-line-number="94">    <span class="dt">Init</span> <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb5-95" data-line-number="95">      <span class="kw">if</span> pTot <span class="fu">&gt;</span> <span class="dv">11</span></a>
-<a class="sourceLine" id="cb5-96" data-line-number="96">        <span class="kw">then</span> <span class="kw">do</span> tell [s{didHit <span class="fu">=</span> act randAct}]</a>
-<a class="sourceLine" id="cb5-97" data-line-number="97">                <span class="kw">if</span> act randAct  <span class="co">-- Is first (randomly chosen) player action &quot;hit&quot;?</span></a>
-<a class="sourceLine" id="cb5-98" data-line-number="98">                  <span class="kw">then</span> play&#39; pol (P.tail cards) dCards (P.head cards <span class="fu">:</span> pCards) <span class="dt">Player</span> randAct</a>
-<a class="sourceLine" id="cb5-99" data-line-number="99">                  <span class="kw">else</span> play&#39; pol cards dCards pCards <span class="dt">Dealer</span> randAct</a>
-<a class="sourceLine" id="cb5-100" data-line-number="100">        <span class="kw">else</span> play&#39; pol (P.tail cards) dCards (P.head cards <span class="fu">:</span> pCards) <span class="dt">Init</span> randAct</a>
-<a class="sourceLine" id="cb5-101" data-line-number="101"></a>
-<a class="sourceLine" id="cb5-102" data-line-number="102">    <span class="dt">Player</span> <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb5-103" data-line-number="103">      <span class="kw">do</span> tell [s]</a>
-<a class="sourceLine" id="cb5-104" data-line-number="104">         <span class="kw">if</span> pTot <span class="fu">&gt;</span> <span class="dv">21</span>        <span class="co">-- Player go bust yet?</span></a>
-<a class="sourceLine" id="cb5-105" data-line-number="105">           <span class="kw">then</span> return (<span class="fu">-</span><span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb5-106" data-line-number="106">           <span class="kw">else</span> <span class="kw">if</span> polHit    <span class="co">-- Does policy dictate a hit?</span></a>
-<a class="sourceLine" id="cb5-107" data-line-number="107">                  <span class="kw">then</span> play&#39; pol (P.tail cards) dCards (P.head cards <span class="fu">:</span> pCards) <span class="dt">Player</span> randAct</a>
-<a class="sourceLine" id="cb5-108" data-line-number="108">                  <span class="kw">else</span> play&#39; pol cards dCards pCards <span class="dt">Dealer</span> randAct</a>
-<a class="sourceLine" id="cb5-109" data-line-number="109"></a>
-<a class="sourceLine" id="cb5-110" data-line-number="110">    <span class="dt">Dealer</span> <span class="ot">-&gt;</span></a>
-<a class="sourceLine" id="cb5-111" data-line-number="111">      <span class="kw">do</span> tell [s]</a>
-<a class="sourceLine" id="cb5-112" data-line-number="112">         <span class="kw">if</span> dTot <span class="fu">&gt;</span> <span class="dv">21</span>        <span class="co">-- Dealer go bust yet?</span></a>
-<a class="sourceLine" id="cb5-113" data-line-number="113">           <span class="kw">then</span> return <span class="dv">1</span></a>
-<a class="sourceLine" id="cb5-114" data-line-number="114">           <span class="kw">else</span> <span class="kw">if</span> dTot <span class="fu">&lt;</span> <span class="dv">17</span>        <span class="co">-- Must dealer take a hit?</span></a>
-<a class="sourceLine" id="cb5-115" data-line-number="115">                  <span class="kw">then</span> play&#39; pol (P.tail cards) (P.head cards <span class="fu">:</span> dCards) pCards <span class="dt">Dealer</span> randAct</a>
-<a class="sourceLine" id="cb5-116" data-line-number="116">                  <span class="kw">else</span> <span class="kw">case</span> compare pTot dTot <span class="kw">of</span></a>
-<a class="sourceLine" id="cb5-117" data-line-number="117">                         <span class="dt">GT</span> <span class="ot">-&gt;</span> return   <span class="dv">1</span></a>
-<a class="sourceLine" id="cb5-118" data-line-number="118">                         <span class="dt">EQ</span> <span class="ot">-&gt;</span> return   <span class="dv">0</span></a>
-<a class="sourceLine" id="cb5-119" data-line-number="119">                         _  <span class="ot">-&gt;</span> return (<span class="fu">-</span><span class="dv">1</span>)</a>
-<a class="sourceLine" id="cb5-120" data-line-number="120"></a>
-<a class="sourceLine" id="cb5-121" data-line-number="121">  <span class="kw">where</span> (pTot, ace) <span class="fu">=</span> cardSum pCards</a>
-<a class="sourceLine" id="cb5-122" data-line-number="122">        (dTot, _)   <span class="fu">=</span> cardSum dCards</a>
-<a class="sourceLine" id="cb5-123" data-line-number="123">        s&#39;          <span class="fu">=</span> stateDef</a>
-<a class="sourceLine" id="cb5-124" data-line-number="124">                        { playerSum  <span class="fu">=</span> pTot</a>
-<a class="sourceLine" id="cb5-125" data-line-number="125">                        , usableAce  <span class="fu">=</span> ace</a>
-<a class="sourceLine" id="cb5-126" data-line-number="126">                        , dealerCard <span class="fu">=</span> P.last dCards</a>
-<a class="sourceLine" id="cb5-127" data-line-number="127">                        , dealerSum  <span class="fu">=</span> dTot</a>
-<a class="sourceLine" id="cb5-128" data-line-number="128">                        }</a>
-<a class="sourceLine" id="cb5-129" data-line-number="129">        s           <span class="fu">=</span> s&#39;</a>
-<a class="sourceLine" id="cb5-130" data-line-number="130">                        { polHit <span class="fu">=</span> polHit</a>
-<a class="sourceLine" id="cb5-131" data-line-number="131">                        , didHit <span class="fu">=</span> polHit</a>
-<a class="sourceLine" id="cb5-132" data-line-number="132">                        }</a>
-<a class="sourceLine" id="cb5-133" data-line-number="133">        polHit      <span class="fu">=</span> (act <span class="fu">.</span> pol) s&#39;</a>
-<a class="sourceLine" id="cb5-134" data-line-number="134"></a>
-<a class="sourceLine" id="cb5-135" data-line-number="135"><span class="ot">cardSum ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> (<span class="dt">Int</span>, <span class="dt">Bool</span>)</a>
-<a class="sourceLine" id="cb5-136" data-line-number="136">cardSum cards <span class="fu">=</span></a>
-<a class="sourceLine" id="cb5-137" data-line-number="137">  <span class="kw">if</span> tot <span class="fu">&lt;</span> <span class="dv">12</span> <span class="fu">&amp;&amp;</span> <span class="dv">1</span> <span class="ot">`elem`</span> cards</a>
-<a class="sourceLine" id="cb5-138" data-line-number="138">    <span class="kw">then</span> (tot <span class="fu">+</span> <span class="dv">10</span>, <span class="dt">True</span>)</a>
-<a class="sourceLine" id="cb5-139" data-line-number="139">    <span class="kw">else</span> (tot,      <span class="dt">False</span>)</a>
-<a class="sourceLine" id="cb5-140" data-line-number="140">  <span class="kw">where</span> tot <span class="fu">=</span> sum cards</a>
-<a class="sourceLine" id="cb5-141" data-line-number="141"></a>
-<a class="sourceLine" id="cb5-142" data-line-number="142"><span class="ot">showVofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> <span class="dt">Vector</span> <span class="dv">200</span> a <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb5-143" data-line-number="143">showVofState v <span class="fu">=</span> intercalate <span class="st">&quot;\n\n&quot;</span> <span class="fu">$</span> map (showVofState&#39; v) [<span class="dt">True</span>, <span class="dt">False</span>]</a>
-<a class="sourceLine" id="cb5-144" data-line-number="144"></a>
-<a class="sourceLine" id="cb5-145" data-line-number="145"><span class="ot">showVofState&#39; ::</span> <span class="dt">Show</span> a <span class="ot">=&gt;</span> <span class="dt">Vector</span> <span class="dv">200</span> a <span class="ot">-&gt;</span> <span class="dt">Bool</span> <span class="ot">-&gt;</span> <span class="dt">String</span></a>
-<a class="sourceLine" id="cb5-146" data-line-number="146">showVofState&#39; v ace <span class="fu">=</span> unlines <span class="fu">$</span></a>
-<a class="sourceLine" id="cb5-147" data-line-number="147">  (<span class="kw">if</span> ace</a>
-<a class="sourceLine" id="cb5-148" data-line-number="148">     <span class="kw">then</span> <span class="st">&quot;With usable ace:&quot;</span></a>
-<a class="sourceLine" id="cb5-149" data-line-number="149">     <span class="kw">else</span> <span class="st">&quot;No usable ace:&quot;</span>)</a>
-<a class="sourceLine" id="cb5-150" data-line-number="150">  <span class="fu">:</span> ( <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c}&quot;</span> <span class="fu">:</span></a>
-<a class="sourceLine" id="cb5-151" data-line-number="151">      ( (<span class="st">&quot;\\text{Player&#39;s Total} &amp;&quot;</span> <span class="fu">++</span> intersperse <span class="ch">&#39;&amp;&#39;</span> (replicate <span class="dv">10</span> <span class="ch">&#39; &#39;</span>) <span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">:</span></a>
-<a class="sourceLine" id="cb5-152" data-line-number="152">        [<span class="st">&quot;\\hline&quot;</span>] <span class="fu">++</span></a>
-<a class="sourceLine" id="cb5-153" data-line-number="153">        intersperse <span class="st">&quot;\\hline&quot;</span></a>
-<a class="sourceLine" id="cb5-154" data-line-number="154">          ( map ((<span class="fu">++</span> <span class="st">&quot; \\\\&quot;</span>) <span class="fu">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</a>
-<a class="sourceLine" id="cb5-155" data-line-number="155">                [ (show pTot <span class="fu">:</span>) <span class="fu">$</span> map show</a>
-<a class="sourceLine" id="cb5-156" data-line-number="156">                  [ v <span class="ot">`index`</span> enumState s</a>
-<a class="sourceLine" id="cb5-157" data-line-number="157">                  <span class="fu">|</span> dCard <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="fu">..</span><span class="dv">10</span>]</a>
-<a class="sourceLine" id="cb5-158" data-line-number="158">                  , <span class="kw">let</span> s <span class="fu">=</span> stateDef { playerSum  <span class="fu">=</span> pTot</a>
-<a class="sourceLine" id="cb5-159" data-line-number="159">                                     , usableAce  <span class="fu">=</span> ace</a>
-<a class="sourceLine" id="cb5-160" data-line-number="160">                                     , dealerCard <span class="fu">=</span> dCard</a>
-<a class="sourceLine" id="cb5-161" data-line-number="161">                                     }</a>
-<a class="sourceLine" id="cb5-162" data-line-number="162">                  ]</a>
-<a class="sourceLine" id="cb5-163" data-line-number="163">                <span class="fu">|</span> pTot <span class="ot">&lt;-</span> [<span class="dv">12</span><span class="fu">..</span><span class="dv">21</span>]</a>
-<a class="sourceLine" id="cb5-164" data-line-number="164">                ]</a>
-<a class="sourceLine" id="cb5-165" data-line-number="165">          )</a>
-<a class="sourceLine" id="cb5-166" data-line-number="166">        <span class="fu">++</span> [<span class="st">&quot;\\hline&quot;</span>]</a>
-<a class="sourceLine" id="cb5-167" data-line-number="167">        <span class="fu">++</span> [intercalate <span class="st">&quot; &amp; &quot;</span> <span class="fu">$</span> <span class="st">&quot;\\text{Dealer&#39;s Card:} &quot;</span> <span class="fu">:</span> [show n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="fu">..</span><span class="dv">10</span>]]]</a>
-<a class="sourceLine" id="cb5-168" data-line-number="168">        <span class="fu">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</a>
-<a class="sourceLine" id="cb5-169" data-line-number="169">      )</a>
-<a class="sourceLine" id="cb5-170" data-line-number="170">    )</a>
-<a class="sourceLine" id="cb5-171" data-line-number="171"></a>
-<a class="sourceLine" id="cb5-172" data-line-number="172"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb5-173" data-line-number="173"><span class="co">  Command line options defintions.</span></a>
-<a class="sourceLine" id="cb5-174" data-line-number="174"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb5-175" data-line-number="175"></a>
-<a class="sourceLine" id="cb5-176" data-line-number="176"><span class="kw">data</span> <span class="dt">Opts</span> w <span class="fu">=</span> <span class="dt">Opts</span></a>
-<a class="sourceLine" id="cb5-177" data-line-number="177">    {<span class="ot"> nGames ::</span> w <span class="ot">::</span><span class="fu">:</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="fu">&lt;?&gt;</span></a>
-<a class="sourceLine" id="cb5-178" data-line-number="178">        <span class="st">&quot;The number of games to play.&quot;</span></a>
-<a class="sourceLine" id="cb5-179" data-line-number="179">    }</a>
-<a class="sourceLine" id="cb5-180" data-line-number="180">    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</a>
-<a class="sourceLine" id="cb5-181" data-line-number="181"></a>
-<a class="sourceLine" id="cb5-182" data-line-number="182"><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</a>
-<a class="sourceLine" id="cb5-183" data-line-number="183"></a>
-<a class="sourceLine" id="cb5-184" data-line-number="184"></a>
-<a class="sourceLine" id="cb5-185" data-line-number="185"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb5-186" data-line-number="186"><span class="co">  main()</span></a>
-<a class="sourceLine" id="cb5-187" data-line-number="187"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb5-188" data-line-number="188"></a>
-<a class="sourceLine" id="cb5-189" data-line-number="189"><span class="ot">main ::</span> <span class="dt">IO</span> ()</a>
-<a class="sourceLine" id="cb5-190" data-line-number="190">main <span class="fu">=</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb5-191" data-line-number="191">  <span class="co">-- Process command line options.</span></a>
-<a class="sourceLine" id="cb5-192" data-line-number="192"><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></a>
-<a class="sourceLine" id="cb5-193" data-line-number="193">    unwrapRecord <span class="st">&quot;A solution to the &#39;Blackjack&#39; problem (Example 5.3).&quot;</span></a>
-<a class="sourceLine" id="cb5-194" data-line-number="194">  <span class="kw">let</span> nG <span class="fu">=</span> fromMaybe <span class="dv">10000</span> (nGames o)</a>
-<a class="sourceLine" id="cb5-195" data-line-number="195"></a>
-<a class="sourceLine" id="cb5-196" data-line-number="196">  <span class="co">-- Initialize policy and state/action values.</span></a>
-<a class="sourceLine" id="cb5-197" data-line-number="197">  <span class="kw">let</span> qs  <span class="fu">=</span> VS.replicate ((<span class="dv">0</span>,<span class="dv">0</span>), (<span class="dv">0</span>,<span class="dv">0</span>))  <span class="co">-- Initialize all state/action values to zero.</span></a>
-<a class="sourceLine" id="cb5-198" data-line-number="198">      pol <span class="fu">=</span> VS.replicate (<span class="dt">BJAction</span> <span class="dt">True</span>)</a>
-<a class="sourceLine" id="cb5-199" data-line-number="199">        <span class="fu">//</span> [ (enumState s, <span class="dt">BJAction</span> <span class="dt">False</span>)</a>
-<a class="sourceLine" id="cb5-200" data-line-number="200">           <span class="fu">|</span> s <span class="ot">&lt;-</span> [ stateDef { playerSum <span class="fu">=</span> pTot</a>
-<a class="sourceLine" id="cb5-201" data-line-number="201">                             , usableAce <span class="fu">=</span> ace</a>
-<a class="sourceLine" id="cb5-202" data-line-number="202">                             , dealerCard <span class="fu">=</span> dCard</a>
-<a class="sourceLine" id="cb5-203" data-line-number="203">                             }</a>
-<a class="sourceLine" id="cb5-204" data-line-number="204">                  <span class="fu">|</span> pTot  <span class="ot">&lt;-</span> [<span class="dv">20</span>, <span class="dv">21</span>]</a>
-<a class="sourceLine" id="cb5-205" data-line-number="205">                  , ace   <span class="ot">&lt;-</span> [<span class="dt">False</span>, <span class="dt">True</span>]</a>
-<a class="sourceLine" id="cb5-206" data-line-number="206">                  , dCard <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="fu">..</span><span class="dv">10</span>]</a>
-<a class="sourceLine" id="cb5-207" data-line-number="207">                  ]</a>
-<a class="sourceLine" id="cb5-208" data-line-number="208">           ]</a>
-<a class="sourceLine" id="cb5-209" data-line-number="209"></a>
-<a class="sourceLine" id="cb5-210" data-line-number="210">  <span class="co">-- Play many games, updating policy and state/action values after each.</span></a>
-<a class="sourceLine" id="cb5-211" data-line-number="211">  (results, _) <span class="ot">&lt;-</span> runWriterT <span class="fu">$</span> iterateM&#39; nG optPol (qs, pol)</a>
-<a class="sourceLine" id="cb5-212" data-line-number="212">  writeFile  <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### Final State Action Values (stand, hit)\n\n&quot;</span></a>
-<a class="sourceLine" id="cb5-213" data-line-number="213">  appendFile <span class="st">&quot;other/blackjack.md&quot;</span> <span class="fu">$</span> pack</a>
-<a class="sourceLine" id="cb5-214" data-line-number="214">                                  <span class="fu">$</span> showVofState</a>
-<a class="sourceLine" id="cb5-215" data-line-number="215">                                  <span class="fu">$</span> VS.map ( toBoth</a>
-<a class="sourceLine" id="cb5-216" data-line-number="216">                                             <span class="fu">$</span> <span class="dt">PrettyFloat</span></a>
-<a class="sourceLine" id="cb5-217" data-line-number="217">                                             <span class="fu">.</span> uncurry safeDiv</a>
-<a class="sourceLine" id="cb5-218" data-line-number="218">                                             <span class="fu">.</span> (fromIntegral <span class="fu">***</span> fromIntegral)</a>
-<a class="sourceLine" id="cb5-219" data-line-number="219">                                           )</a>
-<a class="sourceLine" id="cb5-220" data-line-number="220">                                  <span class="fu">$</span> fst results</a>
-<a class="sourceLine" id="cb5-221" data-line-number="221">  appendFile <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### Final Policy (H = hit)\n\n&quot;</span></a>
-<a class="sourceLine" id="cb5-222" data-line-number="222">  appendFile <span class="st">&quot;other/blackjack.md&quot;</span> <span class="fu">$</span> pack</a>
-<a class="sourceLine" id="cb5-223" data-line-number="223">                                  <span class="fu">$</span> showVofState</a>
-<a class="sourceLine" id="cb5-224" data-line-number="224">                                  <span class="fu">$</span> snd results</a>
-<a class="sourceLine" id="cb5-225" data-line-number="225">  appendFile <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### Debugging Info\n\n&quot;</span></a>
-<a class="sourceLine" id="cb5-226" data-line-number="226">  appendFile <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### State Action Visits (stand, hit)\n\n&quot;</span></a>
-<a class="sourceLine" id="cb5-227" data-line-number="227">  appendFile <span class="st">&quot;other/blackjack.md&quot;</span> <span class="fu">$</span> pack</a>
-<a class="sourceLine" id="cb5-228" data-line-number="228">                                  <span class="fu">$</span> showVofState</a>
-<a class="sourceLine" id="cb5-229" data-line-number="229">                                  <span class="fu">$</span> VS.map ( toBoth snd )</a>
-<a class="sourceLine" id="cb5-230" data-line-number="230">                                  <span class="fu">$</span> fst results</a>
-<a class="sourceLine" id="cb5-231" data-line-number="231"></a>
-<a class="sourceLine" id="cb5-232" data-line-number="232"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb5-233" data-line-number="233"><span class="co">  Monte Carlo optimizer</span></a>
-<a class="sourceLine" id="cb5-234" data-line-number="234"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb5-235" data-line-number="235"></a>
-<a class="sourceLine" id="cb5-236" data-line-number="236"><span class="co">-- | Play one game of Blackjack and return improved state-action value</span></a>
-<a class="sourceLine" id="cb5-237" data-line-number="237"><span class="co">-- and policy estimates.</span></a>
-<a class="sourceLine" id="cb5-238" data-line-number="238"><span class="co">--</span></a>
-<a class="sourceLine" id="cb5-239" data-line-number="239"><span class="co">-- Note that the Q vector contains not only the running expectation for</span></a>
-<a class="sourceLine" id="cb5-240" data-line-number="240"><span class="co">-- hitting/standing at each state, but also the number of times that</span></a>
-<a class="sourceLine" id="cb5-241" data-line-number="241"><span class="co">-- particular state-action pair has been visited. This is needed for</span></a>
-<a class="sourceLine" id="cb5-242" data-line-number="242"><span class="co">-- proper normalization across multiple episodes.</span></a>
-<a class="sourceLine" id="cb5-243" data-line-number="243"><span class="ot">optPol ::</span> ( <span class="dt">Vector</span> <span class="dv">200</span> ((<span class="dt">Int</span>, <span class="dt">Integer</span>), (<span class="dt">Int</span>, <span class="dt">Integer</span>))</a>
-<a class="sourceLine" id="cb5-244" data-line-number="244">          , <span class="dt">Vector</span> <span class="dv">200</span> <span class="dt">BJAction</span></a>
-<a class="sourceLine" id="cb5-245" data-line-number="245">          )</a>
-<a class="sourceLine" id="cb5-246" data-line-number="246">       <span class="ot">-&gt;</span> <span class="dt">WriterT</span> [[<span class="dt">DbgT</span>]]</a>
-<a class="sourceLine" id="cb5-247" data-line-number="247">            <span class="dt">IO</span> ( <span class="dt">Vector</span> <span class="dv">200</span> ((<span class="dt">Int</span>, <span class="dt">Integer</span>), (<span class="dt">Int</span>, <span class="dt">Integer</span>))</a>
-<a class="sourceLine" id="cb5-248" data-line-number="248">               , <span class="dt">Vector</span> <span class="dv">200</span> <span class="dt">BJAction</span></a>
-<a class="sourceLine" id="cb5-249" data-line-number="249">               )</a>
-<a class="sourceLine" id="cb5-250" data-line-number="250">optPol (qs, pol) <span class="fu">=</span> <span class="kw">do</span></a>
-<a class="sourceLine" id="cb5-251" data-line-number="251">  randAct <span class="ot">&lt;-</span> lift <span class="fu">$</span> rand allActs</a>
-<a class="sourceLine" id="cb5-252" data-line-number="252">  cards <span class="ot">&lt;-</span> shuffleM <span class="fu">$</span> concat [replicate  <span class="dv">4</span>  n <span class="fu">|</span> n <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="fu">..</span><span class="dv">9</span>]]</a>
-<a class="sourceLine" id="cb5-253" data-line-number="253">                           <span class="fu">++</span> replicate <span class="dv">16</span> <span class="dv">10</span></a>
-<a class="sourceLine" id="cb5-254" data-line-number="254">  <span class="kw">let</span> ((r, ss), dbgs) <span class="fu">=</span> runWriter <span class="fu">$</span> play (appPolV pol) cards randAct</a>
-<a class="sourceLine" id="cb5-255" data-line-number="255">      ixs             <span class="fu">=</span> (nubOn fst <span class="fu">.</span> map (enumState <span class="fu">&amp;&amp;&amp;</span> didHit) <span class="fu">.</span> validStates) ss</a>
-<a class="sourceLine" id="cb5-256" data-line-number="256">      (qs&#39;, pol&#39;)     <span class="fu">=</span> VS.unzip <span class="fu">$</span> VS.zip qs pol <span class="fu">//</span></a>
-<a class="sourceLine" id="cb5-257" data-line-number="257">                          [ (i, (q&#39;, p&#39;))</a>
-<a class="sourceLine" id="cb5-258" data-line-number="258">                          <span class="fu">|</span> (i, hit) <span class="ot">&lt;-</span> ixs</a>
-<a class="sourceLine" id="cb5-259" data-line-number="259">                          , <span class="kw">let</span> q  <span class="fu">=</span> qs  <span class="ot">`index`</span> i</a>
-<a class="sourceLine" id="cb5-260" data-line-number="260">                                q&#39; <span class="fu">=</span> ( <span class="kw">if</span> hit</a>
-<a class="sourceLine" id="cb5-261" data-line-number="261">                                         <span class="kw">then</span> second</a>
-<a class="sourceLine" id="cb5-262" data-line-number="262">                                         <span class="kw">else</span> first</a>
-<a class="sourceLine" id="cb5-263" data-line-number="263">                                     ) ((<span class="fu">+</span> r) <span class="fu">***</span> (<span class="fu">+</span> <span class="dv">1</span>)) q</a>
-<a class="sourceLine" id="cb5-264" data-line-number="264">                                p&#39; <span class="fu">=</span> <span class="kw">case</span> uncurry compare</a>
-<a class="sourceLine" id="cb5-265" data-line-number="265">                                          <span class="fu">$</span> toBoth ( uncurry (<span class="fu">/</span>)</a>
-<a class="sourceLine" id="cb5-266" data-line-number="266">                                                   <span class="fu">.</span> (fromIntegral <span class="fu">***</span> fromIntegral)</a>
-<a class="sourceLine" id="cb5-267" data-line-number="267">                                                   ) q&#39;</a>
-<a class="sourceLine" id="cb5-268" data-line-number="268">                                     <span class="kw">of</span></a>
-<a class="sourceLine" id="cb5-269" data-line-number="269">                                       <span class="dt">GT</span> <span class="ot">-&gt;</span> <span class="dt">BJAction</span> <span class="dt">False</span></a>
-<a class="sourceLine" id="cb5-270" data-line-number="270">                                       _  <span class="ot">-&gt;</span> <span class="dt">BJAction</span> <span class="dt">True</span></a>
-<a class="sourceLine" id="cb5-271" data-line-number="271">                          ]</a>
-<a class="sourceLine" id="cb5-272" data-line-number="272">  tell [dbgs]</a>
-<a class="sourceLine" id="cb5-273" data-line-number="273">  return (qs&#39;, pol&#39;)</a>
-<a class="sourceLine" id="cb5-274" data-line-number="274"></a>
-<a class="sourceLine" id="cb5-275" data-line-number="275"><span class="co">{----------------------------------------------------------------------</span></a>
-<a class="sourceLine" id="cb5-276" data-line-number="276"><span class="co">  Misc.</span></a>
-<a class="sourceLine" id="cb5-277" data-line-number="277"><span class="co">----------------------------------------------------------------------}</span></a>
-<a class="sourceLine" id="cb5-278" data-line-number="278"></a>
-<a class="sourceLine" id="cb5-279" data-line-number="279"><span class="ot">iterateM&#39; ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> (a <span class="ot">-&gt;</span> m a) <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> m a</a>
-<a class="sourceLine" id="cb5-280" data-line-number="280">iterateM&#39; <span class="dv">0</span> _ a <span class="fu">=</span> return a</a>
-<a class="sourceLine" id="cb5-281" data-line-number="281">iterateM&#39; n f a <span class="fu">=</span> f a <span class="fu">&gt;&gt;=</span> iterateM&#39; (n<span class="fu">-</span><span class="dv">1</span>) f</a>
-<a class="sourceLine" id="cb5-282" data-line-number="282"></a>
-<a class="sourceLine" id="cb5-283" data-line-number="283"><span class="ot">toBoth ::</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> (a,a) <span class="ot">-&gt;</span> (b,b)</a>
-<a class="sourceLine" id="cb5-284" data-line-number="284">toBoth f (x,y) <span class="fu">=</span> (f x, f y)</a>
-<a class="sourceLine" id="cb5-285" data-line-number="285"></a>
-<a class="sourceLine" id="cb5-286" data-line-number="286"><span class="ot">safeDiv ::</span> (<span class="dt">Fractional</span> a, <span class="dt">Eq</span> a)</a>
-<a class="sourceLine" id="cb5-287" data-line-number="287">        <span class="ot">=&gt;</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> a</a>
-<a class="sourceLine" id="cb5-288" data-line-number="288">safeDiv x y <span class="fu">=</span> <span class="kw">if</span> y <span class="fu">==</span> <span class="dv">0</span></a>
-<a class="sourceLine" id="cb5-289" data-line-number="289">                <span class="kw">then</span> <span class="dv">0</span></a>
-<a class="sourceLine" id="cb5-290" data-line-number="290">                <span class="kw">else</span> x <span class="fu">/</span> y</a>
-<a class="sourceLine" id="cb5-291" data-line-number="291"></a>
-<a class="sourceLine" id="cb5-292" data-line-number="292"><span class="kw">newtype</span> <span class="dt">PrettyFloat</span> <span class="fu">=</span> <span class="dt">PrettyFloat</span> <span class="dt">Float</span></a>
-<a class="sourceLine" id="cb5-293" data-line-number="293"></a>
-<a class="sourceLine" id="cb5-294" data-line-number="294"><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">PrettyFloat</span> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb5-295" data-line-number="295">  show (<span class="dt">PrettyFloat</span> x) <span class="fu">=</span> printf <span class="st">&quot;%+5.2f&quot;</span> x</a>
-<a class="sourceLine" id="cb5-296" data-line-number="296"></a>
-<a class="sourceLine" id="cb5-297" data-line-number="297"><span class="ot">nubOn ::</span> <span class="dt">Eq</span> b <span class="ot">=&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [a]</a>
-<a class="sourceLine" id="cb5-298" data-line-number="298">nubOn _ []     <span class="fu">=</span> []</a>
-<a class="sourceLine" id="cb5-299" data-line-number="299">nubOn f (x<span class="fu">:</span>xs) <span class="fu">=</span> x <span class="fu">:</span> filter ((<span class="fu">/=</span> f x) <span class="fu">.</span> f) xs</a></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell literate"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="co">{----------------------------------------------------------------------</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a><span class="co">  Problem specific definitions</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="co">----------------------------------------------------------------------}</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a><span class="kw">data</span> <span class="dt">BJState</span> <span class="ot">=</span> <span class="dt">BJState</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>  {<span class="ot"> playerSum  ::</span> <span class="dt">Int</span>   <span class="co">-- 12 - 21</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>  ,<span class="ot"> usableAce  ::</span> <span class="dt">Bool</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>  ,<span class="ot"> dealerCard ::</span> <span class="dt">Int</span>   <span class="co">-- 1 - 10</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>  ,<span class="ot"> dealerSum  ::</span> <span class="dt">Int</span>   <span class="co">-- For debugging only; not used for learning.</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>  ,<span class="ot"> polHit     ::</span> <span class="dt">Bool</span>  <span class="co">-- For debugging only; not used for learning.</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>  ,<span class="ot"> didHit     ::</span> <span class="dt">Bool</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>  } <span class="kw">deriving</span> (<span class="dt">Show</span>)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a><span class="ot">stateDef ::</span> <span class="dt">BJState</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>stateDef <span class="ot">=</span> <span class="dt">BJState</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>  { playerSum  <span class="ot">=</span> <span class="dv">12</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>  , usableAce  <span class="ot">=</span> <span class="dt">False</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>  , dealerCard <span class="ot">=</span> <span class="dv">1</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a>  , dealerSum  <span class="ot">=</span> <span class="dv">12</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>  , polHit     <span class="ot">=</span> <span class="dt">False</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>  , didHit     <span class="ot">=</span> <span class="dt">False</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>  }</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true"></a><span class="kw">newtype</span> <span class="dt">BJAction</span> <span class="ot">=</span> <span class="dt">BJAction</span> {<span class="ot"> act ::</span> <span class="dt">Bool</span> }  <span class="co">-- Hit?</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true"></a></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true"></a><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">BJAction</span> <span class="kw">where</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true"></a>  <span class="fu">show</span> (<span class="dt">BJAction</span> x) <span class="ot">=</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true"></a>    <span class="kw">if</span> x <span class="kw">then</span> <span class="st">&quot;H&quot;</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true"></a>         <span class="kw">else</span> <span class="st">&quot; &quot;</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true"></a><span class="ot">allActs ::</span> [<span class="dt">BJAction</span>]</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true"></a>allActs <span class="ot">=</span> <span class="fu">map</span> <span class="dt">BJAction</span> [<span class="dt">False</span>, <span class="dt">True</span>]</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true"></a></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true"></a><span class="kw">type</span> <span class="dt">BJPolicy</span> <span class="ot">=</span> <span class="dt">BJState</span> <span class="ot">-&gt;</span> <span class="dt">BJAction</span></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true"></a></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true"></a><span class="ot">appPolV ::</span> <span class="dt">Vector</span> <span class="dv">200</span> <span class="dt">BJAction</span> <span class="ot">-&gt;</span> <span class="dt">BJPolicy</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true"></a>appPolV v <span class="ot">=</span> \s <span class="ot">-&gt;</span> v <span class="ot">`index`</span> enumState s</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true"></a></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true"></a><span class="ot">enumState ::</span> <span class="dt">BJState</span> <span class="ot">-&gt;</span> <span class="dt">Finite</span> <span class="dv">200</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true"></a>enumState s<span class="op">@</span><span class="dt">BJState</span>{<span class="op">..</span>} <span class="ot">=</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true"></a>  <span class="kw">let</span> offset <span class="ot">=</span> (dealerCard <span class="op">-</span> <span class="dv">1</span>) <span class="op">*</span> <span class="dv">10</span> <span class="op">+</span> playerSum <span class="op">-</span> <span class="dv">12</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true"></a>   <span class="kw">in</span> <span class="kw">if</span> offset <span class="op">&lt;</span> <span class="dv">0</span></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true"></a>        <span class="kw">then</span> <span class="fu">error</span> (<span class="fu">show</span> s)</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true"></a>        <span class="kw">else</span> <span class="kw">if</span> usableAce</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true"></a>               <span class="kw">then</span> finite <span class="op">.</span> <span class="fu">fromIntegral</span> <span class="op">$</span> <span class="dv">100</span> <span class="op">+</span> offset</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true"></a>               <span class="kw">else</span> finite <span class="op">.</span> <span class="fu">fromIntegral</span> <span class="op">$</span> offset</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true"></a></span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true"></a><span class="ot">validStates ::</span> [<span class="dt">BJState</span>] <span class="ot">-&gt;</span> [<span class="dt">BJState</span>]</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true"></a>validStates <span class="ot">=</span></span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true"></a>  <span class="fu">filter</span> ( \ <span class="dt">BJState</span>{<span class="op">..</span>} <span class="ot">-&gt;</span></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true"></a>                playerSum  <span class="op">&gt;=</span> <span class="dv">12</span> <span class="op">&amp;&amp;</span> playerSum  <span class="op">&lt;=</span> <span class="dv">21</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true"></a>             <span class="op">&amp;&amp;</span> dealerCard <span class="op">&gt;=</span> <span class="dv">1</span>  <span class="op">&amp;&amp;</span> dealerCard <span class="op">&lt;=</span> <span class="dv">10</span></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true"></a>         )</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true"></a></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true"></a><span class="kw">data</span> <span class="dt">DbgT</span> <span class="ot">=</span> <span class="dt">DbgT</span></span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true"></a>  {<span class="ot"> upCard ::</span> <span class="dt">Int</span></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true"></a>  ,<span class="ot"> states ::</span> [<span class="dt">BJState</span>]</span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true"></a>  ,<span class="ot"> reward ::</span> <span class="dt">Int</span></span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true"></a>  }</span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true"></a></span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true"></a><span class="ot">play ::</span> <span class="dt">BJPolicy</span> <span class="ot">-&gt;</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">BJAction</span> <span class="ot">-&gt;</span> <span class="dt">Writer</span> [<span class="dt">DbgT</span>] (<span class="dt">Int</span>, [<span class="dt">BJState</span>])</span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true"></a>play pol cards randAct <span class="ot">=</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true"></a>  <span class="kw">do</span> <span class="kw">let</span> (r, ss) <span class="op">|</span> pTot <span class="op">==</span> <span class="dv">21</span> <span class="ot">=</span> <span class="kw">if</span> dTot <span class="op">==</span> <span class="dv">21</span></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true"></a>                                  <span class="kw">then</span> (<span class="dv">0</span>, [])</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true"></a>                                  <span class="kw">else</span> (<span class="dv">1</span>, [])</span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true"></a>                 <span class="op">|</span> dTot <span class="op">==</span> <span class="dv">21</span> <span class="ot">=</span> (<span class="op">-</span><span class="dv">1</span>, [])</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true"></a>                 <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true"></a>                   runWriter <span class="op">$</span> play&#39; pol (<span class="fu">drop</span> <span class="dv">4</span> cards) dCards pCards <span class="dt">Init</span> randAct</span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true"></a>     tell [ <span class="dt">DbgT</span> { upCard <span class="ot">=</span> cards <span class="op">!!</span> <span class="dv">2</span></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true"></a>                 , states <span class="ot">=</span> ss</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true"></a>                 , reward <span class="ot">=</span> r</span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true"></a>                 }</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true"></a>          ]</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true"></a>     <span class="fu">return</span> (r, ss)</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true"></a>  <span class="kw">where</span> (pTot, _) <span class="ot">=</span> cardSum pCards</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true"></a>        (dTot, _) <span class="ot">=</span> cardSum dCards</span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true"></a>        dCards    <span class="ot">=</span> <span class="fu">take</span> <span class="dv">2</span> <span class="op">$</span> <span class="fu">drop</span> <span class="dv">2</span> cards</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true"></a>        pCards    <span class="ot">=</span> <span class="fu">take</span> <span class="dv">2</span> cards</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true"></a><span class="kw">data</span> <span class="dt">PlayPhase</span> <span class="ot">=</span> <span class="dt">Init</span>    <span class="co">-- Bringing player&#39;s sum &gt; 11.</span></span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true"></a>               <span class="op">|</span> <span class="dt">Player</span>  <span class="co">-- Player is hitting/standing.</span></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true"></a>               <span class="op">|</span> <span class="dt">Dealer</span>  <span class="co">-- Dealer is hitting/standing.</span></span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true"></a></span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true"></a><span class="ot">play&#39; ::</span> <span class="dt">BJPolicy</span>   <span class="co">-- current policy</span></span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true"></a>      <span class="ot">-&gt;</span> [<span class="dt">Int</span>]      <span class="co">-- remaining deck of cards</span></span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true"></a>      <span class="ot">-&gt;</span> [<span class="dt">Int</span>]      <span class="co">-- dealer&#39;s cards</span></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true"></a>      <span class="ot">-&gt;</span> [<span class="dt">Int</span>]      <span class="co">-- player&#39;s cards</span></span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true"></a>      <span class="ot">-&gt;</span> <span class="dt">PlayPhase</span>  <span class="co">-- phase of the game</span></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true"></a>      <span class="ot">-&gt;</span> <span class="dt">BJAction</span>   <span class="co">-- randomly chosen action to be performed by player at his first free turn</span></span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true"></a>      <span class="ot">-&gt;</span> <span class="dt">Writer</span> [<span class="dt">BJState</span>] <span class="dt">Int</span></span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true"></a>play&#39; pol cards dCards pCards phs randAct <span class="ot">=</span></span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true"></a>  <span class="kw">case</span> phs <span class="kw">of</span></span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true"></a>    <span class="dt">Init</span> <span class="ot">-&gt;</span></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true"></a>      <span class="kw">if</span> pTot <span class="op">&gt;</span> <span class="dv">11</span></span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true"></a>        <span class="kw">then</span> <span class="kw">do</span> tell [s{didHit <span class="ot">=</span> act randAct}]</span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true"></a>                <span class="kw">if</span> act randAct  <span class="co">-- Is first (randomly chosen) player action &quot;hit&quot;?</span></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true"></a>                  <span class="kw">then</span> play&#39; pol (P.tail cards) dCards (P.head cards <span class="op">:</span> pCards) <span class="dt">Player</span> randAct</span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true"></a>                  <span class="kw">else</span> play&#39; pol cards dCards pCards <span class="dt">Dealer</span> randAct</span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true"></a>        <span class="kw">else</span> play&#39; pol (P.tail cards) dCards (P.head cards <span class="op">:</span> pCards) <span class="dt">Init</span> randAct</span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true"></a></span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true"></a>    <span class="dt">Player</span> <span class="ot">-&gt;</span></span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true"></a>      <span class="kw">do</span> tell [s]</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true"></a>         <span class="kw">if</span> pTot <span class="op">&gt;</span> <span class="dv">21</span>        <span class="co">-- Player go bust yet?</span></span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true"></a>           <span class="kw">then</span> <span class="fu">return</span> (<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true"></a>           <span class="kw">else</span> <span class="kw">if</span> polHit    <span class="co">-- Does policy dictate a hit?</span></span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true"></a>                  <span class="kw">then</span> play&#39; pol (P.tail cards) dCards (P.head cards <span class="op">:</span> pCards) <span class="dt">Player</span> randAct</span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true"></a>                  <span class="kw">else</span> play&#39; pol cards dCards pCards <span class="dt">Dealer</span> randAct</span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true"></a></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true"></a>    <span class="dt">Dealer</span> <span class="ot">-&gt;</span></span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true"></a>      <span class="kw">do</span> tell [s]</span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true"></a>         <span class="kw">if</span> dTot <span class="op">&gt;</span> <span class="dv">21</span>        <span class="co">-- Dealer go bust yet?</span></span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true"></a>           <span class="kw">then</span> <span class="fu">return</span> <span class="dv">1</span></span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true"></a>           <span class="kw">else</span> <span class="kw">if</span> dTot <span class="op">&lt;</span> <span class="dv">17</span>        <span class="co">-- Must dealer take a hit?</span></span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true"></a>                  <span class="kw">then</span> play&#39; pol (P.tail cards) (P.head cards <span class="op">:</span> dCards) pCards <span class="dt">Dealer</span> randAct</span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true"></a>                  <span class="kw">else</span> <span class="kw">case</span> <span class="fu">compare</span> pTot dTot <span class="kw">of</span></span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true"></a>                         <span class="dt">GT</span> <span class="ot">-&gt;</span> <span class="fu">return</span>   <span class="dv">1</span></span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true"></a>                         <span class="dt">EQ</span> <span class="ot">-&gt;</span> <span class="fu">return</span>   <span class="dv">0</span></span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true"></a>                         _  <span class="ot">-&gt;</span> <span class="fu">return</span> (<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true"></a></span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true"></a>  <span class="kw">where</span> (pTot, ace) <span class="ot">=</span> cardSum pCards</span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true"></a>        (dTot, _)   <span class="ot">=</span> cardSum dCards</span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true"></a>        s&#39;          <span class="ot">=</span> stateDef</span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true"></a>                        { playerSum  <span class="ot">=</span> pTot</span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true"></a>                        , usableAce  <span class="ot">=</span> ace</span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true"></a>                        , dealerCard <span class="ot">=</span> P.last dCards</span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true"></a>                        , dealerSum  <span class="ot">=</span> dTot</span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true"></a>                        }</span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true"></a>        s           <span class="ot">=</span> s&#39;</span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true"></a>                        { polHit <span class="ot">=</span> polHit</span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true"></a>                        , didHit <span class="ot">=</span> polHit</span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true"></a>                        }</span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true"></a>        polHit      <span class="ot">=</span> (act <span class="op">.</span> pol) s&#39;</span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true"></a></span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true"></a><span class="ot">cardSum ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> (<span class="dt">Int</span>, <span class="dt">Bool</span>)</span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true"></a>cardSum cards <span class="ot">=</span></span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true"></a>  <span class="kw">if</span> tot <span class="op">&lt;</span> <span class="dv">12</span> <span class="op">&amp;&amp;</span> <span class="dv">1</span> <span class="ot">`elem`</span> cards</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true"></a>    <span class="kw">then</span> (tot <span class="op">+</span> <span class="dv">10</span>, <span class="dt">True</span>)</span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true"></a>    <span class="kw">else</span> (tot,      <span class="dt">False</span>)</span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true"></a>  <span class="kw">where</span> tot <span class="ot">=</span> <span class="fu">sum</span> cards</span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true"></a></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true"></a><span class="ot">showVofState ::</span> (<span class="dt">Show</span> a) <span class="ot">=&gt;</span> <span class="dt">Vector</span> <span class="dv">200</span> a <span class="ot">-&gt;</span> <span class="dt">String</span></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true"></a>showVofState v <span class="ot">=</span> intercalate <span class="st">&quot;\n\n&quot;</span> <span class="op">$</span> <span class="fu">map</span> (showVofState&#39; v) [<span class="dt">True</span>, <span class="dt">False</span>]</span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true"></a></span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true"></a><span class="ot">showVofState&#39; ::</span> <span class="dt">Show</span> a <span class="ot">=&gt;</span> <span class="dt">Vector</span> <span class="dv">200</span> a <span class="ot">-&gt;</span> <span class="dt">Bool</span> <span class="ot">-&gt;</span> <span class="dt">String</span></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true"></a>showVofState&#39; v ace <span class="ot">=</span> <span class="fu">unlines</span> <span class="op">$</span></span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true"></a>  (<span class="kw">if</span> ace</span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true"></a>     <span class="kw">then</span> <span class="st">&quot;With usable ace:&quot;</span></span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true"></a>     <span class="kw">else</span> <span class="st">&quot;No usable ace:&quot;</span>)</span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true"></a>  <span class="op">:</span> ( <span class="st">&quot;$$&quot;</span> <span class="op">:</span></span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true"></a>      <span class="st">&quot;\\begin{array}{c|c|c|c|c|c|c|c|c|c}&quot;</span> <span class="op">:</span></span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true"></a>      ( (<span class="st">&quot;\\text{Player&#39;s Total} &amp;&quot;</span> <span class="op">++</span> intersperse <span class="ch">&#39;&amp;&#39;</span> (<span class="fu">replicate</span> <span class="dv">10</span> <span class="ch">&#39; &#39;</span>) <span class="op">++</span> <span class="st">&quot; \\\\\\\\&quot;</span>) <span class="op">:</span></span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true"></a>        [<span class="st">&quot;\\hline&quot;</span>] <span class="op">++</span></span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true"></a>        intersperse <span class="st">&quot;\\hline&quot;</span></span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true"></a>          ( <span class="fu">map</span> ((<span class="op">++</span> <span class="st">&quot; \\\\\\\\&quot;</span>) <span class="op">.</span> intercalate <span class="st">&quot; &amp; &quot;</span>)</span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true"></a>                [ (<span class="fu">show</span> pTot <span class="op">:</span>) <span class="op">$</span> <span class="fu">map</span> <span class="fu">show</span></span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true"></a>                  [ v <span class="ot">`index`</span> enumState s</span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true"></a>                  <span class="op">|</span> dCard <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="op">..</span><span class="dv">10</span>]</span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true"></a>                  , <span class="kw">let</span> s <span class="ot">=</span> stateDef { playerSum  <span class="ot">=</span> pTot</span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true"></a>                                     , usableAce  <span class="ot">=</span> ace</span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true"></a>                                     , dealerCard <span class="ot">=</span> dCard</span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true"></a>                                     }</span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true"></a>                  ]</span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true"></a>                <span class="op">|</span> pTot <span class="ot">&lt;-</span> [<span class="dv">12</span><span class="op">..</span><span class="dv">21</span>]</span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true"></a>                ]</span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true"></a>          )</span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true"></a>        <span class="op">++</span> [<span class="st">&quot;\\hline&quot;</span>]</span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true"></a>        <span class="op">++</span> [intercalate <span class="st">&quot; &amp; &quot;</span> <span class="op">$</span> <span class="st">&quot;\\text{Dealer&#39;s Card:} &quot;</span> <span class="op">:</span> [<span class="fu">show</span> n <span class="op">|</span> n <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="op">..</span><span class="dv">10</span>]]]</span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true"></a>        <span class="op">++</span> [<span class="st">&quot;\\end{array}&quot;</span>]</span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true"></a>        <span class="op">++</span> [<span class="st">&quot;$$&quot;</span>]</span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true"></a>      )</span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true"></a>    )</span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true"></a></span>
+<span id="cb4-174"><a href="#cb4-174" aria-hidden="true"></a><span class="co">{----------------------------------------------------------------------</span></span>
+<span id="cb4-175"><a href="#cb4-175" aria-hidden="true"></a><span class="co">  Command line options defintions.</span></span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true"></a><span class="co">----------------------------------------------------------------------}</span></span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true"></a></span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true"></a><span class="kw">data</span> <span class="dt">Opts</span> w <span class="ot">=</span> <span class="dt">Opts</span></span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true"></a>    {<span class="ot"> nGames ::</span> w <span class="op">:::</span> <span class="dt">Maybe</span> <span class="dt">Int</span> <span class="op">&lt;?&gt;</span></span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true"></a>        <span class="st">&quot;The number of games to play.&quot;</span></span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true"></a>    }</span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true"></a>    <span class="kw">deriving</span> (<span class="dt">Generic</span>)</span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true"></a></span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true"></a><span class="kw">instance</span> <span class="dt">ParseRecord</span> (<span class="dt">Opts</span> <span class="dt">Wrapped</span>)</span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true"></a></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true"></a></span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true"></a><span class="co">{----------------------------------------------------------------------</span></span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true"></a><span class="co">  main()</span></span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true"></a><span class="co">----------------------------------------------------------------------}</span></span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true"></a></span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true"></a><span class="ot">main ::</span> <span class="dt">IO</span> ()</span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true"></a>  <span class="co">-- Process command line options.</span></span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true"></a><span class="ot">  o ::</span> <span class="dt">Opts</span> <span class="dt">Unwrapped</span> <span class="ot">&lt;-</span></span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true"></a>    unwrapRecord <span class="st">&quot;A solution to the &#39;Blackjack&#39; problem (Example 5.3).&quot;</span></span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true"></a>  <span class="kw">let</span> nG <span class="ot">=</span> fromMaybe <span class="dv">1000000</span> (nGames o)</span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true"></a></span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true"></a>  <span class="co">-- Initialize policy and state/action values.</span></span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true"></a>  <span class="kw">let</span> qs  <span class="ot">=</span> VS.replicate ((<span class="dv">0</span>,<span class="dv">0</span>), (<span class="dv">0</span>,<span class="dv">0</span>))  <span class="co">-- Initialize all state/action values to zero.</span></span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true"></a>      pol <span class="ot">=</span> VS.replicate (<span class="dt">BJAction</span> <span class="dt">True</span>)</span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true"></a>        <span class="op">//</span> [ (enumState s, <span class="dt">BJAction</span> <span class="dt">False</span>)</span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true"></a>           <span class="op">|</span> s <span class="ot">&lt;-</span> [ stateDef { playerSum <span class="ot">=</span> pTot</span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true"></a>                             , usableAce <span class="ot">=</span> ace</span>
+<span id="cb4-204"><a href="#cb4-204" aria-hidden="true"></a>                             , dealerCard <span class="ot">=</span> dCard</span>
+<span id="cb4-205"><a href="#cb4-205" aria-hidden="true"></a>                             }</span>
+<span id="cb4-206"><a href="#cb4-206" aria-hidden="true"></a>                  <span class="op">|</span> pTot  <span class="ot">&lt;-</span> [<span class="dv">20</span>, <span class="dv">21</span>]</span>
+<span id="cb4-207"><a href="#cb4-207" aria-hidden="true"></a>                  , ace   <span class="ot">&lt;-</span> [<span class="dt">False</span>, <span class="dt">True</span>]</span>
+<span id="cb4-208"><a href="#cb4-208" aria-hidden="true"></a>                  , dCard <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="op">..</span><span class="dv">10</span>]</span>
+<span id="cb4-209"><a href="#cb4-209" aria-hidden="true"></a>                  ]</span>
+<span id="cb4-210"><a href="#cb4-210" aria-hidden="true"></a>           ]</span>
+<span id="cb4-211"><a href="#cb4-211" aria-hidden="true"></a></span>
+<span id="cb4-212"><a href="#cb4-212" aria-hidden="true"></a>  <span class="co">-- Play many games, updating policy and state/action values after each.</span></span>
+<span id="cb4-213"><a href="#cb4-213" aria-hidden="true"></a>  (results, _) <span class="ot">&lt;-</span> runWriterT <span class="op">$</span> iterateM&#39; nG optPol (qs, pol)</span>
+<span id="cb4-214"><a href="#cb4-214" aria-hidden="true"></a>  <span class="fu">writeFile</span>  <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### Final State Action Values (stand, hit)\n\n&quot;</span></span>
+<span id="cb4-215"><a href="#cb4-215" aria-hidden="true"></a>  <span class="fu">appendFile</span> <span class="st">&quot;other/blackjack.md&quot;</span> <span class="op">$</span> <span class="fu">pack</span></span>
+<span id="cb4-216"><a href="#cb4-216" aria-hidden="true"></a>                                  <span class="op">$</span> showVofState</span>
+<span id="cb4-217"><a href="#cb4-217" aria-hidden="true"></a>                                  <span class="op">$</span> VS.map ( toBoth</span>
+<span id="cb4-218"><a href="#cb4-218" aria-hidden="true"></a>                                             <span class="op">$</span> <span class="dt">PrettyFloat</span></span>
+<span id="cb4-219"><a href="#cb4-219" aria-hidden="true"></a>                                             <span class="op">.</span> <span class="fu">uncurry</span> safeDiv</span>
+<span id="cb4-220"><a href="#cb4-220" aria-hidden="true"></a>                                             <span class="op">.</span> (<span class="fu">fromIntegral</span> <span class="op">***</span> <span class="fu">fromIntegral</span>)</span>
+<span id="cb4-221"><a href="#cb4-221" aria-hidden="true"></a>                                           )</span>
+<span id="cb4-222"><a href="#cb4-222" aria-hidden="true"></a>                                  <span class="op">$</span> <span class="fu">fst</span> results</span>
+<span id="cb4-223"><a href="#cb4-223" aria-hidden="true"></a>  <span class="fu">appendFile</span> <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### Final Policy (H = hit)\n\n&quot;</span></span>
+<span id="cb4-224"><a href="#cb4-224" aria-hidden="true"></a>  <span class="fu">appendFile</span> <span class="st">&quot;other/blackjack.md&quot;</span> <span class="op">$</span> <span class="fu">pack</span></span>
+<span id="cb4-225"><a href="#cb4-225" aria-hidden="true"></a>                                  <span class="op">$</span> showVofState</span>
+<span id="cb4-226"><a href="#cb4-226" aria-hidden="true"></a>                                  <span class="op">$</span> <span class="fu">snd</span> results</span>
+<span id="cb4-227"><a href="#cb4-227" aria-hidden="true"></a>  <span class="fu">appendFile</span> <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### Debugging Info\n\n&quot;</span></span>
+<span id="cb4-228"><a href="#cb4-228" aria-hidden="true"></a>  <span class="fu">appendFile</span> <span class="st">&quot;other/blackjack.md&quot;</span> <span class="st">&quot;\n### State Action Visits (stand, hit)\n\n&quot;</span></span>
+<span id="cb4-229"><a href="#cb4-229" aria-hidden="true"></a>  <span class="fu">appendFile</span> <span class="st">&quot;other/blackjack.md&quot;</span> <span class="op">$</span> <span class="fu">pack</span></span>
+<span id="cb4-230"><a href="#cb4-230" aria-hidden="true"></a>                                  <span class="op">$</span> showVofState</span>
+<span id="cb4-231"><a href="#cb4-231" aria-hidden="true"></a>                                  <span class="op">$</span> VS.map ( toBoth <span class="fu">snd</span> )</span>
+<span id="cb4-232"><a href="#cb4-232" aria-hidden="true"></a>                                  <span class="op">$</span> <span class="fu">fst</span> results</span>
+<span id="cb4-233"><a href="#cb4-233" aria-hidden="true"></a></span>
+<span id="cb4-234"><a href="#cb4-234" aria-hidden="true"></a><span class="co">{----------------------------------------------------------------------</span></span>
+<span id="cb4-235"><a href="#cb4-235" aria-hidden="true"></a><span class="co">  Monte Carlo optimizer</span></span>
+<span id="cb4-236"><a href="#cb4-236" aria-hidden="true"></a><span class="co">----------------------------------------------------------------------}</span></span>
+<span id="cb4-237"><a href="#cb4-237" aria-hidden="true"></a></span>
+<span id="cb4-238"><a href="#cb4-238" aria-hidden="true"></a><span class="co">-- | Play one game of Blackjack and return improved state-action value</span></span>
+<span id="cb4-239"><a href="#cb4-239" aria-hidden="true"></a><span class="co">-- and policy estimates.</span></span>
+<span id="cb4-240"><a href="#cb4-240" aria-hidden="true"></a><span class="co">--</span></span>
+<span id="cb4-241"><a href="#cb4-241" aria-hidden="true"></a><span class="co">-- Note that the Q vector contains not only the running expectation for</span></span>
+<span id="cb4-242"><a href="#cb4-242" aria-hidden="true"></a><span class="co">-- hitting/standing at each state, but also the number of times that</span></span>
+<span id="cb4-243"><a href="#cb4-243" aria-hidden="true"></a><span class="co">-- particular state-action pair has been visited. This is needed for</span></span>
+<span id="cb4-244"><a href="#cb4-244" aria-hidden="true"></a><span class="co">-- proper normalization across multiple episodes.</span></span>
+<span id="cb4-245"><a href="#cb4-245" aria-hidden="true"></a><span class="ot">optPol ::</span> ( <span class="dt">Vector</span> <span class="dv">200</span> ((<span class="dt">Int</span>, <span class="dt">Integer</span>), (<span class="dt">Int</span>, <span class="dt">Integer</span>))</span>
+<span id="cb4-246"><a href="#cb4-246" aria-hidden="true"></a>          , <span class="dt">Vector</span> <span class="dv">200</span> <span class="dt">BJAction</span></span>
+<span id="cb4-247"><a href="#cb4-247" aria-hidden="true"></a>          )</span>
+<span id="cb4-248"><a href="#cb4-248" aria-hidden="true"></a>       <span class="ot">-&gt;</span> <span class="dt">WriterT</span> [[<span class="dt">DbgT</span>]]</span>
+<span id="cb4-249"><a href="#cb4-249" aria-hidden="true"></a>            <span class="dt">IO</span> ( <span class="dt">Vector</span> <span class="dv">200</span> ((<span class="dt">Int</span>, <span class="dt">Integer</span>), (<span class="dt">Int</span>, <span class="dt">Integer</span>))</span>
+<span id="cb4-250"><a href="#cb4-250" aria-hidden="true"></a>               , <span class="dt">Vector</span> <span class="dv">200</span> <span class="dt">BJAction</span></span>
+<span id="cb4-251"><a href="#cb4-251" aria-hidden="true"></a>               )</span>
+<span id="cb4-252"><a href="#cb4-252" aria-hidden="true"></a>optPol (qs, pol) <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb4-253"><a href="#cb4-253" aria-hidden="true"></a>  randAct <span class="ot">&lt;-</span> lift <span class="op">$</span> rand allActs</span>
+<span id="cb4-254"><a href="#cb4-254" aria-hidden="true"></a>  cards <span class="ot">&lt;-</span> shuffleM <span class="op">$</span> <span class="fu">concat</span> [<span class="fu">replicate</span>  <span class="dv">4</span>  n <span class="op">|</span> n <span class="ot">&lt;-</span> [<span class="dv">1</span><span class="op">..</span><span class="dv">9</span>]]</span>
+<span id="cb4-255"><a href="#cb4-255" aria-hidden="true"></a>                           <span class="op">++</span> <span class="fu">replicate</span> <span class="dv">16</span> <span class="dv">10</span></span>
+<span id="cb4-256"><a href="#cb4-256" aria-hidden="true"></a>  <span class="kw">let</span> ((r, ss), dbgs) <span class="ot">=</span> runWriter <span class="op">$</span> play (appPolV pol) cards randAct</span>
+<span id="cb4-257"><a href="#cb4-257" aria-hidden="true"></a>      ixs             <span class="ot">=</span> (nubOn <span class="fu">fst</span> <span class="op">.</span> <span class="fu">map</span> (enumState <span class="op">&amp;&amp;&amp;</span> didHit) <span class="op">.</span> validStates) ss</span>
+<span id="cb4-258"><a href="#cb4-258" aria-hidden="true"></a>      (qs&#39;, pol&#39;)     <span class="ot">=</span> VS.unzip <span class="op">$</span> VS.zip qs pol <span class="op">//</span></span>
+<span id="cb4-259"><a href="#cb4-259" aria-hidden="true"></a>                          [ (i, (q&#39;, p&#39;))</span>
+<span id="cb4-260"><a href="#cb4-260" aria-hidden="true"></a>                          <span class="op">|</span> (i, hit) <span class="ot">&lt;-</span> ixs</span>
+<span id="cb4-261"><a href="#cb4-261" aria-hidden="true"></a>                          , <span class="kw">let</span> q  <span class="ot">=</span> qs  <span class="ot">`index`</span> i</span>
+<span id="cb4-262"><a href="#cb4-262" aria-hidden="true"></a>                                q&#39; <span class="ot">=</span> ( <span class="kw">if</span> hit</span>
+<span id="cb4-263"><a href="#cb4-263" aria-hidden="true"></a>                                         <span class="kw">then</span> second</span>
+<span id="cb4-264"><a href="#cb4-264" aria-hidden="true"></a>                                         <span class="kw">else</span> first</span>
+<span id="cb4-265"><a href="#cb4-265" aria-hidden="true"></a>                                     ) ((<span class="op">+</span> r) <span class="op">***</span> (<span class="op">+</span> <span class="dv">1</span>)) q</span>
+<span id="cb4-266"><a href="#cb4-266" aria-hidden="true"></a>                                p&#39; <span class="ot">=</span> <span class="kw">case</span> <span class="fu">uncurry</span> <span class="fu">compare</span></span>
+<span id="cb4-267"><a href="#cb4-267" aria-hidden="true"></a>                                          <span class="op">$</span> toBoth ( <span class="fu">uncurry</span> (<span class="op">/</span>)</span>
+<span id="cb4-268"><a href="#cb4-268" aria-hidden="true"></a>                                                   <span class="op">.</span> (<span class="fu">fromIntegral</span> <span class="op">***</span> <span class="fu">fromIntegral</span>)</span>
+<span id="cb4-269"><a href="#cb4-269" aria-hidden="true"></a>                                                   ) q&#39;</span>
+<span id="cb4-270"><a href="#cb4-270" aria-hidden="true"></a>                                     <span class="kw">of</span></span>
+<span id="cb4-271"><a href="#cb4-271" aria-hidden="true"></a>                                       <span class="dt">GT</span> <span class="ot">-&gt;</span> <span class="dt">BJAction</span> <span class="dt">False</span></span>
+<span id="cb4-272"><a href="#cb4-272" aria-hidden="true"></a>                                       _  <span class="ot">-&gt;</span> <span class="dt">BJAction</span> <span class="dt">True</span></span>
+<span id="cb4-273"><a href="#cb4-273" aria-hidden="true"></a>                          ]</span>
+<span id="cb4-274"><a href="#cb4-274" aria-hidden="true"></a>  tell [dbgs]</span>
+<span id="cb4-275"><a href="#cb4-275" aria-hidden="true"></a>  <span class="fu">return</span> (qs&#39;, pol&#39;)</span>
+<span id="cb4-276"><a href="#cb4-276" aria-hidden="true"></a></span>
+<span id="cb4-277"><a href="#cb4-277" aria-hidden="true"></a><span class="co">{----------------------------------------------------------------------</span></span>
+<span id="cb4-278"><a href="#cb4-278" aria-hidden="true"></a><span class="co">  Misc.</span></span>
+<span id="cb4-279"><a href="#cb4-279" aria-hidden="true"></a><span class="co">----------------------------------------------------------------------}</span></span>
+<span id="cb4-280"><a href="#cb4-280" aria-hidden="true"></a></span>
+<span id="cb4-281"><a href="#cb4-281" aria-hidden="true"></a><span class="ot">iterateM&#39; ::</span> <span class="dt">Monad</span> m <span class="ot">=&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> (a <span class="ot">-&gt;</span> m a) <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> m a</span>
+<span id="cb4-282"><a href="#cb4-282" aria-hidden="true"></a>iterateM&#39; <span class="dv">0</span> _ a <span class="ot">=</span> <span class="fu">return</span> a</span>
+<span id="cb4-283"><a href="#cb4-283" aria-hidden="true"></a>iterateM&#39; n f a <span class="ot">=</span> f a <span class="op">&gt;&gt;=</span> iterateM&#39; (n<span class="op">-</span><span class="dv">1</span>) f</span>
+<span id="cb4-284"><a href="#cb4-284" aria-hidden="true"></a></span>
+<span id="cb4-285"><a href="#cb4-285" aria-hidden="true"></a><span class="ot">toBoth ::</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> (a,a) <span class="ot">-&gt;</span> (b,b)</span>
+<span id="cb4-286"><a href="#cb4-286" aria-hidden="true"></a>toBoth f (x,y) <span class="ot">=</span> (f x, f y)</span>
+<span id="cb4-287"><a href="#cb4-287" aria-hidden="true"></a></span>
+<span id="cb4-288"><a href="#cb4-288" aria-hidden="true"></a><span class="ot">safeDiv ::</span> (<span class="dt">Fractional</span> a, <span class="dt">Eq</span> a)</span>
+<span id="cb4-289"><a href="#cb4-289" aria-hidden="true"></a>        <span class="ot">=&gt;</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> a</span>
+<span id="cb4-290"><a href="#cb4-290" aria-hidden="true"></a>safeDiv x y <span class="ot">=</span> <span class="kw">if</span> y <span class="op">==</span> <span class="dv">0</span></span>
+<span id="cb4-291"><a href="#cb4-291" aria-hidden="true"></a>                <span class="kw">then</span> <span class="dv">0</span></span>
+<span id="cb4-292"><a href="#cb4-292" aria-hidden="true"></a>                <span class="kw">else</span> x <span class="op">/</span> y</span>
+<span id="cb4-293"><a href="#cb4-293" aria-hidden="true"></a></span>
+<span id="cb4-294"><a href="#cb4-294" aria-hidden="true"></a><span class="kw">newtype</span> <span class="dt">PrettyFloat</span> <span class="ot">=</span> <span class="dt">PrettyFloat</span> <span class="dt">Float</span></span>
+<span id="cb4-295"><a href="#cb4-295" aria-hidden="true"></a></span>
+<span id="cb4-296"><a href="#cb4-296" aria-hidden="true"></a><span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">PrettyFloat</span> <span class="kw">where</span></span>
+<span id="cb4-297"><a href="#cb4-297" aria-hidden="true"></a>  <span class="fu">show</span> (<span class="dt">PrettyFloat</span> x) <span class="ot">=</span> printf <span class="st">&quot;%+5.2f&quot;</span> x</span>
+<span id="cb4-298"><a href="#cb4-298" aria-hidden="true"></a></span>
+<span id="cb4-299"><a href="#cb4-299" aria-hidden="true"></a><span class="ot">nubOn ::</span> <span class="dt">Eq</span> b <span class="ot">=&gt;</span> (a <span class="ot">-&gt;</span> b) <span class="ot">-&gt;</span> [a] <span class="ot">-&gt;</span> [a]</span>
+<span id="cb4-300"><a href="#cb4-300" aria-hidden="true"></a>nubOn _ []     <span class="ot">=</span> []</span>
+<span id="cb4-301"><a href="#cb4-301" aria-hidden="true"></a>nubOn f (x<span class="op">:</span>xs) <span class="ot">=</span> x <span class="op">:</span> <span class="fu">filter</span> ((<span class="op">/=</span> f x) <span class="op">.</span> f) xs</span></code></pre></div>
 <h2 id="output">output</h2>
-<pre class="include"><code>other/blackjack.md</code></pre>
+<h3>Final State Action Values (stand, hit)</h3>
+<p>With usable ace: $$ \begin{array}{c|c|c|c|c|c|c|c|c|c} \text{Player's Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 12 &amp; (-0.53,-0.10) &amp; (-0.27,+0.19) &amp; (-0.10,+0.13) &amp; (-0.21,+0.09) &amp; (-0.14,+0.13) &amp; (-0.08,+0.17) &amp; (-0.48,+0.13) &amp; (-0.45,+0.02) &amp; (-0.51,+0.00) &amp; (-0.55,-0.07) \\ \hline 13 &amp; (-0.67,-0.09) &amp; (-0.21,-0.01) &amp; (-0.22,+0.06) &amp; (-0.20,+0.08) &amp; (-0.15,+0.17) &amp; (-0.13,+0.16) &amp; (-0.47,+0.14) &amp; (-0.50,+0.06) &amp; (-0.50,-0.02) &amp; (-0.54,-0.09) \\ \hline 14 &amp; (-0.62,-0.10) &amp; (-0.22,+0.07) &amp; (-0.23,+0.05) &amp; (-0.17,+0.01) &amp; (-0.14,+0.22) &amp; (-0.07,+0.15) &amp; (-0.44,+0.03) &amp; (-0.51,+0.05) &amp; (-0.54,-0.03) &amp; (-0.55,-0.13) \\ \hline 15 &amp; (-0.66,-0.21) &amp; (-0.30,-0.04) &amp; (-0.23,+0.00) &amp; (-0.20,+0.07) &amp; (-0.13,+0.14) &amp; (-0.06,+0.10) &amp; (-0.46,+0.11) &amp; (-0.54,-0.04) &amp; (-0.52,-0.10) &amp; (-0.55,-0.17) \\ \hline 16 &amp; (-0.72,-0.23) &amp; (-0.25,-0.05) &amp; (-0.24,-0.00) &amp; (-0.16,+0.09) &amp; (-0.16,+0.10) &amp; (-0.10,+0.10) &amp; (-0.44,-0.01) &amp; (-0.49,-0.11) &amp; (-0.55,-0.12) &amp; (-0.54,-0.22) \\ \hline 17 &amp; (-0.50,-0.17) &amp; (-0.12,-0.03) &amp; (-0.08,+0.02) &amp; (-0.02,+0.09) &amp; (+0.06,+0.11) &amp; (+0.02,+0.16) &amp; (-0.09,+0.02) &amp; (-0.40,-0.12) &amp; (-0.41,-0.13) &amp; (-0.39,-0.19) \\ \hline 18 &amp; (-0.10,-0.15) &amp; (+0.12,+0.09) &amp; (+0.17,+0.05) &amp; (+0.20,+0.17) &amp; (+0.20,+0.13) &amp; (+0.27,+0.16) &amp; (+0.38,+0.20) &amp; (+0.14,+0.03) &amp; (-0.21,-0.09) &amp; (-0.21,-0.14) \\ \hline 19 &amp; (+0.27,-0.09) &amp; (+0.37,+0.14) &amp; (+0.42,+0.16) &amp; (+0.41,+0.25) &amp; (+0.46,+0.25) &amp; (+0.48,+0.28) &amp; (+0.59,+0.25) &amp; (+0.63,+0.22) &amp; (+0.31,-0.01) &amp; (+0.06,-0.10) \\ \hline 20 &amp; (+0.66,+0.07) &amp; (+0.65,+0.20) &amp; (+0.62,+0.24) &amp; (+0.70,+0.24) &amp; (+0.67,+0.29) &amp; (+0.69,+0.28) &amp; (+0.77,+0.22) &amp; (+0.79,+0.15) &amp; (+0.77,+0.10) &amp; (+0.55,+0.01) \\ \hline 21 &amp; (+0.93,+0.12) &amp; (+0.87,+0.23) &amp; (+0.86,+0.43) &amp; (+0.88,+0.42) &amp; (+0.90,+0.35) &amp; (+0.91,+0.40) &amp; (+0.92,+0.25) &amp; (+0.93,+0.15) &amp; (+0.93,+0.17) &amp; (+0.96,+0.17) \\ \hline \text{Dealer's Card:} &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 \end{array} $$</p>
+<p>No usable ace: $$ \begin{array}{c|c|c|c|c|c|c|c|c|c} \text{Player's Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 12 &amp; (-0.64,-0.36) &amp; (-0.30,-0.25) &amp; (-0.24,-0.21) &amp; (-0.19,-0.20) &amp; (-0.13,-0.17) &amp; (-0.13,-0.15) &amp; (-0.47,-0.23) &amp; (-0.52,-0.30) &amp; (-0.52,-0.37) &amp; (-0.53,-0.37) \\ \hline 13 &amp; (-0.65,-0.41) &amp; (-0.30,-0.31) &amp; (-0.24,-0.27) &amp; (-0.19,-0.28) &amp; (-0.15,-0.25) &amp; (-0.15,-0.24) &amp; (-0.48,-0.29) &amp; (-0.52,-0.35) &amp; (-0.54,-0.39) &amp; (-0.54,-0.41) \\ \hline 14 &amp; (-0.66,-0.46) &amp; (-0.27,-0.37) &amp; (-0.24,-0.36) &amp; (-0.18,-0.32) &amp; (-0.15,-0.32) &amp; (-0.15,-0.32) &amp; (-0.48,-0.36) &amp; (-0.52,-0.37) &amp; (-0.53,-0.44) &amp; (-0.54,-0.47) \\ \hline 15 &amp; (-0.67,-0.51) &amp; (-0.28,-0.42) &amp; (-0.26,-0.43) &amp; (-0.17,-0.41) &amp; (-0.13,-0.41) &amp; (-0.13,-0.38) &amp; (-0.47,-0.36) &amp; (-0.51,-0.42) &amp; (-0.54,-0.46) &amp; (-0.54,-0.50) \\ \hline 16 &amp; (-0.66,-0.52) &amp; (-0.29,-0.48) &amp; (-0.24,-0.48) &amp; (-0.17,-0.47) &amp; (-0.13,-0.45) &amp; (-0.15,-0.41) &amp; (-0.49,-0.40) &amp; (-0.53,-0.44) &amp; (-0.54,-0.50) &amp; (-0.54,-0.53) \\ \hline 17 &amp; (-0.47,-0.57) &amp; (-0.15,-0.55) &amp; (-0.12,-0.55) &amp; (-0.06,-0.53) &amp; (-0.02,-0.50) &amp; (+0.00,-0.49) &amp; (-0.12,-0.47) &amp; (-0.40,-0.48) &amp; (-0.40,-0.52) &amp; (-0.41,-0.56) \\ \hline 18 &amp; (-0.08,-0.65) &amp; (+0.12,-0.63) &amp; (+0.14,-0.62) &amp; (+0.18,-0.59) &amp; (+0.20,-0.59) &amp; (+0.29,-0.60) &amp; (+0.42,-0.58) &amp; (+0.11,-0.57) &amp; (-0.21,-0.60) &amp; (-0.16,-0.64) \\ \hline 19 &amp; (+0.28,-0.76) &amp; (+0.38,-0.76) &amp; (+0.40,-0.72) &amp; (+0.42,-0.70) &amp; (+0.48,-0.69) &amp; (+0.50,-0.71) &amp; (+0.62,-0.70) &amp; (+0.60,-0.71) &amp; (+0.27,-0.70) &amp; (+0.08,-0.71) \\ \hline 20 &amp; (+0.66,-0.88) &amp; (+0.64,-0.85) &amp; (+0.64,-0.86) &amp; (+0.65,-0.84) &amp; (+0.67,-0.84) &amp; (+0.70,-0.85) &amp; (+0.76,-0.85) &amp; (+0.79,-0.84) &amp; (+0.75,-0.84) &amp; (+0.57,-0.84) \\ \hline 21 &amp; (+0.93,-1.00) &amp; (+0.88,-1.00) &amp; (+0.89,-1.00) &amp; (+0.88,-1.00) &amp; (+0.89,-1.00) &amp; (+0.90,-1.00) &amp; (+0.93,-1.00) &amp; (+0.93,-1.00) &amp; (+0.94,-1.00) &amp; (+0.96,-1.00) \\ \hline \text{Dealer's Card:} &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 \end{array} $$</p>
+<h3>Final Policy (H = hit)</h3>
+<p>With usable ace: $$ \begin{array}{c|c|c|c|c|c|c|c|c|c} \text{Player's Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 12 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\ \hline 13 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\ \hline 14 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\ \hline 15 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\ \hline 16 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\ \hline 17 &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H &amp; H \\ \hline 18 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; H &amp; H \\ \hline 19 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 20 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 21 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline \text{Dealer's Card:} &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 \end{array} $$</p>
+<p>No usable ace: $$ \begin{array}{c|c|c|c|c|c|c|c|c|c} \text{Player's Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 12 &amp; H &amp; H &amp; H &amp; &amp; &amp; &amp; H &amp; H &amp; H &amp; H \\ \hline 13 &amp; H &amp; &amp; &amp; &amp; &amp; &amp; H &amp; H &amp; H &amp; H \\ \hline 14 &amp; H &amp; &amp; &amp; &amp; &amp; &amp; H &amp; H &amp; H &amp; H \\ \hline 15 &amp; H &amp; &amp; &amp; &amp; &amp; &amp; H &amp; H &amp; H &amp; H \\ \hline 16 &amp; H &amp; &amp; &amp; &amp; &amp; &amp; H &amp; H &amp; H &amp; H \\ \hline 17 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 18 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 19 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 20 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 21 &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline \text{Dealer's Card:} &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 \end{array} $$</p>
+<h3>Debugging Info</h3>
+<h3>State Action Visits (stand, hit)</h3>
+<p>With usable ace: $$ \begin{array}{c|c|c|c|c|c|c|c|c|c} \text{Player's Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 12 &amp; (131,124) &amp; (376,374) &amp; (355,336) &amp; (358,341) &amp; (367,374) &amp; (360,383) &amp; (387,373) &amp; (363,357) &amp; (336,322) &amp; (1401,1337) \\ \hline 13 &amp; (481,476) &amp; (749,745) &amp; (937,976) &amp; (930,980) &amp; (966,971) &amp; (936,1013) &amp; (972,964) &amp; (973,960) &amp; (885,919) &amp; (3664,3725) \\ \hline 14 &amp; (499,509) &amp; (953,1037) &amp; (724,790) &amp; (975,1025) &amp; (931,1079) &amp; (938,1045) &amp; (965,1035) &amp; (994,1005) &amp; (960,1057) &amp; (3593,3950) \\ \hline 15 &amp; (512,574) &amp; (1002,1084) &amp; (1048,1121) &amp; (775,831) &amp; (1024,1115) &amp; (1045,1129) &amp; (1015,1162) &amp; (968,1142) &amp; (1036,1140) &amp; (3681,4257) \\ \hline 16 &amp; (497,600) &amp; (1028,1279) &amp; (1064,1203) &amp; (1037,1293) &amp; (819,1073) &amp; (1028,1288) &amp; (1002,1308) &amp; (1112,1315) &amp; (1053,1274) &amp; (4015,4955) \\ \hline 17 &amp; (518,748) &amp; (1147,1242) &amp; (1122,1326) &amp; (1091,1302) &amp; (1156,1303) &amp; (840,1138) &amp; (1165,1358) &amp; (1031,1436) &amp; (1011,1343) &amp; (4060,5296) \\ \hline 18 &amp; (781,572) &amp; (1201,1430) &amp; (1388,1242) &amp; (1532,1083) &amp; (1635,1116) &amp; (1599,1164) &amp; (1332,849) &amp; (1606,1078) &amp; (1136,1628) &amp; (4397,5799) \\ \hline 19 &amp; (813,606) &amp; (1697,1138) &amp; (1593,1117) &amp; (1609,1138) &amp; (1654,1209) &amp; (1639,1106) &amp; (1699,1163) &amp; (1459,918) &amp; (1808,1172) &amp; (6619,4412) \\ \hline 20 &amp; (959,695) &amp; (1793,1164) &amp; (1864,1263) &amp; (1846,1248) &amp; (1764,1157) &amp; (1874,1257) &amp; (1866,1230) &amp; (1872,1278) &amp; (1700,1018) &amp; (7354,4738) \\ \hline 21 &amp; (508,164) &amp; (1009,269) &amp; (963,287) &amp; (898,277) &amp; (1007,291) &amp; (912,296) &amp; (992,280) &amp; (972,312) &amp; (1053,292) &amp; (4160,1107) \\ \hline \text{Dealer's Card:} &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 \end{array} $$</p>
+<p>No usable ace: $$ \begin{array}{c|c|c|c|c|c|c|c|c|c} \text{Player's Total} &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; &amp; \\ \hline 12 &amp; (5783,6210) &amp; (7209,8341) &amp; (8024,8865) &amp; (8828,8315) &amp; (8838,8126) &amp; (9254,8347) &amp; (8394,9082) &amp; (8207,9258) &amp; (8302,9251) &amp; (30927,33666) \\ \hline 13 &amp; (5500,6536) &amp; (8603,8912) &amp; (8813,7052) &amp; (9469,7742) &amp; (9340,7707) &amp; (9334,7804) &amp; (7728,9633) &amp; (7891,9696) &amp; (7997,9642) &amp; (29134,35945) \\ \hline 14 &amp; (5282,6527) &amp; (9473,7567) &amp; (9371,7467) &amp; (8593,6503) &amp; (9395,7169) &amp; (9514,7476) &amp; (7442,9817) &amp; (7203,9624) &amp; (7398,9689) &amp; (27542,35952) \\ \hline 15 &amp; (5105,6811) &amp; (9694,7352) &amp; (9949,7289) &amp; (9999,7249) &amp; (8990,6433) &amp; (9752,7051) &amp; (7068,10178) &amp; (7037,10197) &amp; (7215,10099) &amp; (26308,38289) \\ \hline 16 &amp; (4851,6956) &amp; (9779,6715) &amp; (9895,6619) &amp; (9471,6845) &amp; (9479,6476) &amp; (9029,5835) &amp; (6469,10162) &amp; (6748,10373) &amp; (6698,10230) &amp; (24507,38306) \\ \hline 17 &amp; (7329,4587) &amp; (9992,6343) &amp; (9990,6430) &amp; (9882,6391) &amp; (9820,6463) &amp; (10105,6370) &amp; (10145,5460) &amp; (10756,6233) &amp; (10633,6166) &amp; (40029,23284) \\ \hline 18 &amp; (7264,4070) &amp; (9869,5791) &amp; (9566,5741) &amp; (9607,5867) &amp; (9470,5714) &amp; (9766,5673) &amp; (10450,5915) &amp; (9786,4917) &amp; (10755,5631) &amp; (38985,20965) \\ \hline 19 &amp; (7272,3870) &amp; (9900,5433) &amp; (9618,5275) &amp; (9720,5450) &amp; (9643,5606) &amp; (9671,5377) &amp; (10317,5423) &amp; (10710,5430) &amp; (9966,4639) &amp; (39349,19468) \\ \hline 20 &amp; (10092,6258) &amp; (13391,8678) &amp; (13345,8720) &amp; (13462,8628) &amp; (13326,8843) &amp; (13197,8705) &amp; (14055,8626) &amp; (13999,8798) &amp; (14239,8729) &amp; (49543,28839) \\ \hline 21 &amp; (4990,1148) &amp; (6499,1424) &amp; (6413,1383) &amp; (6407,1380) &amp; (6366,1397) &amp; (6320,1384) &amp; (7278,1423) &amp; (7269,1459) &amp; (7204,1433) &amp; (27645,5199) \\ \hline \text{Dealer's Card:} &amp; 1 &amp; 2 &amp; 3 &amp; 4 &amp; 5 &amp; 6 &amp; 7 &amp; 8 &amp; 9 &amp; 10 \end{array} $$</p>
 <hr />
 <div class="footer">
 <p>Powered by <a href="https://haskell-lang.org/">haskell</a>, <a href="https://docs.haskellstack.org/en/stable/README/">stack</a> and <a href="http://pandoc.org/">pandoc</a>.</p>

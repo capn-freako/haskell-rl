@@ -1,6 +1,8 @@
-```include
-other/header.md
-```
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 
 haskell-rl : Tic-Tac-Toe
 ===
@@ -73,6 +75,7 @@ import qualified Data.Vector.Unboxed as V
 import Control.Arrow              ((&&&))
 import Control.Monad.Extra        (unfoldM)
 import Data.Finite
+import Data.String.Utils          (rstrip)
 import Data.Text                  (pack)
 import System.Random              (randomIO)
 import System.Random.Shuffle      (shuffleM)
@@ -575,18 +578,20 @@ for = flip map
 
 showGame :: ([BoardState], WinProbs) -> String
 showGame (bss, wps) = unlines $
+  "$$" :
   "\\begin{array}{}" :
   ( intersperse "&" (map showBoard bss)
-    ++ [" \\\\ "]
+    ++ [" \\\\\\\\ "]
     ++ intersperse "&" (map (showProb wps) bss)
     ++ ["\\end{array}"]
-  )
+  ) ++
+  ["$$"]
 
 showBoard :: BoardState -> String
-showBoard bs = unlines
+showBoard bs = rstrip $ unlines
   ( "\\begin{array}{c|c|c}" :
     intersperse "\\hline"
-      ( map ((++ " \\\\") . intercalate " & " . map show . VS.toList)
+      ( map ((++ " \\\\\\\\") . intercalate " & " . map show . VS.toList)
             (VS.toList (cells bs))
       )
     ++ ["\\end{array}"]

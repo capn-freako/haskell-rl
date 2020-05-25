@@ -1,6 +1,8 @@
-```include
-other/header.md
-```
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 
 haskell-rl : Inventory Optimization for Single Store, Single Item Case
 ===
@@ -206,10 +208,10 @@ showFofState = showFofState' 0
 showFofState' :: (Show a, Ord a) => Int -> (MyState -> a) -> String
 showFofState' k g = unlines
   ( "\\begin{array}{" : intersperse '|' (replicate (fromIntegral (gMaxOrder + 1)) 'c') : "}" :
-    ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (fromIntegral (gMaxOrder + 1)) ' ') ++ " \\\\") :
+    ( ("\\text{On Hand} &" ++ intersperse '&' (replicate (fromIntegral (gMaxOrder + 1)) ' ') ++ " \\\\\\\\") :
       ["\\hline"] ++
       intersperse "\\hline"
-        ( map ((++ " \\\\") . intercalate " & ")
+        ( map ((++ " \\\\\\\\") . intercalate " & ")
               [ (show onHnd :) $ map show
                 [ g (MyState (finite onHnd) (finite onOrdr) (finite $ fromIntegral (k `mod` (fromIntegral gLeadTime))))
                 | onOrdr <- [0..gMaxOrder]
@@ -397,7 +399,7 @@ main = do
                    [ pdf ]
             )
   appendFile "other/inventory.md" "![](img/pdf.png)\n"
-  appendFile "other/inventory.md" $ pack $ printf "\n$\\int pdf = %5.2f$\n" (0.1 * sum (map snd pdf))
+  appendFile "other/inventory.md" $ pack $ printf "\n\\\\(\\int pdf = %5.2f\\\\)\n" (0.1 * sum (map snd pdf))
 
   -- - demand PMF
   let pmf = [ (x, gamma' (finite $ round demandMean) (finite x))
@@ -412,7 +414,7 @@ main = do
        layout_x_axis . laxis_generate .= autoIndexAxis (map fst values)
        plot $ plotBars <$> bars titles (addIndexes (map snd values))
   appendFile "other/inventory.md" "\n![](img/demand.png)\n"
-  appendFile "other/inventory.md" $ pack $ printf "\n$\\sum pmf = %5.2f$\n" (sum $ map snd pmf)
+  appendFile "other/inventory.md" $ pack $ printf "\n\\\\(\\sum pmf = %5.2f\\\\)\n" (sum $ map snd pmf)
 
   -- - next state PMF
   let nxtStPMFs :: [[(MyState, Double)]]

@@ -163,7 +163,8 @@ executable tic-tac-toe
     random-shuffle,
     random,
     Chart,
-    Chart-cairo
+    Chart-cairo,
+    MissingH
   default-extensions:
     NoImplicitPrelude,
     UnicodeSyntax,

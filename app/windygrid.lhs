@@ -1,6 +1,8 @@
-```include
-other/header.html
-```
+<meta charset="utf-8">
+<link rel="stylesheet" href="other/lhs.css">
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 
 haskell-rl : Stochastically Windy Gridworld
 ===
@@ -227,7 +229,7 @@ showFofState g = unlines
   ( ("\\begin{array}{|" ++ (intersperse '|' (replicate gNumCols 'c')) ++ "|}") :
     ( "\\hline" :
       intersperse "\\hline"
-        ( map ((++ " \\\\") . intercalate " & ")
+        ( map ((++ " \\\\\\\\") . intercalate " & ")
               [ map g'
                 [ ( (finite . fromIntegral) r'
                   , (finite . fromIntegral) c
