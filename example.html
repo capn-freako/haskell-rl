@@ -41,10 +41,10 @@
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>    <span class="kw">let</span> answer <span class="ot">=</span> <span class="fu">product</span> [<span class="dv">1</span><span class="op">..</span>n]</span>
 <span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>    <span class="fu">putStrLn</span> (<span class="fu">show</span> answer <span class="op">&lt;&gt;</span> <span class="st">&quot; 👍&quot;</span><span class="ot"> ::</span> <span class="dt">Text</span>)</span>
 <span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>    <span class="fu">writeFile</span> <span class="st">&quot;other/answer.md&quot;</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        (<span class="st">&quot;$\\prod_{i=1}^{&quot;</span> <span class="op">&lt;&gt;</span> <span class="fu">show</span> n <span class="op">&lt;&gt;</span> <span class="st">&quot;} i = &quot;</span> <span class="op">&lt;&gt;</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>         <span class="fu">show</span> answer <span class="op">&lt;&gt;</span> <span class="st">&quot;$&quot;</span>)</span></code></pre></div>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        (<span class="st">&quot;\\\\( \\\\prod_{i=1}^{&quot;</span> <span class="op">&lt;&gt;</span> <span class="fu">show</span> n <span class="op">&lt;&gt;</span> <span class="st">&quot;} i = &quot;</span> <span class="op">&lt;&gt;</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>         <span class="fu">show</span> answer <span class="op">&lt;&gt;</span> <span class="st">&quot;\\\\)&quot;</span>)</span></code></pre></div>
 <h2 id="output">output</h2>
-<p>$\prod_{i=1}^{10} i = 3628800$</p>
+<p>\( \prod_{i=1}^{10} i = 3628800\)</p>
 <h2 id="tests">tests</h2>
 <ul class="incremental">
 <li><a href="https://www.stackage.org/package/doctest">doctest</a></li>

@@ -60,8 +60,8 @@ main = do
     let answer = product [1..n]
     putStrLn (show answer <> " 👍" :: Text)
     writeFile "other/answer.md"
-        ("\\(\\prod_{i=1}^{" <> show n <> "} i = " <>
-         show answer <> "\\)")
+        ("\\\\( \\\\prod_{i=1}^{" <> show n <> "} i = " <>
+         show answer <> "\\\\)")
 \end{code}
 
 output
